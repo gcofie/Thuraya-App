@@ -4,137 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>THURAYA - Salon Operations OS</title>
-    <style>
-        :root {
-            --primary: #2c3e50;
-            --accent: #b59e4b;
-            --bg: #f9f7f4;
-            --card-bg: #ffffff;
-            --border: #e0e0e0;
-            --text: #333333;
-            --error: #e74c3c;
-            --success: #27ae60;
-            --admin: #8e44ad;
-            --manager: #2980b9;
-            --supply: #d35400;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; }
-        body { background-color: var(--bg); color: var(--text); line-height: 1.6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        
-        .header { text-align: center; padding: 40px 20px 20px; width: 100%; }
-        .header h1 { font-size: 2.5rem; color: var(--primary); letter-spacing: 4px; margin-bottom: 5px; text-transform: uppercase;}
-        .header p { font-size: 0.9rem; color: #666; font-style: italic; letter-spacing: 1px; text-transform: uppercase;}
-
-        .container { width: 100%; max-width: 1000px; padding: 20px; }
-
-        /* Login Card Styles */
-        #loginScreen { max-width: 400px; margin: 40px auto; text-align: center; }
-        .card { background-color: var(--card-bg); border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .login-card { border-top: 4px solid var(--accent); padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        .btn-google { background-color: white; color: #444; border: 1px solid var(--border); padding: 15px; font-size: 1.1rem; border-radius: 4px; cursor: pointer; width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; font-weight: bold; transition: background 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .btn-google:hover { background-color: #f1f1f1; }
-        .btn-logout { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; transition: 0.3s; }
-        .btn-logout:hover { background-color: var(--primary); color: white; }
-        
-        .error-msg { color: var(--error); font-size: 0.9rem; margin-top: 15px; font-weight: bold; display: none; }
-
-        /* Dashboard Styles */
-        #appDashboard { display: none; width: 100%; }
-        .dashboard-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; margin-bottom: 10px; flex-wrap: wrap; gap: 15px;}
-        .user-badge { background: #eef5f9; padding: 10px 15px; border-radius: 4px; border: 1px solid #b8cddb; color: var(--primary); font-weight: bold; }
-        .role-tag { background: var(--primary); color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 10px; text-transform: uppercase; }
-
-        /* Dynamic Navigation Tabs */
-        #topNavMenu { display: none; justify-content: flex-start; gap: 10px; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid var(--border); flex-wrap: wrap; }
-        .nav-tab { display: none; } 
-        .nav-tab label { background: #f1f1f1; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #555; transition: 0.3s; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.9rem;}
-        .nav-tab input[type="radio"] { display: none; }
-        .nav-tab input[type="radio"]:checked + label { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        
-        /* Role-Specific Views */
-        .app-module { display: none; width: 100%; }
-        .module-box { background: var(--card-bg); padding: 25px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .module-box h3 { color: var(--primary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid var(--accent); padding-bottom: 10px;}
-
-        /* Form Elements */
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;}
-        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
-        @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
-        
-        .form-group { margin-bottom: 15px; text-align: left; position: relative; }
-        label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 0.9rem; color: var(--primary);}
-        .required-star { color: #e74c3c; font-weight: bold; }
-        input[type="text"], input[type="email"], input[type="number"], input[type="tel"], input[type="date"], input[type="time"], input[type="password"], select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 1rem; transition: border-color 0.3s; }
-        input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; }
-        
-        .search-box { display: flex; gap: 10px; margin-top: 10px; align-items: stretch; width: 100%; position: relative; z-index: 999; }
-        .search-box input { flex: 1; }
-        .btn { background-color: var(--primary); color: white; border: none; padding: 12px 25px; font-size: 1rem; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; transition: background 0.3s; width: 100%;}
-        .btn:hover { background-color: #1a252f; }
-        .btn-secondary { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); }
-        .btn-secondary:hover { background-color: var(--primary); color: white; }
-        
-        .dropdown-results { display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 8px 16px rgba(0,0,0,0.15); z-index: 1000; max-height: 250px; overflow-y: auto; }
-        .search-result-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.2s; display: block; width: 100%; text-align: left; border-left: none; border-right: none; border-top: none; background: white; font-size: 1rem;}
-        .search-result-item:hover { background-color: #f1f1f1; outline: none; }
-
-        .dept-tabs { display: flex; justify-content: center; gap: 20px; padding: 15px; background: #f9f7f4; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px;}
-        .dept-tabs label { font-size: 1.1rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--primary); margin:0;}
-        .dept-tabs input[type="radio"] { width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer;}
-
-        .menu-col { display: flex; flex-direction: column; gap: 20px; }
-        .menu-section-title { color: var(--accent); font-size: 1.1rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid var(--accent); padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end;}
-        
-        .service-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 15px; margin-bottom: 10px; transition: 0.2s; cursor: pointer; display: flex; align-items: flex-start; gap: 15px;}
-        .service-card:hover { border-color: var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .service-card.selected { border: 2px solid var(--accent); background-color: #fffdfa; }
-        .service-card input[type="radio"], .service-card input[type="checkbox"] { width: 18px; height: 18px; margin-top: 4px; accent-color: var(--accent); cursor: pointer; pointer-events: none;}
-        .service-card label { cursor: pointer; display: flex; flex-direction: column; pointer-events: none; margin: 0; flex-grow: 1;}
-        .service-card label strong { color: #222; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;}
-        
-        .counter-box { display: flex; align-items: center; gap: 10px; justify-content: flex-end; width: 100px; flex-shrink: 0;}
-        .counter-box input { width: 60px; text-align: center; padding: 5px; font-weight: bold; border: 1px solid var(--border); border-radius: 4px;}
-
-        #sched_breakdown { margin-top: 15px; padding: 20px; background: #fff; border: 2px dashed var(--accent); border-radius: 8px; display: none; }
-        .breakdown-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; color: #444; border-bottom: 1px solid #f1f1f1; padding-bottom: 5px;}
-
-        .time-slot-btn { background: #fff; border: 1px solid var(--border); padding: 10px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: bold; color: var(--primary); transition: 0.2s; flex-grow: 1; text-align: center; }
-        .time-slot-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .time-slot-btn.selected { background: var(--accent); color: white; border-color: var(--accent); }
-
-        .breakdown-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .breakdown-table th, .breakdown-table td { border: 1px solid var(--border); padding: 10px; text-align: left; vertical-align: middle;}
-        .breakdown-table th { background-color: #f1f1f1; font-size: 0.9rem; }
-
-        .ticket { border: 2px solid var(--accent); border-radius: 8px; padding: 15px; margin-bottom: 15px; background: #fffaf0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .ticket-badge { background: #f39c12; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; display: inline-block; }
-
-        .roster-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
-        .status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-        .status-available { background-color: var(--success); }
-        .status-busy { background-color: var(--error); }
-
-        .metric-card { background: #fafafa; border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; flex: 1; }
-        .metric-value { font-size: 2rem; font-weight: bold; color: var(--primary); margin-top: 5px; }
-
-        .category-tabs { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; padding: 15px; background: #f1f1f1; border-radius: 8px; border: 1px solid var(--border); flex-wrap: wrap;}
-        .category-tabs label { font-size: 1.1rem; font-weight: bold; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--primary); }
-        .category-tabs input[type="radio"] { width: 22px; height: 22px; accent-color: var(--accent); }
-
-        /* Consultation Modal Styles */
-        .consult-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 100000; display: none; overflow-y: auto; padding: 20px; }
-        .consult-modal { background: white; max-width: 800px; margin: 20px auto; padding: 30px; border-radius: 8px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        .consult-close { position: absolute; right: 20px; top: 20px; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; transition: 0.2s; }
-        .consult-close:hover { color: var(--error); }
-        .consult-section-title { border-bottom: 2px solid var(--accent); color: var(--primary); padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; text-transform: uppercase; font-size: 1rem; font-weight: bold; letter-spacing: 1px;}
-        .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px; }
-        .checkbox-grid label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #444; }
-        .checkbox-grid input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
-        .radio-group { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;}
-        .radio-group label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #444; }
-        .radio-group input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -143,116 +13,89 @@
         <p>CLIENT TELLING & OPERATIONS</p>
     </div>
 
+    <!-- 1. SECURE LOGIN GATEWAY -->
     <div id="loginScreen" class="container">
         <div class="card login-card">
             <h2 style="color: var(--primary); margin-bottom: 10px; text-transform: uppercase; border-bottom: none;">Staff Portal</h2>
             <p style="color: #666; font-size: 0.9rem; margin-bottom: 25px;">Secure operational access requires authorized Thuraya credentials.</p>
             
-            <button class="btn-google" id="btnGoogleLogin">Sign in with Google</button>
+            <button class="btn-google" onclick="signInWithGoogle()">
+                <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                Sign in with Google
+            </button>
 
             <div style="margin: 30px 0 15px 0; color: #999; font-size: 0.8rem; font-weight: bold; letter-spacing: 1px;">OR USE TEST CREDENTIALS</div>
             <div style="text-align: left;">
                 <input type="email" id="testEmail" placeholder="Email Address" style="margin-bottom: 10px;">
                 <input type="password" id="testPassword" placeholder="Password" style="margin-bottom: 15px;">
-                <button class="btn btn-secondary" id="btnEmailLogin">Log In with Email</button>
+                <button class="btn btn-secondary" onclick="signInWithEmail()">Log In with Email</button>
             </div>
             <p id="errorMsg" class="error-msg"></p>
         </div>
     </div>
 
+    <!-- 2. MAIN SECURE DASHBOARD -->
     <div id="appDashboard" class="container">
         
         <div class="dashboard-header">
-            <div class="user-badge">
-                <span id="userNameDisplay">Loading...</span> 
-                <span id="userRoleDisplay" class="role-tag">ROLE</span>
-            </div>
-            <button class="btn-logout" id="btnLogout">Sign Out / Clock Out</button>
+            <div class="user-badge"><span id="userNameDisplay">Loading...</span><span id="userRoleDisplay" class="role-tag">ROLE</span></div>
+            <button class="btn-logout" onclick="logOut()">Sign Out / Clock Out</button>
         </div>
 
         <div id="topNavMenu">
-            <div class="nav-tab" id="tabClients">
-                <input type="radio" name="main_nav" id="nav_clients" value="clientsView" >
-                <label for="nav_clients">🏠 Clients & Booking</label>
-            </div>
-            <div class="nav-tab" id="tabAtelier">
-                <input type="radio" name="main_nav" id="nav_atelier" value="atelierView" >
-                <label for="nav_atelier">💅 The Atelier</label>
-            </div>
-            <div class="nav-tab" id="tabMenu">
-                <input type="radio" name="main_nav" id="nav_menu" value="menuView" >
-                <label for="nav_menu">📋 Service Menu</label>
-            </div>
-            <div class="nav-tab" id="tabHR">
-                <input type="radio" name="main_nav" id="nav_hr" value="hrView" >
-                <label for="nav_hr">👥 HR & Finance</label>
-            </div>
-            <div class="nav-tab" id="tabSupply">
-                <input type="radio" name="main_nav" id="nav_supply" value="supplyView" >
-                <label for="nav_supply">📦 Supply Chain</label>
-            </div>
-            <div class="nav-tab" id="tabAdmin">
-                <input type="radio" name="main_nav" id="nav_admin" value="adminView" >
-                <label for="nav_admin">⚙️ System Admin</label>
-            </div>
+            <div class="nav-tab" id="tabClients"><input type="radio" name="main_nav" id="nav_clients" value="clientsView" onchange="switchModule(this.value)"><label for="nav_clients">🏠 Clients & Booking</label></div>
+            <div class="nav-tab" id="tabAtelier"><input type="radio" name="main_nav" id="nav_atelier" value="atelierView" onchange="switchModule(this.value)"><label for="nav_atelier">💅 The Atelier</label></div>
+            <div class="nav-tab" id="tabMenu"><input type="radio" name="main_nav" id="nav_menu" value="menuView" onchange="switchModule(this.value)"><label for="nav_menu">📋 Service Menu</label></div>
+            <div class="nav-tab" id="tabHR"><input type="radio" name="main_nav" id="nav_hr" value="hrView" onchange="switchModule(this.value)"><label for="nav_hr">👥 HR & Finance</label></div>
+            <div class="nav-tab" id="tabSupply"><input type="radio" name="main_nav" id="nav_supply" value="supplyView" onchange="switchModule(this.value)"><label for="nav_supply">📦 Supply Chain</label></div>
+            <div class="nav-tab" id="tabAdmin"><input type="radio" name="main_nav" id="nav_admin" value="adminView" onchange="switchModule(this.value)"><label for="nav_admin">⚙️ System Admin</label></div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: CLIENTS & BOOKING (FOH/Scheduling)   -->
+        <!-- ========================================== -->
         <div id="clientsView" class="app-module">
-            
-            <div class="category-tabs" style="margin-bottom: 20px;">
-                <label><input type="radio" name="clients_view_toggle" value="checkin" checked > Walk-in & Check-In</label>
-                <label><input type="radio" name="clients_view_toggle" value="schedule" id="tab_toggle_schedule" > Book Appointment</label>
-                <label><input type="radio" name="clients_view_toggle" value="billing" > Billing & Checkout</label>
-                <label><input type="radio" name="clients_view_toggle" value="ops" > End of Day Ops</label>
+            <div class="category-tabs">
+                <label><input type="radio" name="clients_view_toggle" value="checkin" checked onchange="toggleClientsSubView()"> Walk-in & Check-In</label>
+                <label><input type="radio" name="clients_view_toggle" value="schedule" id="tab_toggle_schedule" onchange="toggleClientsSubView()"> Book Appt</label>
+                <label><input type="radio" name="clients_view_toggle" value="billing" onchange="toggleClientsSubView()"> Billing & Checkout</label>
+                <label><input type="radio" name="clients_view_toggle" value="ops" onchange="toggleClientsSubView()"> End of Day Ops</label>
             </div>
 
+            <!-- CHECK-IN DESK -->
             <div id="subView_Checkin">
                 <div class="grid-2" style="align-items: start;">
-                    
                     <div class="module-box" id="fohIntakeForm">
                         <h3 style="border-bottom: none; padding-bottom: 0; color: var(--accent);">Client Registration</h3>
                         <p style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">Search, save, or update client details in the master database.</p>
-
+                        
                         <div class="form-group" style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px dashed var(--border); z-index: 60;">
                             <label>Search Existing Client (Name or Phone):</label>
                             <div class="search-box">
-                                <input type="text" id="fohSearchPhone" placeholder="Type to search..." autocomplete="off" >
-                                <button type="button" class="btn" id="btnFohSearch" style="width: auto;">Search</button>
+                                <input type="text" id="fohSearchPhone" placeholder="Type to search..." autocomplete="off" onkeyup="liveClientSearchFOH()">
+                                <button type="button" class="btn" style="width: auto;" onclick="liveClientSearchFOH()">Search</button>
                                 <div id="foh_searchResults" class="dropdown-results"></div>
                             </div>
                             <p id="fohSearchMsg" style="font-weight: bold; margin-top: 10px; font-size: 0.85rem;"></p>
                         </div>
 
-                        <div class="grid-2">
-                            <div class="form-group"><label>Forename: <span class="required-star">*</span></label><input type="text" id="f_forename" required></div>
-                            <div class="form-group"><label>Surname: <span class="required-star">*</span></label><input type="text" id="f_surname" required></div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="form-group"><label>Primary Tel Number: <span class="required-star">*</span></label><input type="tel" id="f_tel" placeholder="10 digits" maxlength="10" required></div>
-                            <div class="form-group"><label>Alternative Tel Number:</label><input type="tel" id="f_altTel" placeholder="10 digits" maxlength="10"></div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="form-group"><label>Gender: <span class="required-star">*</span></label><select id="f_gender" required><option value="" disabled selected>Select...</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option></select></div>
-                            <div class="form-group"><label>Email:</label><input type="email" id="f_email"></div>
-                        </div>
-                        <div class="grid-2">
-                            <div class="form-group"><label>Date of Birth:</label><input type="date" id="f_dob"></div>
-                            <div></div>
-                        </div>
+                        <div class="grid-2"><div class="form-group"><label>Forename: <span class="required-star">*</span></label><input type="text" id="f_forename" required></div><div class="form-group"><label>Surname: <span class="required-star">*</span></label><input type="text" id="f_surname" required></div></div>
+                        <div class="grid-2"><div class="form-group"><label>Primary Tel Number: <span class="required-star">*</span></label><input type="tel" id="f_tel" placeholder="10 digits" maxlength="10" required></div><div class="form-group"><label>Alternative Tel Number:</label><input type="tel" id="f_altTel" placeholder="10 digits" maxlength="10"></div></div>
+                        <div class="grid-2"><div class="form-group"><label>Gender: <span class="required-star">*</span></label><select id="f_gender" required><option value="" disabled selected>Select...</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option></select></div><div class="form-group"><label>Email:</label><input type="email" id="f_email"></div></div>
+                        <div class="grid-2"><div class="form-group"><label>Date of Birth:</label><input type="date" id="f_dob"></div><div></div></div>
 
-                        <button type="button" class="btn" id="btnRegisterClient" style="margin-top: 15px;">Save Client Record</button>
+                        <button type="button" class="btn" id="btnRegisterClient" onclick="registerClientOnly()" style="margin-top: 15px;">Save Client Record</button>
                     </div>
 
                     <div class="module-box" style="border-top: 4px solid var(--accent); background-color: #fafafa;">
                         <h3 style="color: var(--accent);">Expected Today</h3>
                         <p style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">Clients scheduled for today. Click Check-In to route them to the floor.</p>
-                        <div id="expectedTodayList" style="display:flex; flex-direction:column; gap:10px;">
-                            <p style="color: #999; font-style: italic;">Loading...</p>
-                        </div>
+                        <div id="expectedTodayList" style="display:flex; flex-direction:column; gap:10px;"><p style="color: #999; font-style: italic;">Loading...</p></div>
                     </div>
                 </div>
             </div>
 
+            <!-- SCHEDULING -->
             <div id="subView_Schedule" style="display: none;">
                 <div class="module-box" style="border-top: 4px solid var(--primary);">
                     <h3 style="color: var(--primary); border-bottom-color: var(--primary);">Book Appointment</h3>
@@ -260,41 +103,31 @@
                     <div class="form-group" style="margin-bottom: 20px; z-index: 50;">
                         <label>1. Search Client (Name or Phone): <span class="required-star">*</span></label>
                         <div class="search-box">
-                            <input type="text" id="sched_search" placeholder="Type to search..." autocomplete="off" >
-                            <button type="button" class="btn" id="btnSchedSearch" style="width: auto;">Search</button>
+                            <input type="text" id="sched_search" placeholder="Type to search..." autocomplete="off" onkeyup="liveClientSearch()">
+                            <button type="button" class="btn" style="width: auto;" onclick="liveClientSearch()">Search</button>
                             <div id="sched_searchResults" class="dropdown-results"></div>
                         </div>
                     </div>
 
-                    <input type="hidden" id="sched_phone">
-                    <input type="hidden" id="sched_name">
+                    <input type="hidden" id="sched_phone"><input type="hidden" id="sched_name">
                     
                     <div id="sched_selectedClientDisplay" style="display:none; padding: 10px; background: #eef5f9; border: 1px solid #b8cddb; border-radius: 4px; margin-bottom: 20px; font-weight: bold; color: var(--primary);">
                         Selected Client: <span id="sched_displayName"></span> (<span id="sched_displayPhone"></span>)
-                        <button type="button" id="btnClearScheduleClient" style="float:right; background:transparent; border:none; color:var(--error); cursor:pointer; font-weight:bold;">X</button>
+                        <button type="button" style="float:right; background:transparent; border:none; color:var(--error); cursor:pointer; font-weight:bold;" onclick="clearScheduleClient()">X</button>
                     </div>
 
                     <div class="form-group" style="margin-top: 25px; border-top: 1px solid var(--border); padding-top: 20px;">
                         <h3 style="text-align:center; color: var(--primary); margin-bottom: 15px;">FROM OUR MENU</h3>
                         
-                        <div class="dept-tabs">
-                            <label><input type="radio" name="dept_toggle" value="Hand" checked > HAND THERAPY MENU</label>
-                            <label><input type="radio" name="dept_toggle" value="Foot" > FOOT THERAPY MENU</label>
-                        </div>
-
-                        <div id="sched_serviceMenu" style="margin-bottom: 20px;">
-                            <p style="color:#999; font-style:italic; text-align:center;">Loading live menu...</p>
-                        </div>
+                        <div class="dept-tabs"><label><input type="radio" name="dept_toggle" value="Hand" checked onchange="toggleDeptView()"> HAND THERAPY</label><label><input type="radio" name="dept_toggle" value="Foot" onchange="toggleDeptView()"> FOOT THERAPY</label></div>
+                        <div id="sched_serviceMenu" style="margin-bottom: 20px;"><p style="color:#999; font-style:italic; text-align:center;">Loading live menu...</p></div>
                         
                         <div id="sched_breakdown">
                             <h4 style="color: var(--primary); margin-bottom: 10px; font-size: 1rem; border-bottom: 1px dashed var(--border); padding-bottom: 5px; text-transform: uppercase;">Selected Services</h4>
                             <div id="sched_breakdownList"></div>
-                            
                             <div id="sched_taxBreakdown" style="margin-top:10px; padding-top:10px; border-top: 1px dashed #ddd; display:none;"></div>
-
                             <div style="display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); font-size: 1.1rem; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
-                                <span>Grand Total:</span>
-                                <span><span id="sched_totalDuration" style="color: var(--accent);">0</span> mins | <span id="sched_totalCost" style="color: var(--success);">0.00</span> GHC</span>
+                                <span>Grand Total:</span><span><span id="sched_totalDuration" style="color: var(--accent);">0</span> mins | <span id="sched_totalCost" style="color: var(--success);">0.00</span> GHC</span>
                             </div>
                             
                             <input type="hidden" id="sched_subtotalVal" value="0">
@@ -302,23 +135,15 @@
                             <input type="hidden" id="sched_grandTotalVal" value="0">
 
                             <div style="text-align: right; margin-top: 15px;">
-                                <button class="btn btn-secondary" id="btnClearAllSelections" style="padding: 5px 15px; font-size: 0.8rem; width: auto;">Clear All Selections</button>
+                                <button class="btn btn-secondary" style="padding: 5px 15px; font-size: 0.8rem; width: auto;" onclick="clearAllSelections()">Clear All Selections</button>
                             </div>
                         </div>
                     </div>
 
                     <div class="grid-2" style="align-items: start; border-top: 1px solid var(--border); padding-top: 20px;">
                         <div>
-                            <div class="form-group">
-                                <label>Date: <span class="required-star">*</span></label>
-                                <input type="date" id="sched_date">
-                            </div>
-                            <div class="form-group" style="margin-bottom: 25px;">
-                                <label>Assign Technician: <span class="required-star">*</span></label>
-                                <select id="sched_techSelect" style="background-color: #fffaf0; border-color: var(--accent);">
-                                    <option value="" disabled selected>Select Technician...</option>
-                                </select>
-                            </div>
+                            <div class="form-group"><label>Date: <span class="required-star">*</span></label><input type="date" id="sched_date" onchange="generateTimeSlots()"></div>
+                            <div class="form-group" style="margin-bottom: 25px;"><label>Assign Technician: <span class="required-star">*</span></label><select id="sched_techSelect" style="background-color: #fffaf0; border-color: var(--accent);" onchange="generateTimeSlots()"><option value="" disabled selected>Select Technician...</option></select></div>
                         </div>
                         <div>
                             <div class="form-group">
@@ -332,8 +157,8 @@
                     </div>
                     
                     <div style="display:flex; gap: 10px; margin-top: 15px;">
-                        <button id="btnConfirmBooking" class="btn">Confirm & Book Appointment</button>
-                        <button id="btnCancelEdit" class="btn btn-secondary" style="display:none; width: auto; border-color: var(--error); color: var(--error);">Cancel Edit</button>
+                        <button id="btnConfirmBooking" class="btn" onclick="bookAppointment()">Confirm & Book Appointment</button>
+                        <button id="btnCancelEdit" class="btn btn-secondary" style="display:none; width: auto; border-color: var(--error); color: var(--error);" onclick="cancelEditMode()">Cancel Edit</button>
                     </div>
                 </div>
 
@@ -343,14 +168,13 @@
                 </div>
             </div>
 
+            <!-- BILLING & CHECKOUT -->
             <div id="subView_Billing" style="display: none;">
                 <div class="module-box" style="border-top: 4px solid var(--success);">
                     <h3 style="color: var(--success); border-bottom-color: var(--success);">Billing & Checkout</h3>
                     <p style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">Jobs marked as complete by Technicians and ready for payment.</p>
                     
-                    <div id="fohPendingCheckoutList">
-                        <p style="color: #999; font-style: italic;">Loading pending checkouts...</p>
-                    </div>
+                    <div id="fohPendingCheckoutList"><p style="color: #999; font-style: italic;">Loading pending checkouts...</p></div>
                     
                     <div id="checkoutPanel" style="display:none; margin-top:20px; border-top: 2px dashed var(--border); padding-top:20px;">
                         <h4 style="color:var(--primary); margin-bottom:10px;">Process Payment</h4>
@@ -377,155 +201,71 @@
                                 </div>
                                 <input type="hidden" id="checkoutJobId">
                                 <input type="hidden" id="checkoutGrandTotalVal">
-                                <button class="btn" id="btnConfirmPayment" style="background-color: var(--success);">Confirm & Close Job</button>
+                                <button class="btn" style="background-color: var(--success);" onclick="confirmPayment()">Confirm & Close Job</button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- EOD OPS -->
             <div id="subView_Ops" style="display: none;">
                 <div class="module-box" style="border-top: 4px solid var(--primary);">
                     <h3>End of Day Financials</h3>
                     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                        <div class="metric-card" style="border-color: var(--success); background: #f0fff4;">
-                            <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Total Daily Revenue</div>
-                            <div class="metric-value" id="fohDailyRevenue" style="color: var(--success);">0 GHC</div>
-                        </div>
-                        <div class="metric-card">
-                            <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Jobs Closed Today</div>
-                            <div class="metric-value" id="fohDailyJobs" style="color: var(--primary);">0</div>
-                        </div>
+                        <div class="metric-card" style="border-color: var(--success); background: #f0fff4;"><div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Total Daily Revenue</div><div class="metric-value" id="fohDailyRevenue" style="color: var(--success);">0 GHC</div></div>
+                        <div class="metric-card"><div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Jobs Closed Today</div><div class="metric-value" id="fohDailyJobs" style="color: var(--primary);">0</div></div>
                     </div>
-                    <div style="margin-top: 20px;">
-                        <h4 style="color: var(--primary);">Active Tech Roster</h4>
-                        <div id="fohRosterList"></div>
-                    </div>
+                    <div style="margin-top: 20px;"><h4 style="color: var(--primary);">Active Tech Roster</h4><div id="fohRosterList"></div></div>
                 </div>
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: THE ATELIER (Tech Floor)             -->
+        <!-- ========================================== -->
         <div id="atelierView" class="app-module">
             <div class="module-box" style="border-top: 4px solid var(--accent);">
                 <h3 style="color: var(--accent);">My Daily Earnings</h3>
                 <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                    <div class="metric-card">
-                        <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Services Completed</div>
-                        <div class="metric-value" id="techServiceCount" style="color: var(--primary);">0</div>
-                    </div>
-                    <div class="metric-card" style="border-color: var(--success); background: #f0fff4;">
-                        <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Total Generated</div>
-                        <div class="metric-value" id="techDailyRevenue" style="color: var(--success);">0 GHC</div>
-                    </div>
+                    <div class="metric-card"><div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Services Completed</div><div class="metric-value" id="techServiceCount" style="color: var(--primary);">0</div></div>
+                    <div class="metric-card" style="border-color: var(--success); background: #f0fff4;"><div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Total Generated</div><div class="metric-value" id="techDailyRevenue" style="color: var(--success);">0 GHC</div></div>
                 </div>
             </div>
 
             <div class="module-box">
                 <h3>Atelier Active Queue</h3>
-                <p style="color: #666; margin-bottom: 20px;">Waiting clients assigned to your station.</p>
-                <div id="techLiveQueue">
-                    <p style="color: #999; font-style: italic;">Queue is currently empty.</p>
-                </div>
+                <div id="techLiveQueue"><p style="color: #999; font-style: italic;">Queue is currently empty.</p></div>
             </div>
         </div>
 
-        <div id="consultModal" class="consult-overlay">
-            <div class="consult-modal">
-                <button class="consult-close" id="btnCloseConsult">&times;</button>
-                <h2 style="color:var(--primary); margin-bottom:5px;">Consultation & Assessment</h2>
-                <p style="color:var(--manager); font-weight:bold; margin-bottom:20px; font-size:1.1rem;">Client: <span id="consultName">...</span></p>
-                
-                <div class="consult-section-title">II. MEDICAL HISTORY & SAFETY</div>
-                <div class="checkbox-grid">
-                    <label><input type="checkbox" class="med-cb" value="Diabetes"> Diabetes</label>
-                    <label><input type="checkbox" class="med-cb" value="Fungal infections"> Fungal infections</label>
-                    <label><input type="checkbox" class="med-cb" value="Psoriasis / Eczema"> Psoriasis / Eczema</label>
-                    <label><input type="checkbox" class="med-cb" value="Verrucas / Warts"> Verrucas / Warts</label>
-                    <label><input type="checkbox" class="med-cb" value="Skin infections"> Skin infections</label>
-                    <label><input type="checkbox" class="med-cb" value="Cuts / Open wounds"> Cuts / Open wounds</label>
-                    <label style="color:var(--manager); font-weight:bold;"><input type="checkbox" id="med_none" > None of the above</label>
-                </div>
-                <div class="grid-2">
-                    <div class="form-group"><label>Allergies:</label><input type="text" id="med_allergies" placeholder="Any known allergies..."></div>
-                    <div class="form-group"><label>Other medical conditions:</label><input type="text" id="med_other" placeholder="List any other conditions..."></div>
-                </div>
-
-                <div class="consult-section-title">III. FOOT & NAIL CONDITION ASSESSMENT</div>
-                <div style="margin-bottom:15px;">
-                    <label style="font-weight:bold; margin-bottom:10px; display:block;">Callus Level:</label>
-                    <div class="radio-group">
-                        <label><input type="radio" name="cond_callus" value="Minimal"> Minimal</label>
-                        <label><input type="radio" name="cond_callus" value="Moderate"> Moderate</label>
-                        <label><input type="radio" name="cond_callus" value="Heavy"> Heavy</label>
-                        <label><input type="radio" name="cond_callus" value="Severe"> Severe</label>
-                    </div>
-                </div>
-                <div style="margin-bottom:20px;">
-                    <label style="font-weight:bold; margin-bottom:10px; display:block;">Skin Condition:</label>
-                    <div class="radio-group">
-                        <label><input type="radio" name="cond_skin" value="Normal"> Normal</label>
-                        <label><input type="radio" name="cond_skin" value="Dry"> Dry</label>
-                        <label><input type="radio" name="cond_skin" value="Very Dry"> Very Dry</label>
-                        <label><input type="radio" name="cond_skin" value="Sensitive"> Sensitive</label>
-                    </div>
-                </div>
-                <div class="form-group"><label>Visual Mapping Notes:</label><textarea id="cond_notes" rows="3" placeholder="Add specific notes about the client's hands/feet here..."></textarea></div>
-
-                <div class="consult-section-title" style="color:var(--accent); border-color:var(--accent);">SERVICE MODIFICATION (UPSELL)</div>
-                <div style="background:#f9f9f9; padding:15px; border-radius:6px; border:1px solid #eee;">
-                    <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">Current Ticket: <strong id="consultTicket" style="color:var(--primary);">...</strong></p>
-                    <div class="search-box">
-                        <select id="consultUpsellSelect" style="flex:1;">
-                            <option value="">Select a service or add-on...</option>
-                        </select>
-                        <button class="btn" id="btnAddUpsell" style="width:auto; background:var(--accent);">Add to Ticket</button>
-                    </div>
-                    <div id="consultAddedUpsells" style="margin-top:10px; font-size:0.85rem; color:var(--success); font-weight:bold;"></div>
-                    <div style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px; text-align:right; font-weight:bold; color:var(--primary);">
-                        Projected Total: <span id="consultProjTotal">0.00 GHC</span>
-                    </div>
-                </div>
-
-                <div style="border-top:1px solid var(--border); margin-top:30px; padding-top:20px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:15px;">
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <select id="consultReassign" style="min-width:150px; padding:8px; border-radius:4px; border:1px solid #ccc;">
-                            <option value="">Reassign to...</option>
-                        </select>
-                        <button class="btn btn-secondary" id="btnReassign" style="width:auto; padding:8px 15px; font-size:0.85rem;">Reassign</button>
-                        <button class="btn btn-secondary" id="btnReqReschedule" style="width:auto; padding:8px 15px; font-size:0.85rem; color:var(--error); border-color:var(--error);">Reschedule / Cancel</button>
-                    </div>
-                    <button class="btn" id="btnSaveConsult" style="width:auto; background:var(--success); font-size:1.1rem;">Save & Start Service</button>
-                </div>
-            </div>
-        </div>
-
+        <!-- ========================================== -->
+        <!-- ZONE: MENU & PRICING                       -->
+        <!-- ========================================== -->
         <div id="menuView" class="app-module">
             <div class="module-box" style="border-top: 4px solid var(--manager);">
                 <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Service Menu & Pricing</h3>
                 
                 <div id="managerMenuControls" style="display:none; background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 25px;">
                     <h4 style="margin-bottom: 15px; font-size: 1.1rem; color: var(--manager); border-bottom: 2px solid var(--manager); padding-bottom: 5px;">[Manager] Advanced Service Creator</h4>
-
                     <div class="grid-2">
                         <div class="form-group"><label>1. Service Category</label><select id="adv_category"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
                         <div class="form-group"><label>2. Service Type</label><select id="adv_type"><option value="Main Therapy">Main Therapy (Single Select)</option></select></div>
                     </div>
-
                     <h5 style="margin-top:10px; margin-bottom:10px; color:var(--primary);">3. Service Details</h5>
                     <div class="grid-3">
                         <div class="form-group"><label>Service Name:</label><input type="text" id="adv_name"></div>
                         <div class="form-group"><label>Duration (mins):</label><input type="number" id="adv_duration"></div>
                         <div class="form-group"><label>Price (GHC):</label><input type="number" id="adv_price"></div>
-                        <div class="form-group"><label>Pricing Type:</label><select id="adv_pricing_type"><option value="Fixed">Fixed Price</option><option value="Per Unit">Per Unit (e.g., per nail)</option></select></div>
+                        <div class="form-group"><label>Pricing Type:</label><select id="adv_pricing_type"><option value="Fixed">Fixed Price</option><option value="Per Unit">Per Unit</option></select></div>
                         <div class="form-group"><label>Availability:</label><select id="adv_status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
                     </div>
                     <div class="form-group"><label>Description:</label><textarea id="adv_desc" rows="2"></textarea></div>
-
                     <div class="grid-2">
                         <div>
                             <h5 style="margin-bottom:10px; color:var(--primary);">4. Selection Rules</h5>
                             <div class="form-group"><label>Applies To (Department):</label><select id="adv_applies_to"><option value="Hand">Hand Only</option><option value="Foot">Foot Only</option><option value="Both">Both (Hand & Foot)</option></select></div>
-                            <div class="form-group"><label>Selection Type:</label><select id="adv_selection"><option value="Single">Single Select (Main Base Ritual)</option><option value="Multi">Multi Select (Add-on)</option></select></div>
+                            <div class="form-group"><label>Selection Type:</label><select id="adv_selection"><option value="Single">Single Select</option><option value="Multi">Multi Select (Add-on)</option></select></div>
                         </div>
                         <div>
                             <h5 style="margin-bottom:10px; color:var(--primary);">6. Display Settings</h5>
@@ -533,76 +273,60 @@
                             <div class="form-group"><label>Highlight Tag:</label><select id="adv_tag"><option value="None">None</option><option value="New">New</option><option value="Popular">Popular</option><option value="Recommended">Recommended</option></select></div>
                         </div>
                     </div>
-
                     <div style="text-align: right; border-top: 1px solid var(--border); padding-top: 15px;">
-                        <button class="btn btn-secondary" id="btnClearAdvForm" style="width: auto; margin-right: 10px;">Clear Form</button>
-                        <button class="btn" id="btnSaveServiceConfig" style="width: auto; background-color: var(--manager);">Save Service Configuration</button>
+                        <button class="btn btn-secondary" style="width: auto; margin-right: 10px;" onclick="document.getElementById('adv_name').value=''">Clear Form</button>
+                        <button class="btn" style="width: auto; background-color: var(--manager);" onclick="addNewMenuServiceAdv()">Save Service Configuration</button>
                     </div>
                 </div>
 
-                <div class="dept-tabs">
-                    <label><input type="radio" name="admin_dept_toggle" value="Hand" checked > HAND THERAPY MENU</label>
-                    <label><input type="radio" name="admin_dept_toggle" value="Foot" > FOOT THERAPY MENU</label>
-                </div>
-                
+                <div class="dept-tabs"><label><input type="radio" name="admin_dept_toggle" value="Hand" checked onchange="toggleAdminDeptView()"> HAND THERAPY MENU</label><label><input type="radio" name="admin_dept_toggle" value="Foot" onchange="toggleAdminDeptView()"> FOOT THERAPY MENU</label></div>
                 <div id="menuManagerList"><p style="text-align:center; color:#999; font-style:italic;">Loading menu database...</p></div>
-                
-                <div id="seedMenuBtnContainer" style="display:none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border); text-align: right;">
-                    <button class="btn btn-secondary" id="btnSeedMenu" style="width: auto; font-size: 0.8rem;">[Dev] Initialize Default Menu</button>
-                </div>
+                <div id="seedMenuBtnContainer" style="display:none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border); text-align: right;"><button class="btn btn-secondary" style="width: auto; font-size: 0.8rem;" onclick="seedDefaultMenu()">[Dev] Initialize Default Menu</button></div>
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: HR & FINANCE                         -->
+        <!-- ========================================== -->
         <div id="hrView" class="app-module">
             
             <div class="module-box" style="border-top: 4px solid var(--manager);">
+                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Consultation Form Builder</h3>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Add extra custom fields to the Technician's intake form.</p>
+                <div class="grid-3" style="align-items: end;">
+                    <div class="form-group"><label>Question Prompt / Label:</label><input type="text" id="bld_label" placeholder="e.g. Current Medications"></div>
+                    <div class="form-group"><label>Answer Type:</label><select id="bld_type" onchange="document.getElementById('bld_opts_wrap').style.display=(this.value==='text'?'none':'block')"><option value="text">Text Box</option><option value="checkbox">Multiple Choice (Checkboxes)</option><option value="radio">Single Select (Radio)</option></select></div>
+                    <div class="form-group" id="bld_opts_wrap" style="display:none;"><label>Options (comma separated):</label><input type="text" id="bld_opts" placeholder="e.g. Asthma, Diabetes"></div>
+                </div>
+                <div style="text-align:right;"><button class="btn" style="background-color: var(--manager); width:auto;" onclick="addConsultQuestion()">Save Question to Template</button></div>
+                <div id="consultBuilderList" style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;"></div>
+            </div>
+
+            <!-- TAX CONFIGURATOR -->
+            <div class="module-box" style="border-top: 4px solid var(--manager);">
                 <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Tax Configuration</h3>
-                <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Define taxes and levies. These automatically apply on top of the base service prices during checkout.</p>
-                
                 <div class="grid-3" style="align-items: end;">
                     <div class="form-group"><label>Tax Name (e.g., VAT):</label><input type="text" id="cfgTaxName"></div>
                     <div class="form-group"><label>Rate (%) (e.g., 15):</label><input type="number" id="cfgTaxRate" step="0.1"></div>
-                    <button class="btn" id="btnAddTax" style="background-color: var(--manager); margin-bottom: 15px;">Add / Update Tax</button>
+                    <button class="btn" style="background-color: var(--manager); margin-bottom: 15px;" onclick="addTax()">Add / Update Tax</button>
                 </div>
-                
-                <div id="taxConfigList" style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
-                    <p style="color: #999; font-style: italic;">Loading active taxes...</p>
-                </div>
+                <div id="taxConfigList" style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;"></div>
 
                 <div style="margin-top: 30px; background: #eef5f9; padding: 20px; border-radius: 8px; border: 1px solid #b8cddb;">
                     <h4 style="color: var(--manager); margin-bottom: 15px;">Tax Simulator & Price Preview</h4>
                     <div class="grid-2" style="align-items: start;">
                         <div>
-                            <div class="form-group">
-                                <label>Test Price (GHC):</label>
-                                <input type="number" id="previewBasePrice" placeholder="e.g., 200">
-                            </div>
+                            <div class="form-group"><label>Test Price (GHC):</label><input type="number" id="previewBasePrice" placeholder="e.g., 200" oninput="calculatePreview()"></div>
                             <div class="form-group" style="margin-bottom: 15px;">
-                                <label style="display:inline-block; font-weight:normal; margin-bottom:5px; font-size: 0.85rem; cursor:pointer;">
-                                    <input type="radio" name="tax_inclusive_toggle" value="exclusive" checked  style="width:14px; height:14px; accent-color:var(--manager);"> 
-                                    Price is Tax <strong>Exclusive</strong> <span style="color:#666;">(Add taxes on top)</span>
-                                </label>
-                                <br>
-                                <label style="display:inline-block; font-weight:normal; font-size: 0.85rem; cursor:pointer;">
-                                    <input type="radio" name="tax_inclusive_toggle" value="inclusive"  style="width:14px; height:14px; accent-color:var(--manager);"> 
-                                    Price is Tax <strong>Inclusive</strong> <span style="color:#666;">(Extract taxes from total)</span>
-                                </label>
+                                <label style="display:flex; align-items:center; gap:8px; font-weight:normal; margin-bottom:5px; font-size: 0.85rem; cursor:pointer;"><input type="radio" name="tax_inclusive_toggle" value="exclusive" checked onchange="calculatePreview()" style="width:16px; height:16px; accent-color:var(--manager);"> <span>Price is Tax <strong>Exclusive</strong> <span style="color:#666;">(Add on top)</span></span></label>
+                                <label style="display:flex; align-items:center; gap:8px; font-weight:normal; font-size: 0.85rem; cursor:pointer;"><input type="radio" name="tax_inclusive_toggle" value="inclusive" onchange="calculatePreview()" style="width:16px; height:16px; accent-color:var(--manager);"> <span>Price is Tax <strong>Inclusive</strong> <span style="color:#666;">(Extract from total)</span></span></label>
                             </div>
-                            <div class="form-group">
-                                <label>Apply Taxes to Simulation:</label>
-                                <div id="previewTaxToggles" style="background: white; padding: 10px; border: 1px solid var(--border); border-radius: 4px;">
-                                    <p style="color:#999; font-size:0.8rem; margin:0;">Add a tax above to see toggles here.</p>
-                                </div>
-                            </div>
+                            <div class="form-group"><label>Apply Taxes to Simulation:</label><div id="previewTaxToggles" style="background: white; padding: 10px; border: 1px solid var(--border); border-radius: 4px;"></div></div>
                         </div>
                         <div style="background: white; padding: 15px; border-radius: 4px; border: 1px dashed var(--manager);">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:10px; color:#555; font-size: 0.9rem;">
-                                <span>Base Price (Subtotal):</span> <span id="prevBaseOut">0.00 GHC</span>
-                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:10px; color:#555; font-size: 0.9rem;"><span>Base Price (Subtotal):</span> <span id="prevBaseOut">0.00 GHC</span></div>
                             <div id="prevTaxBreakdown" style="margin-bottom:10px; border-bottom: 1px solid #eee; padding-bottom:10px;"></div>
-                            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.2rem; color:var(--success);">
-                                <span>Grand Total:</span> <span id="prevTotalOut">0.00 GHC</span>
-                            </div>
+                            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.2rem; color:var(--success);"><span>Grand Total:</span> <span id="prevTotalOut">0.00 GHC</span></div>
                         </div>
                     </div>
                 </div>
@@ -613,25 +337,23 @@
                 <div class="grid-3" style="align-items: end;">
                     <div class="form-group"><label>Start Date:</label><input type="date" id="reportStart"></div>
                     <div class="form-group"><label>End Date:</label><input type="date" id="reportEnd"></div>
-                    <button class="btn" id="btnGenerateReport" style="background-color: var(--manager); margin-bottom: 15px;">Run Report</button>
+                    <button class="btn" style="background-color: var(--manager); margin-bottom: 15px;" onclick="generateReport()">Run Report</button>
                 </div>
                 <div id="reportResults" style="display: none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px;">
                     <h4 style="color: var(--primary);">Total Salon Revenue: <span id="reportTotalRevenue" style="color: var(--success);">0.00 GHC</span></h4>
-                    <div style="overflow-x: auto; margin-top: 15px;">
-                        <table class="breakdown-table">
-                            <thead><tr><th>Technician</th><th style="text-align:center;">Services Performed</th><th style="text-align:right;">Revenue Generated (GHC)</th></tr></thead>
-                            <tbody id="reportTechBody"></tbody>
-                        </table>
-                    </div>
+                    <div style="overflow-x: auto; margin-top: 15px;"><table class="breakdown-table"><thead><tr><th>Technician</th><th style="text-align:center;">Services Performed</th><th style="text-align:right;">Revenue Generated (GHC)</th></tr></thead><tbody id="reportTechBody"></tbody></table></div>
                 </div>
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: SYSTEM ADMIN                         -->
+        <!-- ========================================== -->
         <div id="adminView" class="app-module">
             <div class="module-box" style="border-top: 4px solid var(--admin);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
                     <h3 style="margin:0; border:none; padding:0; color: var(--admin);">Staff Matrix & Access Control</h3>
-                    <button class="btn btn-secondary" id="btnRefreshDirectory" style="width:auto; padding:5px 15px; font-size:0.8rem;">Refresh Directory</button>
+                    <button class="btn btn-secondary" style="width:auto; padding:5px 15px; font-size:0.8rem;" onclick="loadStaffDirectory()">Refresh Directory</button>
                 </div>
                 <div style="background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 30px;">
                     <h4 style="margin-bottom: 15px; color: var(--primary);">Register / Update Staff</h4>
@@ -640,1920 +362,94 @@
                         <div class="form-group"><label>Email Address: <span class="required-star">*</span></label><input type="email" id="admin_newEmail" placeholder="e.g., sarah@thuraya.com"></div>
                         <div class="form-group"><label>Temporary Password:</label><input type="text" id="admin_newPassword" placeholder="(Optional) Min 6 chars"></div>
                     </div>
-                    
                     <div class="form-group">
                         <label>Assign Departments: <span class="required-star">*</span></label>
                         <div class="grid-3" style="background: white; padding: 15px; border: 1px solid var(--border); border-radius: 4px;">
-                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px;"><input type="checkbox" class="role-checkbox" value="FOH" style="width: auto;"> Front of House</label>
-                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px;"><input type="checkbox" class="role-checkbox" value="Tech" style="width: auto;"> Technician</label>
-                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--accent);"><input type="checkbox" class="role-checkbox" value="Test Tech" style="width: auto;"> Test Tech (24/7)</label>
-                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--supply);"><input type="checkbox" class="role-checkbox" value="Supply Chain" style="width: auto;"> Supply Chain</label>
-                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--manager);"><input type="checkbox" class="role-checkbox" value="Manager" style="width: auto;"> Manager</label>
-                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--admin);"><input type="checkbox" class="role-checkbox" value="System Admin" style="width: auto;"> System Admin</label>
+                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px;"><input type="checkbox" class="role-checkbox" value="FOH" style="width: auto; height: 16px;"> Front of House</label>
+                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px;"><input type="checkbox" class="role-checkbox" value="Tech" style="width: auto; height: 16px;"> Technician</label>
+                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--accent);"><input type="checkbox" class="role-checkbox" value="Test Tech" style="width: auto; height: 16px;"> Test Tech (24/7)</label>
+                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--supply);"><input type="checkbox" class="role-checkbox" value="Supply Chain" style="width: auto; height: 16px;"> Supply Chain</label>
+                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--manager);"><input type="checkbox" class="role-checkbox" value="Manager" style="width: auto; height: 16px;"> Manager</label>
+                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--admin);"><input type="checkbox" class="role-checkbox" value="System Admin" style="width: auto; height: 16px;"> System Admin</label>
                         </div>
                     </div>
-                    <button class="btn" id="btnSaveStaffAccount" style="background-color: var(--admin); width: auto; padding: 10px 20px;">Save Matrix Settings & Create/Update User</button>
+                    <button class="btn" style="background-color: var(--admin); width: auto; padding: 10px 20px;" onclick="addStaffAccount()">Save Matrix Settings & Create/Update User</button>
                 </div>
-                <div style="overflow-x: auto;">
-                    <div id="adminStaffList"><p style="color: #999; font-style: italic;">Loading directory...</p></div>
-                </div>
+                <div style="overflow-x: auto;"><div id="adminStaffList"><p style="color: #999; font-style: italic;">Loading directory...</p></div></div>
             </div>
         </div>
 
         <div id="supplyView" class="app-module">
-            <div class="module-box" style="border-top: 4px solid var(--supply);">
-                <h3 style="color: var(--supply); border-bottom-color: var(--supply);">Supply Chain & Inventory</h3>
-                <div style="padding: 40px; text-align: center; border: 2px dashed var(--border); border-radius: 8px; background: #fafafa;">
-                    <h4 style="color: #999; margin-bottom: 10px;">Digital Stockroom Infrastructure Installed.</h4>
-                    <p style="color: #666; font-size: 0.9rem;">Module configuration pending next phase.</p>
-                </div>
-            </div>
+            <div class="module-box" style="border-top: 4px solid var(--supply);"><h3 style="color: var(--supply); border-bottom-color: var(--supply);">Supply Chain & Inventory</h3><div style="padding: 40px; text-align: center; border: 2px dashed var(--border); border-radius: 8px; background: #fafafa;"><h4 style="color: #999; margin-bottom: 10px;">Digital Stockroom Infrastructure Installed.</h4><p style="color: #666; font-size: 0.9rem;">Module configuration pending next phase.</p></div></div>
         </div>
-
     </div>
 
+<!-- HARDCODED CONSULTATION MODAL -->
+<div id="consultModal" class="consult-overlay">
+    <div class="consult-modal">
+        <button class="consult-close" onclick="closeConsult()">&times;</button>
+        <h2 style="color:var(--primary); margin-bottom:5px;">Consultation & Assessment</h2>
+        <p style="color:var(--manager); font-weight:bold; margin-bottom:20px; font-size:1.1rem;">Client: <span id="consultName"></span></p>
+        
+        <div class="consult-title">II. MEDICAL HISTORY & SAFETY</div>
+        <div class="checkbox-grid">
+            <label><input type="checkbox" class="med-cb" value="Diabetes"> Diabetes</label>
+            <label><input type="checkbox" class="med-cb" value="Fungal infections"> Fungal infections</label>
+            <label><input type="checkbox" class="med-cb" value="Psoriasis"> Psoriasis/Eczema</label>
+            <label><input type="checkbox" class="med-cb" value="Warts"> Verrucas/Warts</label>
+            <label><input type="checkbox" class="med-cb" value="Skin infections"> Skin infections</label>
+            <label><input type="checkbox" class="med-cb" value="Cuts"> Cuts/Wounds</label>
+            <label style="color:var(--manager);font-weight:bold;"><input type="checkbox" id="med_none" onchange="toggleMedNone(this)"> None</label>
+        </div>
+        <div class="grid-2">
+            <div class="form-group"><input type="text" id="med_allergies" placeholder="Allergies..."></div>
+            <div class="form-group"><input type="text" id="med_other" placeholder="Other conditions..."></div>
+        </div>
+
+        <div class="consult-title">III. FOOT & NAIL CONDITION</div>
+        <div style="margin-bottom:10px;">
+            <label style="font-weight:bold;">Callus:</label>
+            <div class="radio-group">
+                <label><input type="radio" name="cond_callus" value="Minimal"> Minimal</label>
+                <label><input type="radio" name="cond_callus" value="Moderate"> Mod</label>
+                <label><input type="radio" name="cond_callus" value="Heavy"> Heavy</label>
+                <label><input type="radio" name="cond_callus" value="Severe"> Severe</label>
+            </div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="font-weight:bold;">Skin:</label>
+            <div class="radio-group">
+                <label><input type="radio" name="cond_skin" value="Normal"> Normal</label>
+                <label><input type="radio" name="cond_skin" value="Dry"> Dry</label>
+                <label><input type="radio" name="cond_skin" value="Very Dry"> Very Dry</label>
+                <label><input type="radio" name="cond_skin" value="Sensitive"> Sensitive</label>
+            </div>
+        </div>
+        <div class="form-group"><textarea id="cond_notes" rows="2" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:4px;" placeholder="Visual mapping notes..."></textarea></div>
+
+        <div id="dynamicConsultForm"></div>
+
+        <div class="consult-title" style="color:var(--accent);border-color:var(--accent);">SERVICE MODIFICATION (UPSELL)</div>
+        <div style="background:#f9f9f9;padding:15px;border:1px solid #ccc;border-radius:6px;">
+            <p style="font-size:0.85rem;margin-bottom:10px;">Current: <strong id="consultTicket" style="color:var(--primary);"></strong></p>
+            <div style="display:flex;gap:10px;"><select id="consultUpsellSelect" style="flex:1;padding:10px;border-radius:4px;border:1px solid #ccc;"></select><button class="btn" style="width:auto;background:var(--accent);" onclick="addUpsell()">Add</button></div>
+            <div id="consultAddedUpsells" style="margin-top:10px;font-size:0.85rem;color:var(--success);font-weight:bold;"></div>
+            <div style="text-align:right;font-weight:bold;margin-top:10px;border-top:1px dashed #ccc;padding-top:10px;">Projected Total: <span id="consultProjTotal"></span></div>
+        </div>
+
+        <div style="margin-top:20px;border-top:1px solid #ccc;padding-top:20px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;gap:5px;"><select id="consultReassign" style="padding:10px;border:1px solid #ccc;border-radius:4px;"></select><button class="btn btn-secondary" style="padding:10px 15px; width:auto;" onclick="reassign()">Reassign</button><button class="btn btn-secondary" style="padding:10px 15px; width:auto; color:red; border-color:red;" onclick="reqReschedule()">Reject/Reschedule</button></div>
+            <button id="btnConsultSave" class="btn" style="width:auto;background:var(--success);" onclick="saveConsult()">Save & Start</button>
+        </div>
+    </div>
+</div>
+
+<!-- FIREBASE SDKs -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-<script>
-    // ⚠️ PASTE YOUR GOOGLE CHAT WEBHOOK URL HERE
-    const GOOGLE_CHAT_WEBHOOK = ""; 
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyBTZOVjppINaVyYslRnAkC04EjJyMt40j8",
-        authDomain: "thuraya-client-telling.firebaseapp.com",
-        projectId: "thuraya-client-telling",
-        storageBucket: "thuraya-client-telling.firebasestorage.app",
-        messagingSenderId: "1061064260367",
-        appId: "1:1061064260367:web:ffedb019649bcf1cbadc7a"
-    };
-
-    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-    const provider = new firebase.auth.GoogleAuthProvider();
-
-    let secondaryApp;
-    try { secondaryApp = firebase.app("SecondaryApp"); } 
-    catch (e) { secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp"); }
-
-    let currentUserEmail = "", currentUserName = "", currentRoles = []; 
-    let allTechs = [], allClientsCache = [], allMenuServicesCache = [], liveTaxes = []; 
-    let isFetchingClients = false, searchTimeout = null, fohSearchTimeout = null, editingApptId = null; 
-    let curConsultId = null, curConsultData = null, upsls = [];
-    
-    function getLocalDateString() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    let todayDateStr = getLocalDateString();
-
-    function bindEvents() {
-        document.getElementById('btnGoogleLogin')?.addEventListener('click', signInWithGoogle);
-        document.getElementById('btnEmailLogin')?.addEventListener('click', signInWithEmail);
-        document.getElementById('btnLogout')?.addEventListener('click', logOut);
-        document.getElementById('btnFohSearch')?.addEventListener('click', liveClientSearchFOH);
-        document.getElementById('btnRegisterClient')?.addEventListener('click', registerClientOnly);
-        document.getElementById('btnSchedSearch')?.addEventListener('click', liveClientSearch);
-        document.getElementById('btnClearScheduleClient')?.addEventListener('click', clearScheduleClient);
-        document.getElementById('btnClearAllSelections')?.addEventListener('click', clearAllSelections);
-        document.getElementById('btnConfirmBooking')?.addEventListener('click', bookAppointment);
-        document.getElementById('btnCancelEdit')?.addEventListener('click', cancelEditMode);
-        document.getElementById('btnConfirmPayment')?.addEventListener('click', confirmPayment);
-        document.getElementById('btnCloseConsult')?.addEventListener('click', closeConsult);
-        document.getElementById('med_none')?.addEventListener('change', function() { toggleMedNone(this); });
-        document.getElementById('btnAddUpsell')?.addEventListener('click', addUpsell);
-        document.getElementById('btnReassign')?.addEventListener('click', reassign);
-        document.getElementById('btnReqReschedule')?.addEventListener('click', reqReschedule);
-        document.getElementById('btnSaveConsult')?.addEventListener('click', saveConsult);
-        document.getElementById('adv_category')?.addEventListener('change', updateAdvForm);
-        document.getElementById('btnClearAdvForm')?.addEventListener('click', clearAdvForm);
-        document.getElementById('btnSaveServiceConfig')?.addEventListener('click', addNewMenuServiceAdv);
-        document.getElementById('btnSeedMenu')?.addEventListener('click', seedDefaultMenu);
-        document.getElementById('btnAddTax')?.addEventListener('click', addTax);
-        document.getElementById('previewBasePrice')?.addEventListener('input', calculatePreview);
-        document.getElementById('btnGenerateReport')?.addEventListener('click', generateReport);
-        document.getElementById('btnRefreshDirectory')?.addEventListener('click', loadStaffDirectory);
-        document.getElementById('btnSaveStaffAccount')?.addEventListener('click', addStaffAccount);
-
-        document.getElementById('fohSearchPhone')?.addEventListener('keyup', liveClientSearchFOH);
-        document.getElementById('sched_search')?.addEventListener('keyup', liveClientSearch);
-        document.getElementById('sched_date')?.addEventListener('change', generateTimeSlots);
-        document.getElementById('sched_techSelect')?.addEventListener('change', generateTimeSlots);
-
-        document.querySelectorAll('input[name="main_nav"]').forEach(el => {
-            el.addEventListener('change', (e) => switchModule(e.target.value));
-        });
-        document.querySelectorAll('input[name="clients_view_toggle"]').forEach(el => {
-            el.addEventListener('change', toggleClientsSubView);
-        });
-        document.querySelectorAll('input[name="dept_toggle"]').forEach(el => {
-            el.addEventListener('change', toggleDeptView);
-        });
-        document.querySelectorAll('input[name="admin_dept_toggle"]').forEach(el => {
-            el.addEventListener('change', toggleAdminDeptView);
-        });
-        document.querySelectorAll('input[name="tax_inclusive_toggle"]').forEach(el => {
-            el.addEventListener('change', calculatePreview);
-        });
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        todayDateStr = getLocalDateString();
-        const schedDate = document.getElementById('sched_date');
-        if (schedDate) schedDate.min = todayDateStr;
-        bindEvents();
-        updateAdvForm();
-    });
-
-    function timeToMins(timeStr) {
-        if(!timeStr) return 0;
-        let [h, m] = timeStr.split(':');
-        return parseInt(h) * 60 + parseInt(m);
-    }
-
-    function switchModule(moduleId) {
-        document.querySelectorAll('.app-module').forEach(mod => mod.style.display = 'none');
-        document.getElementById(moduleId).style.display = 'block';
-        if (moduleId === 'adminView') { loadStaffDirectory(); }
-    }
-
-    function toggleClientsSubView() {
-        const view = document.querySelector('input[name="clients_view_toggle"]:checked').value;
-        ['Checkin', 'Schedule', 'Billing', 'Ops'].forEach(x => {
-            document.getElementById('subView_' + x).style.display = (view.toLowerCase() === x.toLowerCase()) ? 'block' : 'none';
-        });
-    }
-
-    function toggleDeptView() {
-        const view = document.querySelector('input[name="dept_toggle"]:checked')?.value;
-        const hand = document.getElementById('menu_dept_Hand');
-        const foot = document.getElementById('menu_dept_Foot');
-        if (hand) hand.style.display = (view === 'Hand') ? 'block' : 'none';
-        if (foot) foot.style.display = (view === 'Foot') ? 'block' : 'none';
-    }
-
-    function toggleAdminDeptView() {
-        const view = document.querySelector('input[name="admin_dept_toggle"]:checked')?.value;
-        const hand = document.getElementById('admin_dept_Hand');
-        const foot = document.getElementById('admin_dept_Foot');
-        if (hand) hand.style.display = (view === 'Hand') ? 'block' : 'none';
-        if (foot) foot.style.display = (view === 'Foot') ? 'block' : 'none';
-    }
-
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            const userEmail = user.email.toLowerCase();
-            try { await clockInStaff(userEmail, user.displayName || "Staff", []); } catch(e) { }
-            
-            try {
-                const userDoc = await db.collection('Users').doc(userEmail).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    currentUserEmail = userEmail;
-                    currentUserName = userData.name || user.displayName || "Staff Member";
-                    currentRoles = Array.isArray(userData.roles) ? userData.roles : (userData.role ? [userData.role] : []);
-
-                    document.getElementById('userNameDisplay').innerText = currentUserName;
-                    document.getElementById('userRoleDisplay').innerText = currentRoles.join(' | ');
-                    document.getElementById('loginScreen').style.display = 'none';
-                    document.getElementById('appDashboard').style.display = 'block';
-
-                    try { await fetchAllTechs(); } catch(e) { console.error(e); }
-                    try { startTaxListener(); } catch(e) { console.error(e); }
-                    
-                    document.getElementById('topNavMenu').style.display = 'flex';
-                    document.querySelectorAll('.nav-tab').forEach(tab => tab.style.display = 'none');
-                    
-                    const safeRoles = currentRoles.map(r => (typeof r === 'string' ? r.trim().toLowerCase() : ''));
-                    const isFOH = safeRoles.includes('foh');
-                    const isTech = safeRoles.some(r => r.includes('tech'));
-                    const isManager = safeRoles.includes('manager');
-                    const isAdmin = safeRoles.includes('system admin') || safeRoles.includes('admin');
-                    const isSupply = safeRoles.includes('supply chain');
-
-                    if(isManager || isFOH || isAdmin) {
-                        document.getElementById('tabClients').style.display = 'flex';
-                        try { startFohRosterListener(); } catch(e){}
-                        try { startFohFinancialListener(); } catch(e){}
-                        try { startExpectedTodayListener(); } catch(e){}
-                        try { startScheduleListener(); } catch(e){}
-                        try { startFohBillingListener(); } catch(e){}
-                    }
-
-                    if(isManager || isTech || isAdmin) {
-                        document.getElementById('tabAtelier').style.display = 'flex';
-                        try { startTechFinancialListener(); } catch(e){}
-                        try { startTechQueueListener(); } catch(e){}
-                    }
-
-                    if(isManager || isFOH || isTech || isAdmin) { document.getElementById('tabMenu').style.display = 'flex'; }
-                    if(isAdmin || isManager) { document.getElementById('tabHR').style.display = 'flex'; }
-                    if(isAdmin || isManager || isSupply) { document.getElementById('tabSupply').style.display = 'flex'; }
-                    if(isAdmin) { document.getElementById('tabAdmin').style.display = 'flex'; try { loadStaffDirectory(); } catch(e){} }
-
-                    if(isAdmin || isManager || isFOH || isTech) {
-                        try { fetchLiveMenu(isManager || isAdmin); } catch(e) {}
-                    }
-
-                    const firstVisibleTab = document.querySelector('.nav-tab[style*="flex"] input');
-                    if(firstVisibleTab) {
-                        firstVisibleTab.checked = true;
-                        switchModule(firstVisibleTab.value);
-                    }
-                } else {
-                    auth.signOut();
-                    showError("Access Denied: Your email is not registered in the matrix.");
-                }
-            } catch (error) { console.error(error); showError("Database connection error."); }
-        } else {
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('appDashboard').style.display = 'none';
-            document.getElementById('topNavMenu').style.display = 'none';
-        }
-    });
-
-    function signInWithEmail() { 
-        const email = document.getElementById('testEmail').value.trim();
-        const password = document.getElementById('testPassword').value;
-        if(!email || !password) { showError("Enter email and password."); return; }
-        document.getElementById('errorMsg').style.display = 'none'; 
-        auth.signInWithEmailAndPassword(email, password).catch(error => {
-            const code = error && error.code ? error.code : '';
-            if (
-                code === 'auth/invalid-login-credentials' ||
-                code === 'auth/wrong-password' ||
-                code === 'auth/user-not-found' ||
-                code === 'auth/invalid-credential'
-            ) {
-                showError("Invalid email or password.");
-            } else if (code === 'auth/invalid-email') {
-                showError("Enter a valid email address.");
-            } else if (code === 'auth/too-many-requests') {
-                showError("Too many failed attempts. Try again later.");
-            } else {
-                showError(error.message || "Login failed.");
-            }
-        }); 
-    }
-
-    function signInWithGoogle() { document.getElementById('errorMsg').style.display = 'none'; auth.signInWithPopup(provider).catch(error => showError(error.message)); }
-    
-    async function logOut() { 
-        if(currentUserEmail) { try { await db.collection('Attendance').doc(`${currentUserEmail}_${todayDateStr}`).update({ clockOut: firebase.firestore.FieldValue.serverTimestamp() }); } catch(e) {} }
-        auth.signOut(); 
-    }
-    
-    function showError(msg) { const el = document.getElementById('errorMsg'); el.innerText = msg; el.style.display = 'block'; }
-
-    async function clockInStaff(email, name, rolesArray) {
-        const docId = `${email}_${todayDateStr}`;
-        const docRef = db.collection('Attendance').doc(docId);
-        const doc = await docRef.get();
-        if(!doc.exists) { await docRef.set({ email: email, name: name, roleString: rolesArray.join(','), date: todayDateStr, clockIn: firebase.firestore.FieldValue.serverTimestamp() }); }
-    }
-
-    async function fetchAllTechs() {
-        try {
-            const snapshot = await db.collection('Users').get();
-            allTechs = [];
-            
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const r = Array.isArray(data.roles) ? data.roles : (data.role ? [data.role] : []);
-                const safeR = r.map(role => (typeof role === 'string' ? role.toLowerCase() : ''));
-                
-                const isNormalTech = safeR.some(role => role === 'tech' || role === 'technician');
-                const isTestTech = safeR.some(role => role.includes('test tech'));
-
-                if(isNormalTech || isTestTech) { 
-                    allTechs.push({ email: doc.id, name: data.name || "Unknown", isTest: isTestTech }); 
-                }
-            });
-            
-            const select = document.getElementById('sched_techSelect');
-            if(select) {
-                select.innerHTML = '<option value="" disabled selected>Select Technician...</option>';
-                allTechs.forEach(t => { select.innerHTML += `<option value="${t.email}">${t.name}</option>`; });
-            }
-            const reassignSelect = document.getElementById('consultReassign');
-            if(reassignSelect) {
-                reassignSelect.innerHTML = '<option value="">Reassign to...</option>';
-                allTechs.forEach(t => { reassignSelect.innerHTML += `<option value="${t.email}">${t.name}</option>`; });
-            }
-        } catch(e) { console.error("Error fetching techs:", e); }
-    }
-
-    // ==========================================
-    // DYNAMIC TAX ENGINE
-    // ==========================================
-    function startTaxListener() {
-        db.collection('Tax_Settings').doc('current_taxes').onSnapshot(doc => {
-            liveTaxes = [];
-            if(doc.exists && doc.data().rates) {
-                liveTaxes = doc.data().rates;
-            }
-            renderTaxConfigUI();
-            updatePreviewToggles();
-            calculateScheduleTotals(); 
-        });
-    }
-
-    window.editTax = function(name, rate) {
-        document.getElementById('cfgTaxName').value = name;
-        document.getElementById('cfgTaxRate').value = rate;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    async function addTax() {
-        const name = document.getElementById('cfgTaxName').value.trim();
-        const rate = parseFloat(document.getElementById('cfgTaxRate').value);
-        if(!name || isNaN(rate)) { alert("Enter a valid Tax Name and numerical Rate."); return; }
-
-        let currentRates = [...liveTaxes];
-        let existingIdx = currentRates.findIndex(t => t.name.toLowerCase() === name.toLowerCase());
-        if(existingIdx >= 0) { currentRates[existingIdx].rate = rate; } 
-        else { currentRates.push({ name: name, rate: rate }); }
-
-        try {
-            await db.collection('Tax_Settings').doc('current_taxes').set({ rates: currentRates }, {merge: true});
-            document.getElementById('cfgTaxName').value = '';
-            document.getElementById('cfgTaxRate').value = '';
-        } catch(e) { alert("Error saving tax: " + e.message); }
-    }
-
-    window.deleteTax = async function(taxName) {
-        if(!confirm(`Remove ${taxName} from the system?`)) return;
-        let currentRates = liveTaxes.filter(t => t.name !== taxName);
-        try {
-            await db.collection('Tax_Settings').doc('current_taxes').set({ rates: currentRates }, {merge: true});
-        } catch(e) { alert("Error deleting tax: " + e.message); }
-    }
-
-    function renderTaxConfigUI() {
-        const listDiv = document.getElementById('taxConfigList');
-        if(!listDiv) return;
-        if(liveTaxes.length === 0) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No taxes currently configured.</p>'; return; }
-        
-        let html = '';
-        liveTaxes.forEach(t => {
-            html += `<div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border:1px solid var(--border); border-radius:4px; margin-bottom:5px;">
-                <strong>${t.name}</strong>
-                <div style="display:flex; align-items:center; gap:15px;">
-                    <span style="color:var(--manager); font-weight:bold;">${t.rate}%</span>
-                    <button class="btn" style="background:var(--primary); padding:4px 10px; width:auto; font-size:0.75rem;" onclick="editTax('${t.name}', ${t.rate})">Edit</button>
-                    <button class="btn" style="background:var(--error); padding:4px 10px; width:auto; font-size:0.75rem;" onclick="deleteTax('${t.name}')">Remove</button>
-                </div>
-            </div>`;
-        });
-        listDiv.innerHTML = html;
-    }
-
-    window.updatePreviewToggles = function() {
-        const container = document.getElementById('previewTaxToggles');
-        if(!container) return;
-        if(liveTaxes.length === 0) {
-            container.innerHTML = '<p style="color:#999; font-size:0.8rem; margin:0;">Add a tax above to see toggles here.</p>';
-            calculatePreview();
-            return;
-        }
-        let html = '';
-        liveTaxes.forEach((t, index) => {
-            html += `<label style="font-weight:normal; cursor:pointer; display:flex; align-items:center; gap:8px; margin-bottom:5px;">
-                        <input type="checkbox" class="preview-tax-cb" value="${index}" checked  style="width:16px; height:16px; accent-color:var(--manager);"> 
-                        ${t.name} (${t.rate}%)
-                     </label>`;
-        });
-        container.innerHTML = html;
-        calculatePreview();
-    }
-
-    window.calculatePreview = function() {
-        let inputPrice = parseFloat(document.getElementById('previewBasePrice').value) || 0;
-        let toggleEl = document.querySelector('input[name="tax_inclusive_toggle"]:checked');
-        let isInclusive = toggleEl ? toggleEl.value === 'inclusive' : false;
-
-        let taxHtml = '';
-        let totalTaxRate = 0;
-
-        document.querySelectorAll('.preview-tax-cb:checked').forEach(cb => {
-            let taxObj = liveTaxes[cb.value];
-            if(taxObj) { totalTaxRate += taxObj.rate; }
-        });
-
-        let basePrice = 0, grandTotal = 0;
-
-        if (isInclusive) {
-            grandTotal = inputPrice;
-            basePrice = inputPrice / (1 + (totalTaxRate / 100));
-        } else {
-            basePrice = inputPrice;
-            grandTotal = inputPrice * (1 + (totalTaxRate / 100));
-        }
-
-        let calculatedTotalTax = 0;
-
-        document.querySelectorAll('.preview-tax-cb:checked').forEach(cb => {
-            let taxObj = liveTaxes[cb.value];
-            if(taxObj) {
-                let amt = basePrice * (taxObj.rate / 100);
-                calculatedTotalTax += amt;
-                taxHtml += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#777; margin-bottom:3px;"><span>+ ${taxObj.name} (${taxObj.rate}%)</span><span>${amt.toFixed(2)} GHC</span></div>`;
-            }
-        });
-
-        let baseOut = document.getElementById('prevBaseOut');
-        if(baseOut) baseOut.innerText = 'Base: ' + basePrice.toFixed(2) + ' GHC';
-
-        let breakdownDiv = document.getElementById('prevTaxBreakdown');
-        if(breakdownDiv) breakdownDiv.innerHTML = taxHtml;
-        
-        let totalOut = document.getElementById('prevTotalOut');
-        if(totalOut) totalOut.innerText = 'Total: ' + grandTotal.toFixed(2) + ' GHC';
-    }
-
-    // ==========================================
-    // DYNAMIC MENU DISPLAY ENGINE 
-    // ==========================================
-    function fetchLiveMenu(hasEditAccess) {
-        if (hasEditAccess) {
-            let controls = document.getElementById('managerMenuControls');
-            if (controls) controls.style.display = 'block';
-            let seedBtn = document.getElementById('seedMenuBtnContainer');
-            if (seedBtn) seedBtn.style.display = 'block';
-        }
-
-        db.collection('Menu_Services').onSnapshot(snap => {
-            const menuContainer = document.getElementById('sched_serviceMenu');
-            const adminList = document.getElementById('menuManagerList');
-
-            if(snap.empty) {
-                if(adminList) adminList.innerHTML = '<p style="text-align:center; color:#999;">Menu database is empty. Manager must initialize.</p>';
-                if(menuContainer) menuContainer.innerHTML = '<p style="color:#999; font-style:italic; text-align:center;">No services available.</p>';
-                return;
-            }
-
-            let services = [];
-            snap.forEach(doc => { services.push({ id: doc.id, ...doc.data() }); });
-            
-            services.sort((a, b) => {
-                let catA = a.category || "";
-                let catB = b.category || "";
-                return catA.localeCompare(catB);
-            });
-
-            allMenuServicesCache = services;
-
-            // Populate Upsell Dropdown
-            let uSel = document.getElementById('consultUpsellSelect');
-            if(uSel) {
-                uSel.innerHTML = '<option value="">Select a service or add-on...</option>';
-                allMenuServicesCache.forEach(s => {
-                    if(s.status === "Active") {
-                        uSel.innerHTML += `<option value="${s.id}">${s.name} (${s.price} GHC)</option>`;
-                    }
-                });
-            }
-
-            let dbData = { Hand: {}, Foot: {} };
-            
-            services.forEach(s => {
-                let cat = s.category || "Uncategorized";
-                if(s.department === "Both") {
-                    if(!dbData["Hand"][cat]) dbData["Hand"][cat] = [];
-                    dbData["Hand"][cat].push(s);
-                    if(!dbData["Foot"][cat]) dbData["Foot"][cat] = [];
-                    dbData["Foot"][cat].push(s);
-                } else {
-                    let dept = s.department || "Hand"; 
-                    if(!dbData[dept]) dbData[dept] = {};
-                    if(!dbData[dept][cat]) dbData[dept][cat] = [];
-                    dbData[dept][cat].push(s);
-                }
-            });
-
-            let bookingHtml = '';
-            let adminHtml = '';
-
-            ['Hand', 'Foot'].forEach(dept => {
-                let disp = dept === 'Hand' ? 'block' : 'none';
-                bookingHtml += `<div id="menu_dept_${dept}" style="display: ${disp};">`;
-                adminHtml += `<div id="admin_dept_${dept}" style="display: ${disp};">`;
-                
-                let col1 = ''; let col2 = '';
-                let toggleCol = true;
-
-                // --- SMART SORTING ALGORITHM ---
-                let sortedCats = Object.keys(dbData[dept]).sort((a, b) => {
-                    let aClean = a.trim().toUpperCase();
-                    let bClean = b.trim().toUpperCase();
-                    let numRegex = /^(\d+|I{1,3}|IV|V|VI)\./;
-                    let isNumA = numRegex.test(aClean);
-                    let isNumB = numRegex.test(bClean);
-                    
-                    if (isNumA && !isNumB) return -1;
-                    if (!isNumA && isNumB) return 1;
-                    
-                    return aClean.localeCompare(bClean, undefined, {numeric: true, sensitivity: 'base'});
-                });
-
-                sortedCats.forEach(cat => {
-                    let sectionTypeHint = "";
-                    if (dbData[dept][cat].length > 0) {
-                        let firstType = dbData[dept][cat][0].inputType;
-                        if (firstType === 'radio') sectionTypeHint = "<span class='section-hint'>(SELECT ONE ONLY)</span>";
-                        else sectionTypeHint = "<span class='section-hint'>(SELECT ANY / MULTIPLE)</span>";
-                    }
-
-                    let sectionHtml = `<div class="menu-col"><div class="menu-section-title"><span>${cat}</span> ${sectionTypeHint}</div>`;
-                    let adminSectionHtml = `<div class="menu-section-title">${cat}</div><div class="grid-2">`;
-                    
-                    dbData[dept][cat].forEach(s => {
-                        let type = s.inputType || "radio"; 
-                        let safeName = s.name || "Unnamed";
-                        let safeDur = s.duration || 0;
-                        let safePrc = s.price || 0;
-                        let descHtml = s.desc ? `<span class="service-desc">${s.desc}</span>` : '';
-                        let tagHtml = (s.tag && s.tag !== "None") ? `<span class="hl-tag">${s.tag}</span>` : '';
-                        
-                        if(type === 'counter') {
-                            sectionHtml += `
-                                <div class="service-card" style="align-items:center;">
-                                    <label style="margin-left:0; cursor:default;">
-                                        <strong>${safeName} ${tagHtml}</strong>
-                                        ${descHtml}
-                                        <div style="margin-top:5px; color:var(--accent); font-weight:bold; font-size:0.8rem;">${safeDur > 0 ? safeDur+' mins | ' : ''}${safePrc} GHC / ea</div>
-                                    </label>
-                                    <div class="counter-box">
-                                        <button class="btn btn-secondary" style="padding:2px 10px; width:auto;" onclick="updateCounter('${s.id}', -1)">-</button>
-                                        <input type="number" id="sched_qty_${s.id}" class="sched-service-counter" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}" value="0" min="0" readonly>
-                                        <button class="btn btn-secondary" style="padding:2px 10px; width:auto;" onclick="updateCounter('${s.id}', 1)">+</button>
-                                    </div>
-                                </div>
-                            `;
-                        } else {
-                            let inputName = type === 'radio' ? `sched_base_${dept}` : `sched_cb_${s.id}`;
-                            let inputHtml = type === 'radio' 
-                                ? `<input type="radio" name="${inputName}" class="sched-service-item" id="sched_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`
-                                : `<input type="checkbox" class="sched-service-item" id="sched_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`;
-
-                            sectionHtml += `
-                                <div class="service-card" onclick="toggleServiceCard(event, this, '${s.id}', '${type}', '${inputName}')">
-                                    ${inputHtml}
-                                    <label>
-                                        <strong>${safeName} ${tagHtml}</strong>
-                                        ${descHtml}
-                                        <div style="margin-top:8px; display:inline-block; background:#eef5f9; color:#555; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">${safeDur > 0 ? safeDur+' mins | ' : ''}${safePrc} GHC</div>
-                                    </label>
-                                </div>
-                            `;
-                        }
-
-                        if(hasEditAccess) {
-                            adminSectionHtml += `
-                            <div class="service-card" style="align-items: center; cursor:default;">
-                                <div style="flex-grow: 1;">
-                                    <strong>${safeName} ${tagHtml}</strong> <span style="font-size:0.7rem; background:#eee; padding:2px 5px; border-radius:4px;">${type.toUpperCase()}</span><br>
-                                    <div style="margin-top:8px; display:flex; gap:10px; align-items:center;">
-                                        <input type="number" id="dur_${s.id}" value="${safeDur}" style="width:70px; padding:5px; border:1px solid #ccc; border-radius:4px;"> m
-                                        <input type="number" id="prc_${s.id}" value="${safePrc}" style="width:70px; padding:5px; border:1px solid #ccc; border-radius:4px;"> ₵
-                                    </div>
-                                </div>
-                                <div style="display:flex; flex-direction:column; gap:5px;">
-                                    <button class="btn" style="padding:8px; background:var(--success); font-size:0.75rem;" onclick="updateMenuService('${s.id}')">Save</button>
-                                    <button class="btn" style="padding:8px; background:var(--error); font-size:0.75rem;" onclick="deleteMenuService('${s.id}')">Del</button>
-                                </div>
-                            </div>`;
-                        } else {
-                            adminSectionHtml += `
-                            <div class="service-card" style="cursor:default;">
-                                <label style="margin-left:0; cursor:default;">
-                                    <strong>${safeName} ${tagHtml}</strong>
-                                    <span class="service-desc">${safeDur} mins | ${safePrc} GHC</span>
-                                </label>
-                            </div>`;
-                        }
-                    });
-                    
-                    sectionHtml += `</div>`;
-                    adminSectionHtml += `</div>`;
-
-                    if(toggleCol) { col1 += sectionHtml; } else { col2 += sectionHtml; }
-                    toggleCol = !toggleCol;
-                    adminHtml += adminSectionHtml;
-                });
-                
-                bookingHtml += `<div class="grid-2" style="align-items:start;">${col1}${col2}</div></div>`;
-                adminHtml += `</div>`;
-            });
-
-            if(adminList) adminList.innerHTML = adminHtml;
-            if(menuContainer) menuContainer.innerHTML = bookingHtml;
-
-        }, error => {
-            console.error(error);
-            let menuContainer = document.getElementById('sched_serviceMenu');
-            if(menuContainer) menuContainer.innerHTML = `<p style="color:red;">Error loading menu: ${error.message}</p>`;
-        });
-    }
-
-    window.updateMenuService = async function(id) {
-        let dur = parseInt(document.getElementById('dur_' + id).value) || 0;
-        let prc = parseFloat(document.getElementById('prc_' + id).value) || 0;
-        try {
-            await db.collection('Menu_Services').doc(id).update({ duration: dur, price: prc });
-            alert("Service updated successfully!");
-        } catch(e) { alert("Error updating: " + e.message); }
-    };
-
-    window.deleteMenuService = async function(id) {
-        if(confirm("Are you sure you want to permanently delete this service from the menu?")) {
-            try { await db.collection('Menu_Services').doc(id).delete(); } 
-            catch(e) { alert("Error deleting: " + e.message); }
-        }
-    };
-
-    window.seedDefaultMenu = async function() {
-        if(!confirm("This will inject dummy data. Proceed?")) return;
-        const menuItems = [
-            { dept: "Hand", cat: "I. HAND THERAPIES", type: "radio", name: "Youthful Touch (Hand Renewal)", dur: 45, prc: 220, desc: "", tag: "None" },
-            { dept: "Hand", cat: "A. FINISHING INDULGENCES", type: "checkbox", name: "Lush Arm Sculpt", dur: 20, prc: 50, desc: "", tag: "None" }
-        ];
-        try {
-            for(let item of menuItems) {
-                let docId = item.name.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now();
-                await db.collection('Menu_Services').doc(docId).set({
-                    department: item.dept, category: item.cat, inputType: item.type, name: item.name,
-                    duration: item.dur, price: item.prc, desc: item.desc, status: "Active", tag: item.tag
-                });
-            }
-            alert("Menu seeded successfully!");
-        } catch(e) { alert("Error seeding menu: " + e.message); }
-    }
-
-    // Toggle logic
-    window.toggleServiceCard = function(event, cardElement, id, type, groupName) {
-        event.preventDefault(); 
-        const input = document.getElementById('sched_cb_' + id);
-        if(!input) return;
-
-        if(type === 'radio') {
-            if(input.checked) {
-                input.checked = false;
-                cardElement.classList.remove('selected');
-            } else {
-                document.querySelectorAll(`input[name="${groupName}"]`).forEach(r => {
-                    r.checked = false;
-                    let card = r.closest('.service-card');
-                    if (card) card.classList.remove('selected');
-                });
-                input.checked = true;
-                cardElement.classList.add('selected');
-            }
-        } else {
-            input.checked = !input.checked;
-            if(input.checked) { cardElement.classList.add('selected'); } else { cardElement.classList.remove('selected'); }
-        }
-        calculateScheduleTotals();
-    }
-
-    window.updateCounter = function(id, val) {
-        const input = document.getElementById('sched_qty_' + id);
-        if(!input) return;
-        let current = parseInt(input.value) || 0;
-        current += val;
-        if(current < 0) current = 0;
-        input.value = current;
-        calculateScheduleTotals();
-    }
-
-    window.clearAllSelections = function() {
-        document.querySelectorAll('.sched-service-item').forEach(cb => cb.checked = false);
-        document.querySelectorAll('.sched-service-counter').forEach(input => input.value = 0);
-        document.querySelectorAll('.service-card').forEach(card => card.classList.remove('selected'));
-        calculateScheduleTotals();
-    }
-
-    // Cost Breakdown Logic (WITH TAXES)
-    function calculateScheduleTotals() {
-        let totalMins = 0;
-        let subtotalCost = 0;
-        let breakdownHtml = '';
-        
-        document.querySelectorAll('.sched-service-item:checked').forEach(input => { 
-            let mins = parseInt(input.getAttribute('data-duration')) || 0;
-            let cost = parseFloat(input.getAttribute('data-price')) || 0;
-            let name = input.getAttribute('data-name');
-            
-            totalMins += mins; 
-            subtotalCost += cost;
-            breakdownHtml += `<div class="breakdown-row"><span>${name}</span><span>${cost.toFixed(2)} GHC</span></div>`;
-        });
-        
-        document.querySelectorAll('.sched-service-counter').forEach(input => {
-            let qty = parseInt(input.value) || 0;
-            if(qty > 0) {
-                let costPer = parseFloat(input.getAttribute('data-price')) || 0;
-                let mins = parseInt(input.getAttribute('data-duration')) || 0;
-                let name = input.getAttribute('data-name');
-                
-                let itemTotalCost = costPer * qty;
-                totalMins += mins; 
-                subtotalCost += itemTotalCost;
-                breakdownHtml += `<div class="breakdown-row"><span>${name} (x${qty})</span><span>${itemTotalCost.toFixed(2)} GHC</span></div>`;
-            }
-        });
-
-        // TAX ENGINE CALCULATION
-        let totalTaxAmt = 0;
-        let taxBreakdownHtml = '';
-        let taxDataArr = [];
-
-        if (subtotalCost > 0 && liveTaxes.length > 0) {
-            taxBreakdownHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:5px; font-weight:bold; color:#555;"><span>Subtotal:</span><span>${subtotalCost.toFixed(2)} GHC</span></div>`;
-            
-            liveTaxes.forEach(t => {
-                let tAmt = subtotalCost * (t.rate / 100);
-                totalTaxAmt += tAmt;
-                taxDataArr.push({ name: t.name, rate: t.rate, amount: tAmt });
-                taxBreakdownHtml += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#777; margin-bottom:3px;"><span>+ ${t.name} (${t.rate}%)</span><span>${tAmt.toFixed(2)} GHC</span></div>`;
-            });
-            document.getElementById('sched_taxBreakdown').innerHTML = taxBreakdownHtml;
-            document.getElementById('sched_taxBreakdown').style.display = 'block';
-        } else {
-            document.getElementById('sched_taxBreakdown').style.display = 'none';
-        }
-
-        let grandTotal = subtotalCost + totalTaxAmt;
-
-        document.getElementById('sched_totalDuration').innerText = totalMins;
-        document.getElementById('sched_totalCost').innerText = grandTotal.toFixed(2);
-        
-        document.getElementById('sched_subtotalVal').value = subtotalCost;
-        document.getElementById('sched_taxData').value = JSON.stringify(taxDataArr);
-        document.getElementById('sched_grandTotalVal').value = grandTotal;
-        
-        const breakdownDiv = document.getElementById('sched_breakdown');
-        const breakdownList = document.getElementById('sched_breakdownList');
-        
-        if (subtotalCost > 0 || totalMins > 0) {
-            breakdownList.innerHTML = breakdownHtml;
-            breakdownDiv.style.display = 'block';
-        } else {
-            breakdownList.innerHTML = '';
-            breakdownDiv.style.display = 'none';
-        }
-
-        generateTimeSlots(); 
-    }
-
-    window.selectTimeSlot = function(timeStr, btnElement) {
-        document.getElementById('sched_time').value = timeStr;
-        document.querySelectorAll('.time-slot-btn').forEach(btn => btn.classList.remove('selected'));
-        btnElement.classList.add('selected');
-    }
-
-    async function generateTimeSlots() {
-        let date = document.getElementById('sched_date').value;
-        let duration = parseInt(document.getElementById('sched_totalDuration').innerText) || 0;
-        let techEmail = document.getElementById('sched_techSelect').value;
-        let slotsContainer = document.getElementById('sched_timeSlots');
-        
-        if (date && date < todayDateStr) {
-            slotsContainer.innerHTML = '<p style="color:var(--error); font-weight:bold; margin:0;">You cannot book appointments in the past.</p>';
-            return;
-        }
-
-        document.getElementById('sched_time').value = '';
-
-        if(!date || !techEmail || duration === 0) {
-            slotsContainer.innerHTML = '<p style="color:#999; font-size:0.85rem; margin:0; font-style: italic;">⚠️ Please select at least one Service, a Date, and a Technician to generate available times.</p>';
-            return;
-        }
-
-        slotsContainer.innerHTML = '<p style="color:#666; font-size:0.85rem; margin:0;">Calculating slots...</p>';
-        
-        try {
-            let snap = await db.collection('Appointments').where('dateString', '==', date).get();
-
-            let busyBlocks = []; 
-            snap.forEach(doc => {
-                if(editingApptId && doc.id === editingApptId) return;
-
-                let appt = doc.data();
-                if(appt.assignedTechEmail === techEmail && (appt.status === 'Scheduled' || appt.status === 'Arrived')) {
-                    let aStart = timeToMins(appt.timeString);
-                    let aEnd = aStart + parseInt(appt.bookedDuration || 0);
-                    busyBlocks.push({start: aStart, end: aEnd});
-                }
-            });
-
-            let openTime = 8 * 60; let closeTime = 20 * 60; let interval = 30; 
-            let html = '<div style="display:flex; flex-wrap:wrap; gap:10px;">';
-            let slotsFound = false;
-
-            let now = new Date();
-            let currentMins = now.getHours() * 60 + now.getMinutes();
-            let isToday = (date === todayDateStr);
-
-            for(let t = openTime; t + duration <= closeTime; t += interval) {
-                if (isToday && t <= currentMins) {
-                    continue;
-                }
-
-                let slotStart = t; let slotEnd = t + duration; let isAvailable = true;
-
-                // EVERYONE IS BLOCKED FROM DOUBLE BOOKING NOW
-                for(let i=0; i<busyBlocks.length; i++) {
-                    let b = busyBlocks[i];
-                    if(slotStart < b.end && slotEnd > b.start) { isAvailable = false; break; }
-                }
-
-                if(isAvailable) {
-                    slotsFound = true;
-                    let hrs = Math.floor(t / 60); let mins = t % 60; let ampm = hrs >= 12 ? 'PM' : 'AM';
-                    let displayHrs = hrs % 12; if(displayHrs === 0) displayHrs = 12;
-                    let displayMins = mins < 10 ? '0'+mins : mins;
-                    
-                    let timeString24 = `${hrs < 10 ? '0'+hrs : hrs}:${displayMins}`;
-                    let timeString12 = `${displayHrs}:${displayMins} ${ampm}`;
-
-                    html += `<button type="button" class="time-slot-btn" data-time="${timeString24}" onclick="selectTimeSlot('${timeString24}', this)">${timeString12}</button>`;
-                }
-            }
-            html += '</div>';
-
-            if(!slotsFound) { slotsContainer.innerHTML = '<p style="color:var(--error); font-weight:bold; margin:0;">No time slots available for this duration.</p>'; } 
-            else { slotsContainer.innerHTML = html; }
-
-        } catch(e) { console.error("Availability Error:", e); }
-    }
-
-    // ==========================================
-    // APPOINTMENT EDIT LIFECYCLE
-    // ==========================================
-    window.editAppointment = async function(id) {
-        try {
-            let doc = await db.collection('Appointments').doc(id).get();
-            if(!doc.exists) return;
-            let appt = doc.data();
-
-            document.getElementById('tab_toggle_schedule').click();
-
-            document.getElementById('sched_phone').value = appt.clientPhone || '';
-            document.getElementById('sched_name').value = appt.clientName || '';
-            document.getElementById('sched_displayName').innerText = appt.clientName || 'Unknown';
-            document.getElementById('sched_displayPhone').innerText = appt.clientPhone || 'Unknown';
-            document.getElementById('sched_search').value = '';
-            document.getElementById('sched_searchResults').style.display = 'none';
-            document.getElementById('sched_selectedClientDisplay').style.display = 'block';
-
-            editingApptId = id;
-            document.getElementById('btnConfirmBooking').innerText = "Update Appointment";
-            document.getElementById('btnCancelEdit').style.display = 'inline-block';
-
-            clearAllSelections();
-
-            setTimeout(() => {
-                let servicesArr = appt.bookedService.split(', ').map(s => s.trim());
-                
-                document.querySelectorAll('.sched-service-item').forEach(cb => {
-                    if(servicesArr.includes(cb.getAttribute('data-name'))) {
-                        cb.checked = true;
-                        cb.closest('.service-card').classList.add('selected');
-                    }
-                });
-
-                document.querySelectorAll('.sched-service-counter').forEach(input => {
-                    let name = input.getAttribute('data-name');
-                    let match = servicesArr.find(s => s.startsWith(name + ' (x'));
-                    if(match) {
-                        let matchArr = match.match(/\(x(\d+)\)/);
-                        if(matchArr && matchArr[1]) {
-                            input.value = parseInt(matchArr[1]);
-                        }
-                    }
-                });
-
-                document.getElementById('sched_date').value = appt.dateString;
-                document.getElementById('sched_techSelect').value = appt.assignedTechEmail;
-
-                calculateScheduleTotals();
-
-                setTimeout(() => {
-                    let timeBtns = document.querySelectorAll('.time-slot-btn');
-                    timeBtns.forEach(btn => {
-                        if(btn.getAttribute('data-time') === appt.timeString) {
-                            selectTimeSlot(appt.timeString, btn);
-                        }
-                    });
-                }, 500); 
-            }, 200);
-
-        } catch(e) {
-            console.error(e);
-            alert("Error loading appointment for edit.");
-        }
-    }
-
-    function clearScheduleClient() {
-        const schedPhone = document.getElementById('sched_phone');
-        const schedName = document.getElementById('sched_name');
-        const displayName = document.getElementById('sched_displayName');
-        const displayPhone = document.getElementById('sched_displayPhone');
-        const selectedClientDisplay = document.getElementById('sched_selectedClientDisplay');
-        const searchInput = document.getElementById('sched_search');
-        const resultsBox = document.getElementById('sched_searchResults');
-
-        if (schedPhone) schedPhone.value = '';
-        if (schedName) schedName.value = '';
-        if (displayName) displayName.innerText = '';
-        if (displayPhone) displayPhone.innerText = '';
-        if (selectedClientDisplay) selectedClientDisplay.style.display = 'none';
-        if (searchInput) searchInput.value = '';
-        if (resultsBox) {
-            resultsBox.innerHTML = '';
-            resultsBox.style.display = 'none';
-        }
-    }
-
-    function clearAdvForm() {
-        ['adv_name', 'adv_duration', 'adv_price', 'adv_desc', 'adv_section'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        const defaults = {
-            adv_category: 'Hand Therapy',
-            adv_pricing_type: 'Fixed',
-            adv_status: 'Active',
-            adv_applies_to: 'Hand',
-            adv_selection: 'Single',
-            adv_tag: 'None'
-        };
-        Object.entries(defaults).forEach(([id, value]) => {
-            const el = document.getElementById(id);
-            if (el) el.value = value;
-        });
-        updateAdvForm();
-    }
-
-    function updateAdvForm() {
-        const category = document.getElementById('adv_category')?.value || 'Hand Therapy';
-        const typeSelect = document.getElementById('adv_type');
-        const appliesTo = document.getElementById('adv_applies_to');
-        const selection = document.getElementById('adv_selection');
-
-        if (!typeSelect) return;
-
-        if (category === 'Add-On') {
-            typeSelect.innerHTML = '<option value="Add-On">Add-On / Upgrade</option>';
-            if (appliesTo) appliesTo.value = 'Both';
-            if (selection) selection.value = 'Multi';
-        } else {
-            typeSelect.innerHTML = '<option value="Main Therapy">Main Therapy (Single Select)</option>';
-            if (selection && selection.value !== 'Single' && selection.value !== 'Multi') selection.value = 'Single';
-        }
-    }
-
-    async function addNewMenuServiceAdv() {
-        const payload = {
-            category: document.getElementById('adv_category')?.value || '',
-            type: document.getElementById('adv_type')?.value || '',
-            name: document.getElementById('adv_name')?.value.trim() || '',
-            duration: parseInt(document.getElementById('adv_duration')?.value || '0', 10),
-            price: parseFloat(document.getElementById('adv_price')?.value || '0'),
-            pricingType: document.getElementById('adv_pricing_type')?.value || 'Fixed',
-            status: document.getElementById('adv_status')?.value || 'Active',
-            description: document.getElementById('adv_desc')?.value.trim() || '',
-            appliesTo: document.getElementById('adv_applies_to')?.value || 'Hand',
-            selection: document.getElementById('adv_selection')?.value || 'Single',
-            section: document.getElementById('adv_section')?.value.trim() || '',
-            tag: document.getElementById('adv_tag')?.value || 'None',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        if (!payload.name) {
-            alert('Enter a service name.');
-            return;
-        }
-        if (!payload.duration || payload.duration < 0) {
-            alert('Enter a valid duration.');
-            return;
-        }
-        if (isNaN(payload.price) || payload.price < 0) {
-            alert('Enter a valid price.');
-            return;
-        }
-
-        try {
-            await db.collection('Menu_Services').add(payload);
-            clearAdvForm();
-            if (typeof fetchLiveMenu === 'function') {
-                fetchLiveMenu(true);
-            }
-            alert('Service configuration saved.');
-        } catch (e) {
-            console.error(e);
-            alert('Error saving service configuration.');
-        }
-    }
-
-    window.cancelEditMode = function() {
-        editingApptId = null;
-        document.getElementById('btnConfirmBooking').innerText = "Confirm & Book Appointment";
-        document.getElementById('btnCancelEdit').style.display = 'none';
-        clearScheduleClient();
-        document.getElementById('sched_date').value = '';
-        document.getElementById('sched_time').value = '';
-        document.getElementById('sched_techSelect').value = '';
-        clearAllSelections();
-    }
-
-    async function bookAppointment() {
-        const phone = document.getElementById('sched_phone').value;
-        const name = document.getElementById('sched_name').value;
-        const date = document.getElementById('sched_date').value;
-        const time = document.getElementById('sched_time').value;
-        const duration = document.getElementById('sched_totalDuration').innerText;
-        
-        const subtotal = document.getElementById('sched_subtotalVal').value;
-        const taxData = document.getElementById('sched_taxData').value;
-        const grandTotal = document.getElementById('sched_grandTotalVal').value;
-        
-        const techEmail = document.getElementById('sched_techSelect').value;
-        const techName = document.getElementById('sched_techSelect').options[document.getElementById('sched_techSelect').selectedIndex]?.text;
-        
-        let services = [];
-        
-        document.querySelectorAll('.sched-service-item:checked').forEach(cb => { services.push(cb.getAttribute('data-name')); });
-        document.querySelectorAll('.sched-service-counter').forEach(input => {
-            let qty = parseInt(input.value) || 0;
-            if(qty > 0) { services.push(`${input.getAttribute('data-name')} (x${qty})`); }
-        });
-
-        const serviceString = services.join(', ');
-
-        if(!phone || !name || !date || !time || !techEmail || services.length === 0) {
-            alert("Please complete the form: Select a client, at least one service, date, a technician, and an AVAILABLE TIME SLOT."); return;
-        }
-
-        try {
-            let payload = {
-                clientPhone: phone, clientName: name, dateString: date, timeString: time,
-                assignedTechEmail: techEmail, assignedTechName: techName,
-                bookedService: serviceString, bookedDuration: duration, 
-                bookedPrice: subtotal, taxBreakdown: taxData, grandTotal: grandTotal, 
-                status: 'Scheduled', bookedBy: currentUserEmail,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-
-            if (editingApptId) {
-                await db.collection('Appointments').doc(editingApptId).update(payload);
-                alert("Appointment successfully updated!");
-            } else {
-                payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                await db.collection('Appointments').add(payload);
-                alert("Appointment successfully secured!");
-            }
-            
-            cancelEditMode(); 
-            
-        } catch(e) { alert("Error booking: " + e.message); }
-    }
-
-    function startScheduleListener() {
-        const listDiv = document.getElementById('upcomingScheduleList');
-        try {
-            scheduleListener = db.collection('Appointments').where('status', 'in', ['Scheduled', 'Action Required']).onSnapshot(snap => {
-                if(snap.empty) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No upcoming appointments scheduled.</p>'; return; }
-                
-                let allAppts = [];
-                snap.forEach(doc => {
-                    let appt = doc.data();
-                    if(appt.dateString >= todayDateStr || appt.status === 'Action Required') { allAppts.push({id: doc.id, ...appt}); }
-                });
-
-                allAppts.sort((a, b) => {
-                    let dateA = a.dateString || ""; let dateB = b.dateString || "";
-                    let timeA = a.timeString || ""; let timeB = b.timeString || "";
-                    if (dateA === dateB) return timeA.localeCompare(timeB);
-                    return dateA.localeCompare(dateB);
-                });
-
-                if(allAppts.length === 0) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No upcoming appointments scheduled.</p>'; return; }
-
-                let html = '';
-                allAppts.forEach(appt => {
-                    const isToday = appt.dateString === todayDateStr ? '<span class="ticket-badge" style="background:#e74c3c;">TODAY</span>' : '';
-                    let actionReq = appt.status === 'Action Required' ? '<span class="ticket-badge" style="background:var(--error); margin-left:5px;">RESCHEDULE REQUESTED</span>' : '';
-                    
-                    let timeParts = (appt.timeString || "00:00").split(':');
-                    let hr = parseInt(timeParts[0]) || 0; let min = timeParts[1] || "00";
-                    let ampm = hr >= 12 ? 'PM' : 'AM'; let hr12 = hr % 12; if(hr12 === 0) hr12 = 12;
-                    let displayAmt = parseFloat(appt.grandTotal || appt.bookedPrice || 0).toFixed(2);
-
-                    html += `
-                        <div class="ticket" style="border-color: ${appt.status === 'Action Required' ? 'var(--error)' : 'var(--manager)'}; padding: 10px;">
-                            <div style="flex-grow:1;">
-                                <h4 style="margin:0; font-size:1rem; color:var(--manager);">${appt.clientName || 'Unknown'} ${isToday} ${actionReq}</h4>
-                                <p style="margin:0; font-size:0.8rem; color: var(--primary); font-weight: bold;">💅 ${appt.bookedService} (${appt.bookedDuration} mins | ${displayAmt} GHC)</p>
-                                <p style="margin:0; font-size:0.8rem;">📅 ${appt.dateString} at ⏰ ${hr12}:${min} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'}</p>
-                            </div>
-                            <div style="display:flex; flex-direction:column; gap:5px;">
-                                <button class="btn btn-secondary" style="width:100%; padding:5px 10px; font-size:0.75rem;" onclick="editAppointment('${appt.id}')">Edit</button>
-                                <button class="btn btn-secondary" style="width:100%; padding:5px 10px; font-size:0.75rem; color:var(--error); border-color:var(--error);" onclick="cancelAppointment('${appt.id}')">Cancel</button>
-                            </div>
-                        </div>`;
-                });
-                listDiv.innerHTML = html;
-            });
-        } catch(e) { console.error(e); }
-    }
-
-    async function cancelAppointment(id) {
-        if(confirm("Are you sure you want to cancel this appointment?")) {
-            await db.collection('Appointments').doc(id).update({ status: 'Cancelled' });
-        }
-    }
-
-    // ==========================================
-    // FOH PIPELINE: REGISTRATION & SEARCH
-    // ==========================================
-    window.selectClientForSchedule = function(clientData) {
-        document.getElementById('sched_phone').value = clientData.Tel_Number || '';
-        const fullName = `${clientData.Forename || ''} ${clientData.Surname || ''}`.trim() || 'Unknown Client';
-        document.getElementById('sched_name').value = fullName;
-        document.getElementById('sched_displayName').innerText = fullName;
-        document.getElementById('sched_displayPhone').innerText = clientData.Tel_Number || 'No Phone';
-        document.getElementById('sched_search').value = '';
-        document.getElementById('sched_searchResults').style.display = 'none';
-        document.getElementById('sched_selectedClientDisplay').style.display = 'block';
-    }
-
-    window.selectClientForFOH = function(clientData) {
-        document.getElementById('f_forename').value = clientData.Forename || '';
-        document.getElementById('f_surname').value = clientData.Surname || '';
-        document.getElementById('f_tel').value = clientData.Tel_Number || '';
-        document.getElementById('f_altTel').value = clientData.Tel_Number_Alt || '';
-        document.getElementById('f_gender').value = clientData.Gender || '';
-        document.getElementById('f_email').value = clientData.Email || '';
-        document.getElementById('f_dob').value = clientData.DOB || '';
-        
-        document.getElementById('fohSearchPhone').value = '';
-        document.getElementById('foh_searchResults').style.display = 'none';
-        
-        const msg = document.getElementById('fohSearchMsg');
-        msg.innerText = "Client Loaded. You can update their details and save.";
-        msg.style.color = "var(--success)";
-    }
-
-    async function liveClientSearchFOH() {
-        clearTimeout(fohSearchTimeout);
-        fohSearchTimeout = setTimeout(async () => {
-            try {
-                let val = document.getElementById('fohSearchPhone').value.toLowerCase().trim();
-                let resDiv = document.getElementById('foh_searchResults');
-                if(val.length < 2) { resDiv.style.display = 'none'; return; }
-
-                if(allClientsCache.length === 0) {
-                    if (!isFetchingClients) {
-                        isFetchingClients = true;
-                        resDiv.innerHTML = '<div style="padding:10px; color:#666; font-size:0.85rem;">Loading database...</div>';
-                        resDiv.style.display = 'block';
-                        const snap = await db.collection('Clients').get();
-                        allClientsCache = [];
-                        snap.forEach(doc => allClientsCache.push(doc.data()));
-                        isFetchingClients = false;
-                    } else { return; }
-                }
-
-                let matches = allClientsCache.filter(c => {
-                    let phone = c.Tel_Number ? String(c.Tel_Number) : "";
-                    let fname = c.Forename ? String(c.Forename).toLowerCase() : "";
-                    let sname = c.Surname ? String(c.Surname).toLowerCase() : "";
-                    return phone.includes(val) || fname.includes(val) || sname.includes(val);
-                });
-
-                resDiv.innerHTML = '';
-                if(matches.length > 0) {
-                    matches.slice(0, 5).forEach(m => {
-                        let btn = document.createElement('button');
-                        btn.className = 'search-result-item';
-                        let phoneDisp = m.Tel_Number ? String(m.Tel_Number) : "No Phone";
-                        btn.innerHTML = `<strong>${m.Forename || ''} ${m.Surname || ''}</strong> <br> <small style="color:var(--manager);">${phoneDisp}</small>`;
-                        
-                        // Fixed click event
-                        btn.onmousedown = function(e) {
-                            e.preventDefault();
-                            selectClientForFOH(m);
-                        };
-                        resDiv.appendChild(btn);
-                    });
-                    resDiv.style.display = 'block';
-                } else {
-                    resDiv.innerHTML = '<div style="padding:10px; color:#999; font-size:0.85rem;">No client found.</div>';
-                    resDiv.style.display = 'block';
-                }
-            } catch(e) { console.error(e); }
-        }, 300);
-    }
-
-    async function liveClientSearch() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(async () => {
-            try {
-                let val = document.getElementById('sched_search').value.toLowerCase().trim();
-                let resDiv = document.getElementById('sched_searchResults');
-                if(val.length < 2) { resDiv.style.display = 'none'; return; }
-
-                if(allClientsCache.length === 0) {
-                    if (!isFetchingClients) {
-                        isFetchingClients = true;
-                        resDiv.innerHTML = '<div style="padding:10px; color:#666; font-size:0.85rem;">Loading database...</div>';
-                        resDiv.style.display = 'block';
-                        const snap = await db.collection('Clients').get();
-                        allClientsCache = [];
-                        snap.forEach(doc => allClientsCache.push(doc.data()));
-                        isFetchingClients = false;
-                    } else { return; }
-                }
-
-                let matches = allClientsCache.filter(c => {
-                    let phone = c.Tel_Number ? String(c.Tel_Number) : "";
-                    let fname = c.Forename ? String(c.Forename).toLowerCase() : "";
-                    let sname = c.Surname ? String(c.Surname).toLowerCase() : "";
-                    return phone.includes(val) || fname.includes(val) || sname.includes(val);
-                });
-
-                resDiv.innerHTML = '';
-                if(matches.length > 0) {
-                    matches.slice(0, 5).forEach(m => {
-                        let btn = document.createElement('button');
-                        btn.className = 'search-result-item';
-                        let phoneDisp = m.Tel_Number ? String(m.Tel_Number) : "No Phone";
-                        btn.innerHTML = `<strong>${m.Forename || ''} ${m.Surname || ''}</strong> <br> <small style="color:var(--manager);">${phoneDisp}</small>`;
-                        
-                        // Fixed click event
-                        btn.onmousedown = function(e) {
-                            e.preventDefault();
-                            selectClientForSchedule(m);
-                        };
-                        resDiv.appendChild(btn);
-                    });
-                    resDiv.style.display = 'block';
-                } else {
-                    resDiv.innerHTML = '<div style="padding:10px; color:#999; font-size:0.85rem;">No client found.</div>';
-                    resDiv.style.display = 'block';
-                }
-            } catch(e) { console.error(e); }
-        }, 300);
-    }
-
-    function clearFohForm() { ['f_forename', 'f_surname', 'f_tel', 'f_altTel', 'f_gender', 'f_email', 'f_dob'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; }); }
-
-    async function searchClientFOH() {
-        const phone = document.getElementById('fohSearchPhone').value.replace(/\D/g, ''); const msg = document.getElementById('fohSearchMsg');
-        if(!phone) { msg.innerText = "Please enter a telephone number."; msg.style.color = "var(--error)"; return; }
-        msg.innerText = "Searching..."; msg.style.color = "#666";
-        try {
-            let query = await db.collection("Clients").where("Tel_Number", "==", phone).get();
-            if (query.empty) query = await db.collection("Clients").where("Tel_Number_Alt", "==", phone).get();
-
-            if (query.empty) {
-                msg.innerText = "New Client. Please fill in their details below."; msg.style.color = "var(--primary)";
-                clearFohForm(); document.getElementById('f_tel').value = phone;
-            } else {
-                msg.innerText = "Client Found! Review details below."; msg.style.color = "var(--success)";
-                const clientData = query.docs[0].data();
-                document.getElementById('f_forename').value = clientData.Forename || ''; document.getElementById('f_surname').value = clientData.Surname || '';
-                document.getElementById('f_tel').value = clientData.Tel_Number || ''; document.getElementById('f_altTel').value = clientData.Tel_Number_Alt || '';
-                document.getElementById('f_gender').value = clientData.Gender || ''; document.getElementById('f_email').value = clientData.Email || '';
-                document.getElementById('f_dob').value = clientData.DOB || '';
-            }
-        } catch (error) { msg.innerText = "Error searching database."; msg.style.color = "var(--error)"; }
-    }
-
-    async function registerClientOnly() {
-        const btn = document.getElementById('btnRegisterClient');
-        const f_forename = document.getElementById('f_forename').value.trim(); 
-        const f_surname = document.getElementById('f_surname').value.trim();
-        const f_tel = document.getElementById('f_tel').value.replace(/\D/g, ''); 
-        const f_altTel = document.getElementById('f_altTel').value.replace(/\D/g, '');
-        const f_gender = document.getElementById('f_gender').value; 
-
-        if(!f_forename || !f_surname || !f_tel || !f_gender) { alert("Please fill in all required fields (*)."); return; }
-        if(f_tel.length !== 10) { alert("Primary Telephone must be 10 digits."); return; }
-        
-        btn.innerText = "Saving..."; btn.disabled = true;
-
-        const clientMasterData = { 
-            Forename: f_forename, Surname: f_surname, Tel_Number: f_tel, Tel_Number_Alt: f_altTel, 
-            Gender: f_gender, Email: document.getElementById('f_email').value.trim(), 
-            DOB: document.getElementById('f_dob').value, Last_Updated: firebase.firestore.FieldValue.serverTimestamp() 
-        };
-
-        try {
-            await db.collection("Clients").doc(f_tel).set(clientMasterData, { merge: true });
-            
-            let existingIdx = allClientsCache.findIndex(c => c.Tel_Number === f_tel);
-            if(existingIdx >= 0) { allClientsCache[existingIdx] = clientMasterData; }
-            else { allClientsCache.push(clientMasterData); }
-            
-            alert(`Success! ${f_forename} ${f_surname} has been saved to the database. \n\nPlease proceed to the Book Appointment tab to assign them a service and Technician.`);
-            clearFohForm(); document.getElementById('fohSearchPhone').value = ''; document.getElementById('fohSearchMsg').innerText = '';
-        } catch (error) { alert("Error saving client: " + error.message); } finally { btn.innerText = "Save Client Record"; btn.disabled = false; }
-    }
-
-    function startExpectedTodayListener() {
-        const listDiv = document.getElementById('expectedTodayList');
-        try {
-            expectedTodayListener = db.collection('Appointments').where('dateString', '==', todayDateStr).onSnapshot(snap => {
-                if(snap.empty) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No appointments scheduled for today.</p>'; return; }
-                
-                let todaysAppts = [];
-                snap.forEach(doc => {
-                    let appt = doc.data();
-                    if(appt.status === 'Scheduled') todaysAppts.push({id: doc.id, ...appt});
-                });
-
-                todaysAppts.sort((a, b) => {
-                    let timeA = a.timeString || ""; let timeB = b.timeString || "";
-                    return timeA.localeCompare(timeB);
-                });
-
-                if(todaysAppts.length === 0) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No appointments scheduled for today.</p>'; return; }
-
-                let html = '';
-                let now = new Date();
-                let currentMins = now.getHours() * 60 + now.getMinutes();
-                let validCount = 0;
-
-                todaysAppts.forEach(appt => {
-                    let timeParts = (appt.timeString || "00:00").split(':');
-                    let hr = parseInt(timeParts[0]) || 0; let min = timeParts[1] || "00";
-                    let aStart = hr * 60 + parseInt(min);
-                    let aEnd = aStart + parseInt(appt.bookedDuration || 0);
-
-                    if (currentMins > aEnd + 15) { return; }
-
-                    validCount++;
-                    let ampm = hr >= 12 ? 'PM' : 'AM'; let hr12 = hr % 12; if(hr12 === 0) hr12 = 12;
-                    let displayMins = parseInt(min) < 10 ? '0' + parseInt(min) : min;
-                    let displayAmt = parseFloat(appt.grandTotal || appt.bookedPrice || 0).toFixed(2);
-                    
-                    html += `
-                        <div class="ticket" style="border-color: var(--accent); padding: 10px; display:flex; justify-content:space-between; align-items:center;">
-                            <div style="flex-grow:1;">
-                                <h4 style="margin:0; font-size:1rem;">${appt.clientName || 'Unknown'}</h4>
-                                <p style="margin:0; font-size:0.8rem; color: var(--primary);">💅 <strong>${appt.bookedService || 'N/A'}</strong></p>
-                                <p style="margin:0; font-size:0.8rem;">⏰ ${hr12}:${displayMins} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'} | 📞 ${appt.clientPhone || 'N/A'}</p>
-                            </div>
-                            <div style="display:flex; flex-direction:column; gap:5px; width:80px;">
-                                <button class="btn" style="width:100%; padding:5px; font-size:0.75rem;" onclick="checkInAppointment('${appt.id}')">Check-In</button>
-                                <button class="btn btn-secondary" style="width:100%; padding:5px; font-size:0.75rem;" onclick="editAppointment('${appt.id}')">Edit</button>
-                                <button class="btn btn-secondary" style="width:100%; padding:5px; font-size:0.75rem; color:var(--error); border-color:var(--error);" onclick="cancelAppointment('${appt.id}')">Cancel</button>
-                            </div>
-                        </div>`;
-                });
-                
-                if(validCount === 0) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No more appointments expected today.</p>'; } 
-                else { listDiv.innerHTML = html; }
-            });
-        } catch(e) { console.error(e); }
-    }
-
-    async function checkInAppointment(id) {
-        try {
-            const doc = await db.collection('Appointments').doc(id).get();
-            const appt = doc.data();
-            await db.collection('Appointments').doc(id).update({ status: 'Arrived' });
-
-            const activeJobData = { 
-                clientPhone: appt.clientPhone, clientName: appt.clientName, 
-                assignedTechEmail: appt.assignedTechEmail, assignedTechName: appt.assignedTechName, 
-                bookedService: appt.bookedService || "N/A", bookedDuration: appt.bookedDuration || "0", 
-                bookedPrice: appt.bookedPrice || "0", grandTotal: appt.grandTotal || "0", taxBreakdown: appt.taxBreakdown || "[]",
-                status: "Waiting", fohCreator: currentUserEmail, 
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(), dateString: todayDateStr 
-            };
-            await db.collection("Active_Jobs").add(activeJobData);
-
-            if (GOOGLE_CHAT_WEBHOOK !== "") {
-                fetch(GOOGLE_CHAT_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: `🛎️ *Client Arrived*\n*Client:* ${appt.clientName}\n*Service:* ${appt.bookedService}\n*Assigned Tech:* ${appt.assignedTechName}\n_Please check your Dashboard._` }) }).catch(err => console.error(err));
-            }
-            alert(`${appt.clientName} checked in and routed to ${appt.assignedTechName}!`);
-        } catch(e) { alert("Error checking in: " + e.message); }
-    }
-
-    // ==========================================
-    // TECH CONSULTATION & UPSELL ENGINE
-    // ==========================================
-    window.toggleMedNone = function(checkbox) {
-        if(checkbox.checked) {
-            document.querySelectorAll('.med-cb').forEach(cb => { cb.checked = false; cb.disabled = true; });
-        } else {
-            document.querySelectorAll('.med-cb').forEach(cb => { cb.disabled = false; });
-        }
-    }
-
-    window.openConsultation = async function(id) {
-        window.openConsult = window.openConsultation;
-        try {
-            const doc = await db.collection('Active_Jobs').doc(id).get();
-            if(!doc.exists) return;
-            currentConsultJobData = doc.data();
-            currentConsultJobId = id;
-            pendingUpsells = [];
-
-            document.getElementById('consultName').innerText = currentConsultJobData.clientName;
-            document.getElementById('consultTicket').innerText = currentConsultJobData.bookedService;
-            document.getElementById('consultProjTotal').innerText = parseFloat(currentConsultJobData.grandTotal || currentConsultJobData.bookedPrice || 0).toFixed(2) + ' GHC';
-            document.getElementById('consultAddedUpsells').innerHTML = '';
-            document.getElementById('consultUpsellSelect').value = '';
-            
-            document.querySelectorAll('.med-cb').forEach(cb => { cb.checked = false; cb.disabled = false; });
-            document.getElementById('med_none').checked = false;
-            document.getElementById('med_allergies').value = '';
-            document.getElementById('med_other').value = '';
-            document.querySelectorAll('input[name="cond_callus"]').forEach(r => r.checked = false);
-            document.querySelectorAll('input[name="cond_skin"]').forEach(r => r.checked = false);
-            document.getElementById('cond_notes').value = '';
-            
-            document.getElementById('consultReassign').value = '';
-
-            document.getElementById('consultModal').style.display = 'block';
-        } catch(e) { alert("Error opening consultation: " + e.message); }
-    }
-
-    window.closeConsult = function() {
-        document.getElementById('consultModal').style.display = 'none';
-        currentConsultJobId = null;
-        currentConsultJobData = null;
-        pendingUpsells = [];
-    }
-
-    window.addUpsell = function() {
-        const select = document.getElementById('consultUpsellSelect');
-        const sId = select.value;
-        if(!sId) return;
-
-        const sObj = allMenuServicesCache.find(s => s.id === sId);
-        if(!sObj) return;
-
-        pendingUpsells.push(sObj);
-        
-        let html = '';
-        pendingUpsells.forEach(p => { html += `<div>+ ${p.name} (${p.price} GHC)</div>`; });
-        document.getElementById('consultAddedUpsells').innerHTML = html;
-
-        let base = parseFloat(currentConsultJobData.bookedPrice || 0);
-        pendingUpsells.forEach(p => base += parseFloat(p.price || 0));
-
-        let taxes = 0;
-        liveTaxes.forEach(t => { taxes += base * (t.rate / 100); });
-        
-        let newGrand = base + taxes;
-        document.getElementById('consultProjTotal').innerText = newGrand.toFixed(2) + ' GHC';
-        select.value = '';
-    }
-
-    window.reassign = async function() {
-        const techEmail = document.getElementById('consultReassign').value;
-        const techName = document.getElementById('consultReassign').options[document.getElementById('consultReassign').selectedIndex]?.text;
-        if(!techEmail) { alert("Please select a Technician to reassign to."); return; }
-
-        try {
-            await db.collection('Active_Jobs').doc(currentConsultJobId).update({
-                assignedTechEmail: techEmail,
-                assignedTechName: techName
-            });
-            alert(`Ticket successfully reassigned to ${techName}.`);
-            closeConsult();
-        } catch(e) { alert("Error reassigning: " + e.message); }
-    }
-
-    window.reqReschedule = async function() {
-        if(!confirm("Are you sure you want to cancel this Active Job and send it back to Front of House to Reschedule?")) return;
-        try {
-            await db.collection('Active_Jobs').doc(currentConsultJobId).delete();
-            
-            const snap = await db.collection('Appointments')
-                .where('clientPhone', '==', currentConsultJobData.clientPhone)
-                .where('dateString', '==', currentConsultJobData.dateString)
-                .get();
-                
-            if(!snap.empty) {
-                await db.collection('Appointments').doc(snap.docs[0].id).update({ status: 'Action Required' });
-            }
-            alert("Ticket removed. Front of House has been notified.");
-            closeConsult();
-        } catch(e) { alert("Error rescheduling: " + e.message); }
-    }
-
-    window.saveConsult = async function() {
-        let medChecks = [];
-        document.querySelectorAll('.med-cb:checked').forEach(cb => medChecks.push(cb.value));
-        if(document.getElementById('med_none').checked) medChecks = ["None"];
-
-        let consultData = {
-            medicalHistory: medChecks,
-            allergies: document.getElementById('med_allergies').value.trim(),
-            otherMedical: document.getElementById('med_other').value.trim(),
-            callusLevel: document.querySelector('input[name="cond_callus"]:checked')?.value || "Not specified",
-            skinCondition: document.querySelector('input[name="cond_skin"]:checked')?.value || "Not specified",
-            visualNotes: document.getElementById('cond_notes').value.trim(),
-            assessedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        let base = parseFloat(currentConsultJobData.bookedPrice || 0);
-        let serviceStr = currentConsultJobData.bookedService;
-        let dur = parseInt(currentConsultJobData.bookedDuration || 0);
-
-        if(pendingUpsells.length > 0) {
-            pendingUpsells.forEach(p => {
-                base += parseFloat(p.price || 0);
-                dur += parseInt(p.duration || 0);
-                serviceStr += `, ${p.name}`;
-            });
-        }
-
-        let newTaxArr = [];
-        let totalTaxes = 0;
-        liveTaxes.forEach(t => {
-            let tAmt = base * (t.rate / 100);
-            totalTaxes += tAmt;
-            newTaxArr.push({ name: t.name, rate: t.rate, amount: tAmt });
-        });
-        
-        let newGrand = base + totalTaxes;
-
-        try {
-            await db.collection('Active_Jobs').doc(currentConsultJobId).update({
-                status: 'In Progress',
-                consultationRecord: consultData,
-                bookedPrice: base,
-                bookedService: serviceStr,
-                bookedDuration: dur,
-                taxBreakdown: JSON.stringify(newTaxArr),
-                grandTotal: newGrand
-            });
-            closeConsult();
-        } catch(e) { alert("Error saving consultation: " + e.message); }
-    }
-
-    function startTechQueueListener() {
-        const queueDiv = document.getElementById('techLiveQueue');
-        try {
-            techQueueListener = db.collection('Active_Jobs')
-                .where('assignedTechEmail', '==', currentUserEmail)
-                .where('status', 'in', ['Waiting', 'In Progress'])
-                .onSnapshot(snap => {
-                    if(snap.empty) { queueDiv.innerHTML = '<p style="color: #999; font-style: italic;">Queue is currently empty.</p>'; return; }
-                    
-                    queueDiv.innerHTML = '';
-                    snap.forEach(doc => {
-                        let job = doc.data();
-                        
-                        let div = document.createElement('div');
-                        div.className = 'ticket';
-                        div.style.borderColor = job.status === 'Waiting' ? 'var(--accent)' : 'var(--manager)';
-                        
-                        let infoDiv = document.createElement('div');
-                        infoDiv.style.flexGrow = '1';
-                        infoDiv.innerHTML = `
-                            <h4 style="margin:0; font-size:1.1rem;">${job.clientName}</h4>
-                            <span class="ticket-badge" style="background:${job.status === 'Waiting' ? '#f39c12' : '#2980b9'}; margin-bottom:5px;">${job.status.toUpperCase()}</span>
-                            <p style="margin:0; font-size:0.85rem; color:var(--primary);">💅 <strong>${job.bookedService}</strong></p>
-                        `;
-                        
-                        let btnWrapper = document.createElement('div');
-                        btnWrapper.style.width = '140px';
-                        
-                        let btn = document.createElement('button');
-                        btn.className = 'btn';
-                        btn.style.width = '100%';
-                        btn.style.padding = '8px';
-                        btn.style.fontSize = '0.8rem';
-                        
-                        if (job.status === 'Waiting') {
-                            btn.innerText = 'Consultation';
-                            btn.onclick = function() { openConsult(doc.id); };
-                        } else {
-                            btn.innerText = 'Complete & Bill';
-                            btn.style.background = 'var(--success)';
-                            btn.onclick = async function() { 
-                                try { await db.collection('Active_Jobs').doc(doc.id).update({ status: 'Ready for Payment' }); }
-                                catch(e) { alert("Error: " + e.message); }
-                            };
-                        }
-                        
-                        btnWrapper.appendChild(btn);
-                        div.appendChild(infoDiv);
-                        div.appendChild(btnWrapper);
-                        queueDiv.appendChild(div);
-                    });
-                });
-        } catch(e) { console.error(e); }
-    }
-
-    function startFohBillingListener() {
-        const listDiv = document.getElementById('fohPendingCheckoutList');
-        try {
-            fohBillingListener = db.collection('Active_Jobs')
-                .where('status', '==', 'Ready for Payment')
-                .onSnapshot(snap => {
-                    if(snap.empty) { 
-                        listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No pending checkouts.</p>'; 
-                        document.getElementById('checkoutPanel').style.display = 'none';
-                        return; 
-                    }
-                    listDiv.innerHTML = '';
-                    snap.forEach(doc => {
-                        let job = doc.data();
-                        
-                        let taxes = [];
-                        try { taxes = JSON.parse(job.taxBreakdown || '[]'); } catch(e){}
-                        let subtotal = parseFloat(job.bookedPrice || 0).toFixed(2);
-                        let grandTotal = parseFloat(job.grandTotal || job.bookedPrice || 0).toFixed(2);
-
-                        let taxHtml = '';
-                        taxes.forEach(t => { taxHtml += `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#777;"><span>+ ${t.name}</span><span>${parseFloat(t.amount).toFixed(2)} GHC</span></div>`; });
-
-                        let div = document.createElement('div');
-                        div.className = 'ticket';
-                        div.style.borderColor = 'var(--success)';
-                        div.style.padding = '10px';
-                        
-                        let infoDiv = document.createElement('div');
-                        infoDiv.style.flexGrow = '1';
-                        infoDiv.innerHTML = `
-                            <h4 style="margin:0; font-size:1rem; color:var(--success);">${job.clientName}</h4>
-                            <p style="margin:0; font-size:0.8rem; margin-bottom:5px;">💅 ${job.bookedService}</p>
-                            <div style="background:#f1f1f1; padding:8px; border-radius:4px; max-width:250px;">
-                                <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span>Subtotal:</span><span>${subtotal} GHC</span></div>
-                                ${taxHtml}
-                                <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:0.9rem; margin-top:3px; border-top:1px solid #ddd; padding-top:3px;"><span>Total:</span><span>${grandTotal} GHC</span></div>
-                            </div>
-                        `;
-                        
-                        let btn = document.createElement('button');
-                        btn.className = 'btn';
-                        btn.style.background = 'var(--success)';
-                        btn.style.width = 'auto';
-                        btn.style.padding = '5px 15px';
-                        btn.style.fontSize = '0.8rem';
-                        btn.innerText = 'Checkout';
-                        btn.onclick = function() {
-                            openCheckout(doc.id, job.clientName, job.bookedService, subtotal, taxHtml, grandTotal);
-                        };
-                        
-                        div.appendChild(infoDiv);
-                        div.appendChild(btn);
-                        listDiv.appendChild(div);
-                    });
-                });
-        } catch(e) { console.error(e); }
-    }
-
-    window.openCheckout = function(id, name, services, subtotal, taxHtml, grandTotal) {
-        document.getElementById('checkoutJobId').value = id;
-        document.getElementById('checkoutClientName').innerText = name;
-        document.getElementById('checkoutServices').innerText = services;
-        document.getElementById('checkoutSubtotal').innerText = subtotal + ' GHC';
-        document.getElementById('checkoutTaxList').innerHTML = taxHtml;
-        document.getElementById('checkoutTotal').innerText = grandTotal + ' GHC';
-        document.getElementById('checkoutGrandTotalVal').value = grandTotal;
-        document.getElementById('checkoutPaymentMethod').value = '';
-        document.getElementById('checkoutPanel').style.display = 'block';
-        document.getElementById('checkoutPanel').scrollIntoView({behavior: 'smooth'});
-    }
-
-    window.confirmPayment = async function() {
-        const id = document.getElementById('checkoutJobId').value;
-        const method = document.getElementById('checkoutPaymentMethod').value;
-        const price = parseFloat(document.getElementById('checkoutGrandTotalVal').value) || 0; 
-        
-        if(!method) { alert("Please select a Payment Method."); return; }
-        
-        try {
-            await db.collection('Active_Jobs').doc(id).update({
-                status: 'Closed',
-                paymentMethod: method,
-                totalGHC: price,
-                closedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                closedBy: currentUserEmail
-            });
-            alert("Payment processed successfully!");
-            document.getElementById('checkoutPanel').style.display = 'none';
-        } catch(e) { alert("Error processing payment: " + e.message); }
-    }
-
-    async function generateReport() {
-        const start = document.getElementById('reportStart').value;
-        const end = document.getElementById('reportEnd').value;
-        if(!start || !end) { alert("Please select both a Start Date and End Date."); return; }
-
-        try {
-            const snap = await db.collection('Active_Jobs')
-                .where('status', '==', 'Closed')
-                .where('dateString', '>=', start)
-                .where('dateString', '<=', end)
-                .get();
-
-            let totalRev = 0; let techStats = {};
-
-            snap.forEach(doc => {
-                const job = doc.data(); 
-                totalRev += parseFloat(job.totalGHC) || 0;
-            });
-
-            document.getElementById('reportTotalRevenue').innerText = totalRev.toFixed(2) + " GHC";
-            let tbody = '';
-            for(const email in techStats) { tbody += `<tr><td><strong>${techStats[email].name}</strong></td><td style="text-align:center;">${techStats[email].count}</td><td style="text-align:right;">${techStats[email].rev.toFixed(2)} GHC</td></tr>`; }
-            if(tbody === '') tbody = '<tr><td colspan="3" style="text-align:center; color: #999;">No completed services found in this date range.</td></tr>';
-            
-            document.getElementById('reportTechBody').innerHTML = tbody; document.getElementById('reportResults').style.display = 'block';
-        } catch (e) { console.error(e); alert("Error generating report: " + e.message); }
-    }
-
-    function startFohFinancialListener() {
-        try {
-            fohFinancialListener = db.collection('Active_Jobs').where('status', '==', 'Closed').where('dateString', '==', todayDateStr).onSnapshot(snap => {
-                let totalRev = 0; let jobCount = 0;
-                snap.forEach(doc => { totalRev += parseFloat(doc.data().totalGHC) || 0; jobCount++; });
-                document.getElementById('fohDailyRevenue').innerText = totalRev.toFixed(2) + " GHC"; document.getElementById('fohDailyJobs').innerText = jobCount;
-            });
-        } catch(e) { console.error(e); }
-    }
-
-    function startTechFinancialListener() {
-        try {
-            techFinancialListener = db.collection('Active_Jobs')
-                .where('status', '==', 'Closed')
-                .where('dateString', '==', todayDateStr)
-                .where('assignedTechEmail', '==', currentUserEmail)
-                .onSnapshot(snap => {
-                    let techRev = 0; let serviceCount = 0;
-                    snap.forEach(doc => {
-                        let job = doc.data();
-                        techRev += parseFloat(job.totalGHC) || 0;
-                        serviceCount++;
-                    });
-                    document.getElementById('techDailyRevenue').innerText = techRev.toFixed(2) + " GHC"; 
-                    document.getElementById('techServiceCount').innerText = serviceCount;
-                });
-        } catch(e) { console.error(e); }
-    }
-
-    function startFohRosterListener() {
-        const rosterDiv = document.getElementById('fohRosterList');
-        try {
-            fohRosterListener = db.collection('Attendance').where('date', '==', todayDateStr).onSnapshot(async (attendanceSnap) => {
-                
-                const activeJobsSnap = await db.collection('Active_Jobs').where('status', 'in', ['Waiting', 'In Progress']).get();
-                let busyTechEmails = []; activeJobsSnap.forEach(job => { busyTechEmails.push(job.data().assignedTechEmail); });
-
-                const scheduledSnap = await db.collection('Appointments').where('dateString', '==', todayDateStr).where('status', '==', 'Scheduled').get();
-                let now = new Date();
-                let currentMins = now.getHours() * 60 + now.getMinutes();
-
-                scheduledSnap.forEach(doc => {
-                    let appt = doc.data();
-                    let aStart = timeToMins(appt.timeString);
-                    let aEnd = aStart + parseInt(appt.bookedDuration || 0);
-                    if (currentMins >= aStart && currentMins < aEnd) { busyTechEmails.push(appt.assignedTechEmail); }
-                });
-
-                let html = '';
-                attendanceSnap.forEach(doc => {
-                    const tech = doc.data(); 
-                    if(tech.clockOut || !(tech.roleString && (tech.roleString.toLowerCase().includes('tech') || tech.roleString.toLowerCase().includes('test tech')))) return; 
-                    
-                    const isBusy = busyTechEmails.includes(tech.email);
-                    const statusDot = isBusy ? 'status-busy' : 'status-available';
-                    const statusText = isBusy ? '<span style="color:var(--error); font-size:0.8rem; font-weight:bold;">BUSY</span>' : '<span style="color:var(--success); font-size:0.8rem; font-weight:bold;">AVAILABLE</span>';
-                    html += `<div class="roster-item"><div><strong>${tech.name}</strong></div><div style="display:flex; align-items:center;"><span class="status-dot ${statusDot}"></span> ${statusText}</div></div>`;
-                });
-                
-                if(html === '') html = '<p style="color: #999; font-style: italic;">No Technicians currently on the floor.</p>';
-                rosterDiv.innerHTML = html;
-            });
-        } catch(e) { console.error(e); }
-    }
-
-    function loadStaffDirectory() {
-        const listDiv = document.getElementById('adminStaffList');
-        if (!listDiv) return;
-
-        listDiv.innerHTML = '<p style="color: #000; font-weight:bold;">Loading directory... Please wait.</p>';
-
-        db.collection('Users').onSnapshot((snap) => {
-            if (snap.empty) { listDiv.innerHTML = '<p style="color: #999;">No staff found.</p>'; return; }
-
-            listDiv.innerHTML = '';
-            const table = document.createElement('table');
-            table.className = 'breakdown-table'; table.style.marginTop = '0';
-            const thead = document.createElement('thead');
-            thead.innerHTML = '<tr><th>Name</th><th>Google Email</th><th>Departments</th><th style="text-align:center;">Action</th></tr>';
-            table.appendChild(thead);
-            const tbody = document.createElement('tbody');
-
-            snap.forEach(doc => {
-                try {
-                    let data = doc.data() || {};
-                    let name = data.name ? String(data.name).replace(/['"]/g, "") : "Unknown";
-                    let email = doc.id;
-
-                    let rolesArr = [];
-                    if (data.roles && Array.isArray(data.roles)) { rolesArr = data.roles; } 
-                    else if (data.roles && typeof data.roles === 'string') { rolesArr = [data.roles]; } 
-                    else if (data.role && typeof data.role === 'string') { rolesArr = [data.role]; }
-
-                    let validRoles = rolesArr.filter(r => r);
-                    let rolesStr = validRoles.join(',');
-                    let tagsHtml = validRoles.map(r => {
-                        let c = (r === 'System Admin' || r === 'Admin') ? 'var(--admin)' : (r === 'Manager' ? 'var(--manager)' : (r === 'Supply Chain' ? 'var(--supply)' : (r === 'FOH' ? '#e74c3c' : 'var(--primary)')));
-                        return `<span class="ticket-badge" style="background:${c}; margin-right: 5px; display:inline-block; margin-bottom:3px;">${r}</span>`;
-                    }).join('');
-
-                    let tr = document.createElement('tr');
-                    
-                    let tdName = document.createElement('td'); tdName.innerHTML = `<strong>${name}</strong>`;
-                    let tdEmail = document.createElement('td'); tdEmail.style.color = '#666'; tdEmail.innerText = email;
-                    let tdRoles = document.createElement('td'); tdRoles.innerHTML = tagsHtml;
-                    
-                    let tdAction = document.createElement('td');
-                    tdAction.style.textAlign = 'center'; tdAction.style.display = 'flex'; tdAction.style.gap = '5px'; tdAction.style.justifyContent = 'center';
-
-                    let btnEdit = document.createElement('button');
-                    btnEdit.className = 'btn'; btnEdit.style.cssText = 'padding:5px 10px; width:auto; font-size:0.75rem; background:var(--primary);';
-                    btnEdit.innerText = 'Edit'; btnEdit.onclick = function() { editStaff(email, name, rolesStr); };
-
-                    let btnRevoke = document.createElement('button');
-                    btnRevoke.className = 'btn btn-secondary'; btnRevoke.style.cssText = 'padding:5px 10px; width:auto; font-size:0.75rem; color:red; border-color:red;';
-                    btnRevoke.innerText = 'Del'; btnRevoke.onclick = function() { removeStaffAccount(email); };
-
-                    tdAction.appendChild(btnEdit); tdAction.appendChild(btnRevoke);
-                    tr.appendChild(tdName); tr.appendChild(tdEmail); tr.appendChild(tdRoles); tr.appendChild(tdAction);
-                    tbody.appendChild(tr);
-
-                } catch(innerErr) { console.log("Skipped corrupted user:", doc.id); }
-            });
-            table.appendChild(tbody); listDiv.appendChild(table);
-        }, (error) => {
-            listDiv.innerHTML = `<div style="background:#ffebee; padding:15px; border:1px solid red; border-radius:4px; color:red;"><strong>Database Error!</strong><br>${error.message}</div>`;
-        });
-    }
-
-    window.editStaff = function(email, name, rolesStr) {
-        document.getElementById('admin_newEmail').value = email;
-        document.getElementById('admin_newName').value = name;
-        document.getElementById('admin_newPassword').value = '';
-        document.getElementById('admin_newPassword').placeholder = "(Leave blank to keep current password)";
-        
-        const safeRoles = rolesStr.toLowerCase().split(',');
-        document.querySelectorAll('.role-checkbox').forEach(cb => { cb.checked = safeRoles.includes(cb.value.toLowerCase()); });
-        window.scrollTo(0, 0);
-    }
-
-    async function addStaffAccount() {
-        const name = document.getElementById('admin_newName').value.trim();
-        const email = document.getElementById('admin_newEmail').value.trim().toLowerCase();
-        const password = document.getElementById('admin_newPassword').value;
-        const selectedRoles = Array.from(document.querySelectorAll('.role-checkbox:checked')).map(cb => cb.value);
-        
-        if(!name || !email || selectedRoles.length === 0) { alert("Please fill all required fields and select at least one department."); return; }
-        
-        if (password) {
-            try {
-                await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
-                await secondaryApp.auth().signOut(); 
-            } catch (authError) { 
-                if(authError.code !== 'auth/email-already-in-use') { alert("Failed to create login credential.\n\nError: " + authError.message); return; }
-            }
-        }
-        try {
-            await db.collection('Users').doc(email).set({ name: name, roles: selectedRoles, updatedBy: currentUserEmail, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-            alert(`Success! Staff profile updated in Matrix for ${name}.`);
-            document.getElementById('admin_newName').value = ''; document.getElementById('admin_newEmail').value = ''; document.getElementById('admin_newPassword').value = '';
-            document.getElementById('admin_newPassword').placeholder = "(Optional) Min 6 chars";
-            document.querySelectorAll('.role-checkbox').forEach(cb => cb.checked = false);
-            fetchAllTechs();
-        } catch(dbError) { alert("Database Error: " + dbError.message); }
-    }
-
-    async function removeStaffAccount(email) {
-        if(email === currentUserEmail) { alert("You cannot revoke your own admin access from here."); return; }
-        if(confirm(`Are you absolutely sure you want to permanently revoke system access for ${email}?`)) {
-            try { await db.collection('Users').doc(email).delete(); alert("Access revoked."); fetchAllTechs(); } 
-            catch(e) { alert("Error revoking access: " + e.message); }
-        }
-    }
-</script>
+<!-- MAIN APP LOGIC -->
+<script src="app.js"></script>
 </body>
 </html>
