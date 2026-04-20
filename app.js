@@ -167,6 +167,24 @@ function timeToMins(timeStr) {
     return parseInt(h) * 60 + parseInt(m);
 }
 
+/**
+ * Safely parse taxBreakdown regardless of whether it was stored as a JSON string,
+ * a double-serialised string, or is already an array.
+ * Always returns an array of { name, rate, amount } objects.
+ */
+function _parseTaxBreakdown(raw) {
+    if (!raw) return [];
+    // Already an array (should not happen with Firestore strings, but defensive)
+    if (Array.isArray(raw)) return raw;
+    try {
+        const parsed = JSON.parse(raw);
+        // Double-serialised: JSON.parse returned another string
+        if (typeof parsed === 'string') return JSON.parse(parsed);
+        if (Array.isArray(parsed)) return parsed;
+        return [];
+    } catch (e) { return []; }
+}
+
 // ============================================================
 //  MODULE SWITCHING
 // ============================================================
@@ -904,8 +922,11 @@ window.bookAppointment = async function() {
         const payload = {
             clientPhone: phone, clientName: name, dateString: date, timeString: time,
             assignedTechEmail: techEmail, assignedTechName: techName,
-            bookedService: services.join(', '), bookedDuration: duration,
-            bookedPrice: subtotal, taxBreakdown: taxData, grandTotal,
+            bookedService:  services.join(', '),
+            bookedDuration: parseInt(duration, 10)    || 0,   // always Number
+            bookedPrice:    parseFloat(subtotal)      || 0,   // always Number
+            grandTotal:     parseFloat(grandTotal)    || 0,   // always Number
+            taxBreakdown:   taxData,                          // JSON string
             status: 'Scheduled', bookedBy: currentUserEmail,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -1275,6 +1296,17 @@ window.checkInAppointment = async function(id, triggerEl) {
 //  FOH BILLING
 // ============================================================
 
+// Track which job id is currently open in the checkout panel (fix 4 & 5)
+let _activeCheckoutJobId = null;
+
+function _closeCheckoutPanel() {
+    _activeCheckoutJobId = null;
+    const panel = document.getElementById('checkoutPanel');
+    if (panel) panel.style.display = 'none';
+    const method = document.getElementById('checkoutPaymentMethod');
+    if (method) method.value = '';
+}
+
 function startFohBillingListener() {
     if (fohBillingListener) { fohBillingListener(); fohBillingListener = null; }
     const listDiv = document.getElementById('fohPendingCheckoutList');
@@ -1282,77 +1314,172 @@ function startFohBillingListener() {
     fohBillingListener = db.collection('Active_Jobs')
         .where('status', '==', 'Ready for Payment')
         .onSnapshot(snap => {
+            listDiv.innerHTML = '';
+
             if (snap.empty) {
                 listDiv.innerHTML = '<p class="text-muted">No pending checkouts.</p>';
-                document.getElementById('checkoutPanel').style.display = 'none';
+                _closeCheckoutPanel(); // fix 7 & 10: close panel when queue clears
                 return;
             }
 
-            listDiv.innerHTML = '';
+            // Fix 4 & 7: if the job currently open was closed by another session, close the panel
+            const snapIds = new Set();
+            snap.forEach(doc => snapIds.add(doc.id));
+            if (_activeCheckoutJobId && !snapIds.has(_activeCheckoutJobId)) {
+                _closeCheckoutPanel();
+            }
+
             snap.forEach(doc => {
                 const job = doc.data();
-                let taxes = [];
-                try { taxes = JSON.parse(job.taxBreakdown || '[]'); } catch (e) { }
-                const subtotal   = parseFloat(job.bookedPrice || 0).toFixed(2);
-                const grandTotal = parseFloat(job.grandTotal  || job.bookedPrice || 0).toFixed(2);
-                const taxHtml    = taxes.map(t => `<div class="checkout-row" style="font-size:0.8rem; color:#888;"><span>+ ${t.name}</span><span>${parseFloat(t.amount).toFixed(2)} GHC</span></div>`).join('');
+                const taxes = _parseTaxBreakdown(job.taxBreakdown); // fix 6: safe parse
 
+                // Fix 9: coerce to Number at read time — defensive against string-stored legacy values
+                const subtotal   = parseFloat(job.bookedPrice || 0);
+                const grandTotal = parseFloat(job.grandTotal  || job.bookedPrice || 0);
+
+                // Fix 3: verify arithmetic consistency and flag mismatches visually
+                const taxSum     = taxes.reduce((s, t) => s + parseFloat(t.amount || 0), 0);
+                const expected   = subtotal + taxSum;
+                const mismatch   = Math.abs(expected - grandTotal) > 0.02;
+
+                const taxLines = taxes.map(t =>
+                    `<div class="checkout-row" style="font-size:0.8rem;color:#888;">
+                        <span>+ ${t.name} (${parseFloat(t.rate||0).toFixed(1)}%)</span>
+                        <span>${parseFloat(t.amount||0).toFixed(2)} GHC</span>
+                     </div>`).join('');
+
+                const mismatchBanner = mismatch
+                    ? `<div style="color:var(--error);font-size:0.75rem;margin-top:5px;padding:4px 6px;
+                                   background:#fff0f0;border-radius:4px;border:1px solid var(--error);">
+                           ⚠ Total mismatch — verify before charging (expected ${expected.toFixed(2)} GHC)
+                       </div>` : '';
+
+                // Fix 5: highlight the card whose job is currently open in the panel
+                const isActive = doc.id === _activeCheckoutJobId;
                 const div = document.createElement('div');
                 div.className = 'ticket';
-                div.style.borderColor = 'var(--success)';
+                div.style.borderColor = isActive ? 'var(--manager)' : 'var(--success)';
+                if (isActive) div.style.background = '#f0f7ff';
+
                 div.innerHTML = `
                     <div class="ticket-info">
-                        <h4 class="text-success">${job.clientName}</h4>
-                        <p>💅 ${job.bookedService}</p>
-                        <div style="background:#f1f1f1; padding:8px; border-radius:4px; max-width:260px; margin-top:6px;">
-                            <div class="checkout-row" style="font-size:0.85rem;"><span>Subtotal:</span><span>${subtotal} GHC</span></div>
-                            ${taxHtml}
-                            <div class="checkout-total"><span>Total:</span><span>${grandTotal} GHC</span></div>
+                        <h4 class="text-success">${job.clientName || 'Unknown'}</h4>
+                        <p style="font-size:0.82rem;color:#666;margin-bottom:6px;">💅 ${job.bookedService || 'N/A'}</p>
+                        <div style="background:#f5f5f5;padding:8px 10px;border-radius:4px;font-size:0.875rem;">
+                            <div class="checkout-row">
+                                <span>Subtotal:</span>
+                                <strong>${subtotal.toFixed(2)} GHC</strong>
+                            </div>
+                            ${taxLines}
+                            <div class="checkout-row" style="font-weight:700;color:var(--success);
+                                 border-top:1px solid #ddd;padding-top:5px;margin-top:4px;">
+                                <span>Grand Total:</span>
+                                <span>${grandTotal.toFixed(2)} GHC</span>
+                            </div>
+                            ${mismatchBanner}
                         </div>
                     </div>`;
+
                 const checkoutBtn = document.createElement('button');
-                checkoutBtn.className = 'btn btn-success btn-auto btn-sm';
-                checkoutBtn.textContent = 'Checkout';
-                checkoutBtn.onclick = () => window.openCheckout(doc.id, job.clientName, job.bookedService, subtotal, taxHtml, grandTotal);
+                checkoutBtn.className = isActive
+                    ? 'btn btn-manager btn-auto btn-sm'
+                    : 'btn btn-success btn-auto btn-sm';
+                checkoutBtn.textContent = isActive ? '▶ In Progress' : 'Checkout';
+                // Pass parsed taxes array — no raw HTML strings passed around (fix 6 & 9)
+                checkoutBtn.onclick = () => window.openCheckout(
+                    doc.id, job.clientName, job.bookedService,
+                    subtotal, taxes, grandTotal
+                );
                 div.appendChild(checkoutBtn);
                 listDiv.appendChild(div);
             });
         });
 }
 
-window.openCheckout = function(id, name, services, subtotal, taxHtml, grandTotal) {
-    document.getElementById('checkoutJobId').value        = id;
-    document.getElementById('checkoutClientName').innerText = name;
-    document.getElementById('checkoutServices').innerText   = services;
-    document.getElementById('checkoutSubtotal').innerText   = subtotal + ' GHC';
-    document.getElementById('checkoutTaxList').innerHTML    = taxHtml;
-    document.getElementById('checkoutTotal').innerText      = grandTotal + ' GHC';
-    document.getElementById('checkoutGrandTotalVal').value  = grandTotal;
+/**
+ * Open the checkout panel for a specific job.
+ * Fix 9: accepts Numbers + parsed tax array — no raw HTML or untyped strings.
+ */
+window.openCheckout = function(id, name, services, subtotal, taxes, grandTotal) {
+    _activeCheckoutJobId = id; // fix 4 & 5: track which job is open
+
+    document.getElementById('checkoutJobId').value          = id;
+    document.getElementById('checkoutClientName').innerText = name     || 'Unknown';
+    document.getElementById('checkoutServices').innerText   = services || '';
+    document.getElementById('checkoutSubtotal').innerText   = parseFloat(subtotal   || 0).toFixed(2) + ' GHC';
+    document.getElementById('checkoutTotal').innerText      = parseFloat(grandTotal || 0).toFixed(2) + ' GHC';
+    // Fix 9: store as clean fixed-precision string — parseFloat in confirmPayment will always succeed
+    document.getElementById('checkoutGrandTotalVal').value  = parseFloat(grandTotal || 0).toFixed(2);
     document.getElementById('checkoutPaymentMethod').value  = '';
-    document.getElementById('checkoutPanel').style.display = 'block';
-    document.getElementById('checkoutPanel').scrollIntoView({ behavior: 'smooth' });
+
+    // Rebuild tax list from the parsed array — no raw HTML passed (fix 6)
+    const taxListEl = document.getElementById('checkoutTaxList');
+    if (taxes && taxes.length > 0) {
+        taxListEl.innerHTML = taxes.map(t =>
+            `<div class="checkout-row" style="font-size:0.85rem;color:#777;">
+                <span>+ ${t.name} (${parseFloat(t.rate||0).toFixed(1)}%)</span>
+                <span>${parseFloat(t.amount||0).toFixed(2)} GHC</span>
+             </div>`).join('');
+        taxListEl.style.display = 'block';
+    } else {
+        taxListEl.innerHTML = '<div style="color:#aaa;font-size:0.8rem;padding:2px 0;">No taxes applied</div>';
+        taxListEl.style.display = 'block';
+    }
+
+    const panel = document.getElementById('checkoutPanel');
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
 
 window.confirmPayment = async function() {
     const btn    = document.getElementById('btnConfirmPayment');
     const id     = document.getElementById('checkoutJobId').value;
     const method = document.getElementById('checkoutPaymentMethod').value;
+    // Fix 9: grandTotal stored as toFixed(2) string — always parses cleanly
     const price  = parseFloat(document.getElementById('checkoutGrandTotalVal').value) || 0;
+    const name   = document.getElementById('checkoutClientName').innerText || 'Client';
 
-    if (!method) { toast("Please select a Payment Method.", 'warning'); return; }
+    // Fix 2: guard against empty id (panel was open with no job selected)
+    if (!id) {
+        toast("No job selected — please click Checkout on a pending job first.", 'error');
+        return;
+    }
+    if (!method) {
+        toast("Please select a Payment Method before confirming.", 'warning');
+        return;
+    }
+    if (price <= 0) {
+        toast("Grand total is zero — please verify the job before closing.", 'warning');
+        return;
+    }
 
     captureButtonText(btn);
     setButtonLoading(btn, true, 'Processing...');
     try {
+        // Fix 3: write both totalGHC and grandTotal as the same authoritative Number
         await db.collection('Active_Jobs').doc(id).update({
-            status: 'Closed', paymentMethod: method, totalGHC: price,
-            closedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            closedBy: currentUserEmail
+            status:        'Closed',
+            paymentMethod: method,
+            totalGHC:      price,    // used by financial listeners / reports
+            grandTotal:    price,    // kept in sync so billing UI is always consistent
+            closedAt:      firebase.firestore.FieldValue.serverTimestamp(),
+            closedBy:      currentUserEmail
         });
-        toast("Payment processed successfully.", 'success');
-        document.getElementById('checkoutPanel').style.display = 'none';
-    } catch (e) { toast("Error processing payment: " + e.message, 'error'); }
-    finally { setButtonLoading(btn, false); }
+
+        // Fix 8: receipt toast — confirms client, amount, and method to the cashier
+        const methodIcon = { 'Cash': '💵', 'Card / POS': '💳', 'Mobile Money': '📱' };
+        toast(
+            `${methodIcon[method] || '✓'} Payment confirmed — ${name} — ${price.toFixed(2)} GHC via ${method}`,
+            'success', 7000
+        );
+
+        // Fix 10: close panel explicitly after payment — don't rely on snapshot to do it
+        _closeCheckoutPanel();
+    } catch (e) {
+        toast("Error processing payment: " + e.message, 'error');
+    } finally {
+        setButtonLoading(btn, false);
+    }
 };
 
 // ============================================================
