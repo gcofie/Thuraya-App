@@ -137,9 +137,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .consult-close { position: absolute; right: 20px; top: 20px; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; transition: 0.2s; }
 .consult-close:hover { color: var(--error); }
 .consult-section-title { border-bottom: 2px solid var(--accent); color: var(--primary); padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; text-transform: uppercase; font-size: 1rem; font-weight: bold; letter-spacing: 1px;}
-.checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 15px; }
+.checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px; }
 .checkbox-grid label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #444; }
 .checkbox-grid input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
-.radio-group { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;}
+.radio-group { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;}
 .radio-group label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #444; }
 .radio-group input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); }

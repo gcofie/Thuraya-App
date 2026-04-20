@@ -46,13 +46,13 @@ function timeToMins(t) {
     return parseInt(h) * 60 + parseInt(m); 
 }
 
-function switchModule(m) { 
+window.switchModule = function(m) { 
     document.querySelectorAll('.app-module').forEach(x => x.style.display = 'none'); 
     document.getElementById(m).style.display = 'block'; 
     if(m === 'adminView') loadStaffDirectory(); 
 }
 
-function toggleClientsSubView() { 
+window.toggleClientsSubView = function() { 
     let v = document.querySelector('input[name="clients_view_toggle"]:checked').value; 
     document.getElementById('subView_Checkin').style.display = (v === 'checkin') ? 'block' : 'none';
     document.getElementById('subView_Schedule').style.display = (v === 'schedule') ? 'block' : 'none';
@@ -60,13 +60,13 @@ function toggleClientsSubView() {
     document.getElementById('subView_Ops').style.display = (v === 'ops') ? 'block' : 'none';
 }
 
-function toggleDeptView() { 
+window.toggleDeptView = function() { 
     let v = document.querySelector('input[name="dept_toggle"]:checked').value; 
     document.getElementById('menu_dept_Hand').style.display = (v === 'Hand') ? 'block' : 'none'; 
     document.getElementById('menu_dept_Foot').style.display = (v === 'Foot') ? 'block' : 'none'; 
 }
 
-function toggleAdminDeptView() { 
+window.toggleAdminDeptView = function() { 
     let v = document.querySelector('input[name="admin_dept_toggle"]:checked').value; 
     document.getElementById('admin_dept_Hand').style.display = (v === 'Hand') ? 'block' : 'none'; 
     document.getElementById('admin_dept_Foot').style.display = (v === 'Foot') ? 'block' : 'none'; 
@@ -124,24 +124,35 @@ auth.onAuthStateChanged(async (user) => {
     }
 });
 
-function signInWithEmail() { 
-    let e = document.getElementById('testEmail').value; 
+window.signInWithEmail = function() { 
+    let e = document.getElementById('testEmail').value.trim(); 
     let p = document.getElementById('testPassword').value; 
-    if(e && p) auth.signInWithEmailAndPassword(e,p).catch(err => showError(err.message)); 
+    if(!e || !p) { showError("Enter email and password."); return; }
+    
+    document.getElementById('errorMsg').style.display = 'none';
+    
+    auth.signInWithEmailAndPassword(e, p).catch(err => {
+        let msg = err.message;
+        // Clean up the ugly JSON error message
+        if(msg.includes('INVALID_LOGIN_CREDENTIALS') || msg.includes('invalid')) {
+            msg = "Invalid email or password. Please try again.";
+        }
+        showError(msg);
+    }); 
 }
 
-function signInWithGoogle() { 
+window.signInWithGoogle = function() { 
     auth.signInWithPopup(provider).catch(e => showError(e.message)); 
 }
 
-function logOut() { 
+window.logOut = function() { 
     if(currentUserEmail) {
         db.collection('Attendance').doc(`${currentUserEmail}_${todayDateStr}`).update({clockOut:firebase.firestore.FieldValue.serverTimestamp()}).catch(e=>{}); 
     }
     auth.signOut(); 
 }
 
-function showError(m) { 
+window.showError = function(m) { 
     let el = document.getElementById('errorMsg'); 
     el.innerText = m; 
     el.style.display = 'block'; 
@@ -175,7 +186,7 @@ function startTaxListener() {
     });
 }
 
-function addTax() {
+window.addTax = function() {
     let n = document.getElementById('cfgTaxName').value.trim(); 
     let r = parseFloat(document.getElementById('cfgTaxRate').value);
     if(!n || isNaN(r)) { alert("Fill Tax fields correctly."); return; }
@@ -190,13 +201,13 @@ function addTax() {
     });
 }
 
-function deleteTax(n) { 
+window.deleteTax = function(n) { 
     if(confirm("Remove?")) {
         db.collection('Tax_Settings').doc('current_taxes').set({rates: liveTaxes.filter(t => t.name !== n)}, {merge: true}); 
     }
 }
 
-function editTax(n, r) { 
+window.editTax = function(n, r) { 
     document.getElementById('cfgTaxName').value = n; 
     document.getElementById('cfgTaxRate').value = r; 
     window.scrollTo(0,0); 
@@ -306,7 +317,7 @@ function fetchLiveMenu(hasEditAccess) {
     });
 }
 
-function toggleCard(el, id, t, grp) {
+window.toggleCard = function(el, id, t, grp) {
     let i = document.getElementById('sched_cb_'+id); 
     if(!i) return;
     if(t === 'radio') { 
@@ -324,14 +335,14 @@ function toggleCard(el, id, t, grp) {
     calculateScheduleTotals();
 }
 
-function updateCounter(id, v) { 
+window.updateCounter = function(id, v) { 
     let i = document.getElementById('sched_qty_'+id); 
     let n = parseInt(i.value) + v; 
     i.value = n < 0 ? 0 : n; 
     calculateScheduleTotals(); 
 }
 
-function clearAllSelections() { 
+window.clearAllSelections = function() { 
     document.querySelectorAll('.sched-item').forEach(c => {
         c.checked = false; 
         let p = c.closest('.service-card'); 
@@ -386,7 +397,7 @@ function calculateScheduleTotals() {
     generateTimeSlots();
 }
 
-async function generateTimeSlots() {
+window.generateTimeSlots = async function() {
     let dtEl = document.getElementById('sched_date');
     let drEl = document.getElementById('sched_totalDuration');
     let teEl = document.getElementById('sched_techSelect');
@@ -439,14 +450,14 @@ async function generateTimeSlots() {
     c.innerHTML = f ? h + '</div>' : '<p style="color:var(--error);font-weight:bold;margin:0;">No slots available.</p>';
 }
 
-function selectTimeSlot(timeStr, btn) {
+window.selectTimeSlot = function(timeStr, btn) {
     document.getElementById('sched_time').value = timeStr;
     document.querySelectorAll('.time-slot-btn').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
 }
 
 // --- FOH SEARCH ---
-function selectSClient(id) { 
+window.selectSClient = function(id) { 
     let m = allClientsCache.find(c => c.Tel_Number === id); 
     if(!m) return;
     document.getElementById('sched_phone').value = m.Tel_Number; 
@@ -458,7 +469,7 @@ function selectSClient(id) {
     document.getElementById('sched_selectedClientDisplay').style.display = 'block'; 
 }
 
-function selectFClient(id) { 
+window.selectFClient = function(id) { 
     let m = allClientsCache.find(c => c.Tel_Number === id); 
     if(!m) return;
     document.getElementById('f_forename').value = m.Forename || ''; 
@@ -474,7 +485,7 @@ function selectFClient(id) {
     document.getElementById('fohSearchMsg').style.color = "var(--success)";
 }
 
-function liveClientSearch() { 
+window.liveClientSearch = function() { 
     clearTimeout(searchTimeout); 
     searchTimeout = setTimeout(async () => { 
         let v = document.getElementById('sched_search').value.toLowerCase().trim();
@@ -491,7 +502,7 @@ function liveClientSearch() {
     }, 300); 
 }
 
-function liveClientSearchFOH() { 
+window.liveClientSearchFOH = function() { 
     clearTimeout(fohSearchTimeout); 
     fohSearchTimeout = setTimeout(async () => { 
         let v = document.getElementById('fohSearchPhone').value.toLowerCase().trim();
@@ -508,6 +519,7 @@ function liveClientSearchFOH() {
     }, 300); 
 }
 
+// Ensure clearScheduleClient is fully exposed to the window
 window.clearScheduleClient = function() { 
     document.getElementById('sched_phone').value = ''; 
     document.getElementById('sched_name').value = ''; 
@@ -583,7 +595,7 @@ window.bookAppointment = async function() {
         alert("Appointment Secured!"); 
     }
     
-    clearScheduleClient(); 
+    window.clearScheduleClient(); 
     clearAllSelections(); 
     document.getElementById('sched_date').value = ''; 
     document.getElementById('sched_time').value = '';
@@ -632,7 +644,7 @@ window.cancelEditMode = function() {
     editingApptId = null; 
     document.getElementById('btnConfirmBooking').innerText = "Confirm & Book Appointment"; 
     document.getElementById('btnCancelEdit').style.display = 'none'; 
-    clearScheduleClient(); 
+    window.clearScheduleClient(); 
     document.getElementById('sched_date').value = ''; 
     document.getElementById('sched_time').value = ''; 
     document.getElementById('sched_techSelect').value = ''; 
