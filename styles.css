@@ -41,13 +41,9 @@ body { background-color: var(--bg); color: var(--text); line-height: 1.6; displa
 /* Dynamic Navigation Tabs */
 #topNavMenu { display: none; justify-content: flex-start; gap: 10px; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid var(--border); flex-wrap: wrap; }
 .nav-tab { display: none; } 
-.nav-tab.visible { display: flex; }
 .nav-tab label { background: #f1f1f1; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #555; transition: 0.3s; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.9rem;}
 .nav-tab input[type="radio"] { display: none; }
 .nav-tab input[type="radio"]:checked + label { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-.nav-tab-hr input[type="radio"]:checked + label { background: var(--manager); border-color: var(--manager); }
-.nav-tab-admin input[type="radio"]:checked + label { background: var(--admin); border-color: var(--admin); }
-.nav-tab-supply input[type="radio"]:checked + label { background: var(--supply); border-color: var(--supply); }
 
 /* Role-Specific Views */
 .app-module { display: none; width: 100%; }
@@ -57,8 +53,7 @@ body { background-color: var(--bg); color: var(--text); line-height: 1.6; displa
 /* Form Elements */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;}
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
-.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; }
-@media (max-width: 768px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 
 .form-group { margin-bottom: 15px; text-align: left; position: relative; }
 label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 0.9rem; color: var(--primary);}
@@ -72,11 +67,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .btn:hover { background-color: #1a252f; }
 .btn-secondary { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); }
 .btn-secondary:hover { background-color: var(--primary); color: white; }
-.btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
 
 .dropdown-results { display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 8px 16px rgba(0,0,0,0.15); z-index: 1000; max-height: 250px; overflow-y: auto; }
-.search-result-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.2s; display: block; width: 100%; text-align: left; background: white; border: none; font-size: 1rem;}
-.search-result-item:hover, .search-result-item:focus { background-color: #f1f1f1; outline: none; }
+.search-result-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.2s; display: block; width: 100%; text-align: left; border-left: none; border-right: none; border-top: none; background: white; font-size: 1rem;}
+.search-result-item:hover { background-color: #f1f1f1; outline: none; }
 
 /* Premium Dept Toggles */
 .dept-tabs { display: flex; justify-content: center; gap: 20px; padding: 15px; background: #f9f7f4; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px;}
@@ -86,7 +80,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 /* Premium Tap-to-Book UI Cards */
 .menu-col { display: flex; flex-direction: column; gap: 20px; }
 .menu-section-title { color: var(--accent); font-size: 1.1rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid var(--accent); padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end;}
-.section-hint { font-size: 0.75rem; color: #999; font-style: italic; font-weight: normal; letter-spacing: 0;}
 
 .service-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 15px; margin-bottom: 10px; transition: 0.2s; cursor: pointer; display: flex; align-items: flex-start; gap: 15px;}
 .service-card:hover { border-color: var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
@@ -94,8 +87,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .service-card input[type="radio"], .service-card input[type="checkbox"] { width: 18px; height: 18px; margin-top: 4px; accent-color: var(--accent); cursor: pointer; pointer-events: none;}
 .service-card label { cursor: pointer; display: flex; flex-direction: column; pointer-events: none; margin: 0; flex-grow: 1;}
 .service-card label strong { color: #222; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;}
-.service-desc { color: #7f8c8d; font-size: 0.85rem; margin-top: 5px; line-height: 1.4; font-weight: normal; }
-.hl-tag { background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; }
 
 .counter-box { display: flex; align-items: center; gap: 10px; justify-content: flex-end; width: 100px; flex-shrink: 0;}
 .counter-box input { width: 60px; text-align: center; padding: 5px; font-weight: bold; border: 1px solid var(--border); border-radius: 4px;}
@@ -112,11 +103,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .breakdown-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
 .breakdown-table th, .breakdown-table td { border: 1px solid var(--border); padding: 10px; text-align: left; vertical-align: middle;}
 .breakdown-table th { background-color: #f1f1f1; font-size: 0.9rem; }
-.total-row { font-weight: bold; font-size: 1.2rem; background-color: #eef5f9; }
 
 .ticket { border: 2px solid var(--accent); border-radius: 8px; padding: 15px; margin-bottom: 15px; background: #fffaf0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-.ticket-info h4 { color: var(--primary); margin-bottom: 5px; font-size: 1.2rem; }
-.ticket-info p { color: #666; font-size: 0.9rem; margin-bottom: 2px; }
 .ticket-badge { background: #f39c12; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; display: inline-block; }
 
 .roster-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
@@ -137,9 +125,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .consult-close { position: absolute; right: 20px; top: 20px; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; transition: 0.2s; }
 .consult-close:hover { color: var(--error); }
 .consult-section-title { border-bottom: 2px solid var(--accent); color: var(--primary); padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; text-transform: uppercase; font-size: 1rem; font-weight: bold; letter-spacing: 1px;}
-.checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px; }
+.checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 15px; }
 .checkbox-grid label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #444; }
 .checkbox-grid input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
-.radio-group { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;}
+.radio-group { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;}
 .radio-group label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #444; }
 .radio-group input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); }
