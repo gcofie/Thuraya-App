@@ -22,8 +22,10 @@ catch (e) { secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp"
 let currentUserEmail = "", currentUserName = "", currentRoles = []; 
 let allTechs = [], allClientsCache = [], allMenuServicesCache = [], liveTaxes = []; 
 let isFetchingClients = false, searchTimeout = null, fohSearchTimeout = null, editingApptId = null; 
-let curConsultId = null, curConsultData = null, upsls = [];
+let currentConsultJobId = null, currentConsultJobData = null, pendingUpsells = [];
 let consultTemplate = [];
+let expectedTodayListener = null, scheduleListener = null, techQueueListener = null, fohBillingListener = null;
+
 
 function getLocalDateString() {
     const now = new Date();
@@ -78,33 +80,106 @@ window.toggleAdminDeptView = function() {
     if (foot) foot.style.display = (view === 'Foot') ? 'block' : 'none';
 }
 
+auth.onAuthStateChanged(async (user) => {
+    if (user) {
+        const userEmail = user.email.toLowerCase();
+        try { await clockInStaff(userEmail, user.displayName || "Staff", []); } catch(e) { }
+        
+        try {
+            const userDoc = await db.collection('Users').doc(userEmail).get();
+            
+            if (userDoc.exists) {
+                const userData = userDoc.data() || {};
+                currentUserEmail = userEmail;
+                currentUserName = userData.name || user.displayName || "Staff Member";
+                currentRoles = Array.isArray(userData.roles) ? userData.roles : (userData.role ? [userData.role] : []);
 
-// --- SUPER OVERRIDE ---
+                document.getElementById('userNameDisplay').innerText = currentUserName;
+                document.getElementById('userRoleDisplay').innerText = currentRoles.join(' | ');
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('appDashboard').style.display = 'block';
+
+                try { await fetchAllTechs(); } catch(e) { console.error(e); }
+                try { startTaxListener(); } catch(e) { console.error(e); }
+                try { startConsultTemplateListener(); } catch(e) {}
+                
+                document.getElementById('topNavMenu').style.display = 'flex';
+                document.querySelectorAll('.nav-tab').forEach(tab => tab.style.display = 'none');
+                
+                const safeRoles = currentRoles.map(r => (typeof r === 'string' ? r.trim().toLowerCase() : ''));
+                
+                const isFOH = safeRoles.some(r => r.includes('foh') || r.includes('front of house'));
+                const isTech = safeRoles.some(r => r.includes('tech'));
+                const isManager = safeRoles.some(r => r.includes('manager'));
+                const isAdmin = safeRoles.some(r => r.includes('admin')); 
+                const isSupply = safeRoles.some(r => r.includes('supply'));
+
+                if(isManager || isFOH || isAdmin) {
+                    document.getElementById('tabClients').style.display = 'flex';
+                    try { startFohRosterListener(); } catch(e){}
+                    try { startFohFinancialListener(); } catch(e){}
+                    try { startExpectedTodayListener(); } catch(e){}
+                    try { startScheduleListener(); } catch(e){}
+                    try { startFohBillingListener(); } catch(e){}
+                }
+
+                if(isManager || isTech || isAdmin) {
+                    document.getElementById('tabAtelier').style.display = 'flex';
+                    try { startTechFinancialListener(); } catch(e){}
+                    try { startTechQueueListener(); } catch(e){}
+                }
+
+                if(isManager || isFOH || isTech || isAdmin) { document.getElementById('tabMenu').style.display = 'flex'; }
+                if(isAdmin || isManager) { document.getElementById('tabHR').style.display = 'flex'; }
+                if(isAdmin || isManager || isSupply) { document.getElementById('tabSupply').style.display = 'flex'; }
+                
+                if(isAdmin) { 
+                    document.getElementById('tabAdmin').style.display = 'flex'; 
+                    try { loadStaffDirectory(); } catch(e){} 
+                }
+
+                if(isAdmin || isManager || isFOH || isTech) {
+                    try { fetchLiveMenu(isManager || isAdmin); } catch(e) {}
+                }
+
+                const firstVisibleTab = document.querySelector('.nav-tab[style*="flex"] input');
+                if(firstVisibleTab) {
+                    firstVisibleTab.checked = true;
+                    switchModule(firstVisibleTab.value);
+                }
+            } else {
+                auth.signOut();
+                showError("Access Denied: Your email is not registered in the matrix.");
+            }
+        } catch (error) { console.error(error); showError("Database connection error."); }
+    } else {
+        const loginScreen = document.getElementById('loginScreen');
+        const appDashboard = document.getElementById('appDashboard');
+        const topNavMenu = document.getElementById('topNavMenu');
+        if (loginScreen) loginScreen.style.display = 'block';
+        if (appDashboard) appDashboard.style.display = 'none';
+        if (topNavMenu) topNavMenu.style.display = 'none';
+    }
+});
+
 window.signInWithEmail = function() { 
-    // This completely bypasses Firebase Authentication and forces you into the system.
-    currentUserEmail = "emergency_admin@thuraya.com";
-    currentUserName = "MASTER OVERRIDE";
-    currentRoles = ["System Admin"];
-
-    document.getElementById('userNameDisplay').innerText = currentUserName;
-    document.getElementById('userRoleDisplay').innerText = currentRoles.join(' | ');
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('appDashboard').style.display = 'block';
-
-    document.getElementById('topNavMenu').style.display = 'flex';
-    document.querySelectorAll('.nav-tab').forEach(tab => tab.style.display = 'flex'); // Show ALL tabs
+    const email = document.getElementById('testEmail').value.trim();
+    const password = document.getElementById('testPassword').value;
+    if(!email || !password) { showError("Enter email and password."); return; }
+    const errorEl = document.getElementById('errorMsg');
+    if (errorEl) errorEl.style.display = 'none'; 
     
-    // Start listeners (will only pull data if database allows read access, but UI will open)
-    try { fetchAllTechs(); } catch(e) {}
-    try { startTaxListener(); } catch(e) {}
-    try { startConsultTemplateListener(); } catch(e) {}
-    try { loadStaffDirectory(); } catch(e) {}
-    try { fetchLiveMenu(true); } catch(e) {}
-
-    // Force open Admin tab
-    const adminTabInput = document.getElementById('nav_admin');
-    if(adminTabInput) adminTabInput.checked = true;
-    switchModule('adminView');
+    auth.signInWithEmailAndPassword(email, password).catch(error => {
+        if (['auth/invalid-login-credentials','auth/wrong-password','auth/user-not-found','auth/invalid-credential'].includes(error.code)) {
+            showError("Invalid email or password. Please try again.");
+        } else if (error.code === 'auth/invalid-email') {
+            showError("Please enter a valid email address.");
+        } else if (error.code === 'auth/too-many-requests') {
+            showError("Too many failed login attempts. Please try again later.");
+        } else {
+            showError(error.message || "Login failed.");
+        }
+    }); 
 }
 
 window.signInWithGoogle = function() { 
@@ -115,11 +190,11 @@ window.signInWithGoogle = function() {
 window.logOut = async function() { 
     if(currentUserEmail) { try { await db.collection('Attendance').doc(`${currentUserEmail}_${todayDateStr}`).update({ clockOut: firebase.firestore.FieldValue.serverTimestamp() }); } catch(e) {} }
     auth.signOut(); 
-    location.reload(); // Force reload to clear override
 }
 
 window.showError = function(msg) { 
     const el = document.getElementById('errorMsg'); 
+    if (!el) { alert(msg); return; }
     el.innerText = msg; 
     el.style.display = 'block'; 
 }
@@ -552,7 +627,7 @@ window.clearAllSelections = function() {
     calculateScheduleTotals();
 }
 
-window.calculateScheduleTotals = function() {
+function calculateScheduleTotals() {
     let totalMins = 0;
     let subtotalCost = 0;
     let breakdownHtml = '';
@@ -581,6 +656,7 @@ window.calculateScheduleTotals = function() {
         }
     });
 
+    // TAX ENGINE CALCULATION
     let totalTaxAmt = 0;
     let taxBreakdownHtml = '';
     let taxDataArr = [];
@@ -629,86 +705,373 @@ window.selectTimeSlot = function(timeStr, btnElement) {
     btnElement.classList.add('selected');
 }
 
-window.generateTimeSlots = async function() {
-    let dtEl = document.getElementById('sched_date');
-    let drEl = document.getElementById('sched_totalDuration');
-    let teEl = document.getElementById('sched_techSelect');
-    let c = document.getElementById('sched_timeSlots');
+async function generateTimeSlots() {
+    let date = document.getElementById('sched_date').value;
+    let duration = parseInt(document.getElementById('sched_totalDuration').innerText) || 0;
+    let techEmail = document.getElementById('sched_techSelect').value;
+    let slotsContainer = document.getElementById('sched_timeSlots');
     
-    if(!dtEl || !drEl || !teEl || !c) return;
-    
-    let dt = dtEl.value;
-    let dr = parseInt(drEl.innerText) || 0;
-    let te = teEl.value; 
+    if (date && date < todayDateStr) {
+        slotsContainer.innerHTML = '<p style="color:var(--error); font-weight:bold; margin:0;">You cannot book appointments in the past.</p>';
+        return;
+    }
+
     document.getElementById('sched_time').value = '';
-    
-    if(!dt || !te || dr === 0) { 
-        c.innerHTML = '<p style="color:#999;font-size:0.85rem;margin:0;font-style:italic;">⚠️ Select Service, Date, and Tech.</p>'; 
-        return; 
+
+    if(!date || !techEmail || duration === 0) {
+        slotsContainer.innerHTML = '<p style="color:#999; font-size:0.85rem; margin:0; font-style: italic;">⚠️ Please select at least one Service, a Date, and a Technician to generate available times.</p>';
+        return;
     }
+
+    slotsContainer.innerHTML = '<p style="color:#666; font-size:0.85rem; margin:0;">Calculating slots...</p>';
     
-    c.innerHTML = 'Loading...';
-    let bb = []; 
-    let querySnap = await db.collection('Appointments').where('dateString','==',dt).get();
-    querySnap.forEach(d => {
-        let a = d.data(); 
-        if(a.assignedTechEmail === te && (a.status === 'Scheduled' || a.status === 'Arrived') && d.id !== editingApptId) {
-            bb.push({s: timeToMins(a.timeString), e: timeToMins(a.timeString) + parseInt(a.bookedDuration)});
+    try {
+        let snap = await db.collection('Appointments').where('dateString', '==', date).get();
+
+        let busyBlocks = []; 
+        snap.forEach(doc => {
+            if(editingApptId && doc.id === editingApptId) return;
+
+            let appt = doc.data();
+            if(appt.assignedTechEmail === techEmail && (appt.status === 'Scheduled' || appt.status === 'Arrived')) {
+                let aStart = timeToMins(appt.timeString);
+                let aEnd = aStart + parseInt(appt.bookedDuration || 0);
+                busyBlocks.push({start: aStart, end: aEnd});
+            }
+        });
+
+        let openTime = 8 * 60; let closeTime = 20 * 60; let interval = 30; 
+        let html = '<div style="display:flex; flex-wrap:wrap; gap:10px;">';
+        let slotsFound = false;
+
+        let now = new Date();
+        let currentMins = now.getHours() * 60 + now.getMinutes();
+        let isToday = (date === todayDateStr);
+
+        for(let t = openTime; t + duration <= closeTime; t += interval) {
+            if (isToday && t <= currentMins) {
+                continue;
+            }
+
+            let slotStart = t; let slotEnd = t + duration; let isAvailable = true;
+
+            for(let i=0; i<busyBlocks.length; i++) {
+                let b = busyBlocks[i];
+                if(slotStart < b.end && slotEnd > b.start) { isAvailable = false; break; }
+            }
+
+            if(isAvailable) {
+                slotsFound = true;
+                let hrs = Math.floor(t / 60); let mins = t % 60; let ampm = hrs >= 12 ? 'PM' : 'AM';
+                let displayHrs = hrs % 12; if(displayHrs === 0) displayHrs = 12;
+                let displayMins = mins < 10 ? '0'+mins : mins;
+                
+                let timeString24 = `${hrs < 10 ? '0'+hrs : hrs}:${displayMins}`;
+                let timeString12 = `${displayHrs}:${displayMins} ${ampm}`;
+
+                html += `<button type="button" class="time-slot-btn" data-time="${timeString24}" onclick="selectTimeSlot('${timeString24}', this)">${timeString12}</button>`;
+            }
         }
+        html += '</div>';
+
+        if(!slotsFound) { slotsContainer.innerHTML = '<p style="color:var(--error); font-weight:bold; margin:0;">No time slots available for this duration.</p>'; } 
+        else { slotsContainer.innerHTML = html; }
+
+    } catch(e) { console.error("Availability Error:", e); }
+}
+
+window.editAppointment = async function(id) {
+    try {
+        let doc = await db.collection('Appointments').doc(id).get();
+        if(!doc.exists) return;
+        let appt = doc.data();
+
+        document.getElementById('tab_toggle_schedule').click();
+
+        document.getElementById('sched_phone').value = appt.clientPhone || '';
+        document.getElementById('sched_name').value = appt.clientName || '';
+        document.getElementById('sched_displayName').innerText = appt.clientName || 'Unknown';
+        document.getElementById('sched_displayPhone').innerText = appt.clientPhone || 'Unknown';
+        document.getElementById('sched_search').value = '';
+        document.getElementById('sched_searchResults').style.display = 'none';
+        document.getElementById('sched_selectedClientDisplay').style.display = 'block';
+
+        editingApptId = id;
+        document.getElementById('btnConfirmBooking').innerText = "Update Appointment";
+        document.getElementById('btnCancelEdit').style.display = 'inline-block';
+
+        clearAllSelections();
+
+        setTimeout(() => {
+            let servicesArr = appt.bookedService.split(', ').map(s => s.trim());
+            
+            document.querySelectorAll('.sched-service-item').forEach(cb => {
+                if(servicesArr.includes(cb.getAttribute('data-name'))) {
+                    cb.checked = true;
+                    cb.closest('.service-card').classList.add('selected');
+                }
+            });
+
+            document.querySelectorAll('.sched-service-counter').forEach(input => {
+                let name = input.getAttribute('data-name');
+                let match = servicesArr.find(s => s.startsWith(name + ' (x'));
+                if(match) {
+                    let matchArr = match.match(/\(x(\d+)\)/);
+                    if(matchArr && matchArr[1]) {
+                        input.value = parseInt(matchArr[1]);
+                    }
+                }
+            });
+
+            document.getElementById('sched_date').value = appt.dateString;
+            document.getElementById('sched_techSelect').value = appt.assignedTechEmail;
+
+            calculateScheduleTotals();
+
+            setTimeout(() => {
+                let timeBtns = document.querySelectorAll('.time-slot-btn');
+                timeBtns.forEach(btn => {
+                    if(btn.getAttribute('data-time') === appt.timeString) {
+                        selectTimeSlot(appt.timeString, btn);
+                    }
+                });
+            }, 500); 
+        }, 200);
+
+    } catch(e) {
+        console.error(e);
+        alert("Error loading appointment for edit.");
+    }
+}
+
+window.clearAdvForm = function() {
+    ['adv_name', 'adv_duration', 'adv_price', 'adv_desc', 'adv_section'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
     });
-    
-    let h = '<div style="display:flex;flex-wrap:wrap;gap:10px;">';
-    let f = false;
-    let nw = new Date();
-    let isT = (dt === todayDateStr);
-    let cm = nw.getHours() * 60 + nw.getMinutes();
-    
-    for(let t = 8*60; t + dr <= 20*60; t += 30) {
-        if(isT && t <= cm) continue;
-        let av = true; 
-        for(let i=0; i<bb.length; i++) { 
-            if(t < bb[i].e && t + dr > bb[i].s) { av = false; break; } 
-        }
-        if(av) { 
-            f = true; 
-            let hr = Math.floor(t/60);
-            let mn = t % 60;
-            let mD = mn < 10 ? '0'+mn : mn;
-            let hd = hr % 12 || 12; 
-            let timeVal = `${hr < 10 ? '0'+hr : hr}:${mD}`;
-            h += `<button type="button" class="time-slot-btn" onclick="selectTimeSlot('${timeVal}', this)">${hd}:${mD} ${hr>=12?'PM':'AM'}</button> `;
-        }
+    const defaults = {
+        adv_category: 'Hand Therapy',
+        adv_pricing_type: 'Fixed',
+        adv_status: 'Active',
+        adv_applies_to: 'Hand',
+        adv_selection: 'Single',
+        adv_tag: 'None'
+    };
+    Object.entries(defaults).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+    updateAdvForm();
+}
+
+window.updateAdvForm = function() {
+    const category = document.getElementById('adv_category')?.value || 'Hand Therapy';
+    const typeSelect = document.getElementById('adv_type');
+    const appliesTo = document.getElementById('adv_applies_to');
+    const selection = document.getElementById('adv_selection');
+
+    if (!typeSelect) return;
+
+    if (category === 'Add-On') {
+        typeSelect.innerHTML = '<option value="Add-On">Add-On / Upgrade</option>';
+        if (appliesTo) appliesTo.value = 'Both';
+        if (selection) selection.value = 'Multi';
+    } else {
+        typeSelect.innerHTML = '<option value="Main Therapy">Main Therapy (Single Select)</option>';
+        if (selection && selection.value !== 'Single' && selection.value !== 'Multi') selection.value = 'Single';
     }
-    c.innerHTML = f ? h + '</div>' : '<p style="color:var(--error);font-weight:bold;margin:0;">No slots available.</p>';
 }
 
-// --- FOH SEARCH ---
-window.selectSClient = function(id) { 
-    let m = allClientsCache.find(c => c.Tel_Number === id); 
-    if(!m) return;
-    document.getElementById('sched_phone').value = m.Tel_Number; 
-    document.getElementById('sched_name').value = `${m.Forename||''} ${m.Surname||''}`.trim(); 
-    document.getElementById('sched_displayName').innerText = document.getElementById('sched_name').value; 
-    document.getElementById('sched_displayPhone').innerText = m.Tel_Number; 
-    document.getElementById('sched_search').value = ''; 
-    document.getElementById('sched_searchResults').style.display = 'none'; 
-    document.getElementById('sched_selectedClientDisplay').style.display = 'block'; 
+window.addNewMenuServiceAdv = async function() {
+    const payload = {
+        category: document.getElementById('adv_category')?.value || '',
+        type: document.getElementById('adv_type')?.value || '',
+        name: document.getElementById('adv_name')?.value.trim() || '',
+        duration: parseInt(document.getElementById('adv_duration')?.value || '0', 10),
+        price: parseFloat(document.getElementById('adv_price')?.value || '0'),
+        pricingType: document.getElementById('adv_pricing_type')?.value || 'Fixed',
+        status: document.getElementById('adv_status')?.value || 'Active',
+        description: document.getElementById('adv_desc')?.value.trim() || '',
+        appliesTo: document.getElementById('adv_applies_to')?.value || 'Hand',
+        selection: document.getElementById('adv_selection')?.value || 'Single',
+        section: document.getElementById('adv_section')?.value.trim() || '',
+        tag: document.getElementById('adv_tag')?.value || 'None',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (!payload.name) {
+        alert('Enter a service name.');
+        return;
+    }
+    if (!payload.duration || payload.duration < 0) {
+        alert('Enter a valid duration.');
+        return;
+    }
+    if (isNaN(payload.price) || payload.price < 0) {
+        alert('Enter a valid price.');
+        return;
+    }
+
+    try {
+        await db.collection('Menu_Services').add(payload);
+        clearAdvForm();
+        if (typeof fetchLiveMenu === 'function') {
+            fetchLiveMenu(true);
+        }
+        alert('Service configuration saved.');
+    } catch (e) {
+        console.error(e);
+        alert('Error saving service configuration.');
+    }
 }
 
-window.selectFClient = function(id) { 
-    let m = allClientsCache.find(c => c.Tel_Number === id); 
-    if(!m) return;
-    document.getElementById('f_forename').value = m.Forename || ''; 
-    document.getElementById('f_surname').value = m.Surname || ''; 
-    document.getElementById('f_tel').value = m.Tel_Number || ''; 
-    document.getElementById('f_altTel').value = m.Tel_Number_Alt || ''; 
-    document.getElementById('f_gender').value = m.Gender || ''; 
-    document.getElementById('f_email').value = m.Email || ''; 
-    document.getElementById('f_dob').value = m.DOB || ''; 
-    document.getElementById('fohSearchPhone').value = ''; 
-    document.getElementById('foh_searchResults').style.display = 'none'; 
-    document.getElementById('fohSearchMsg').innerText = 'Client Loaded. You can update and save.'; 
-    document.getElementById('fohSearchMsg').style.color = "var(--success)";
+window.cancelEditMode = function() {
+    editingApptId = null;
+    document.getElementById('btnConfirmBooking').innerText = "Confirm & Book Appointment";
+    document.getElementById('btnCancelEdit').style.display = 'none';
+    window.clearScheduleClient();
+    document.getElementById('sched_date').value = '';
+    document.getElementById('sched_time').value = '';
+    document.getElementById('sched_techSelect').value = '';
+    clearAllSelections();
+}
+
+window.bookAppointment = async function() {
+    const phone = document.getElementById('sched_phone').value;
+    const name = document.getElementById('sched_name').value;
+    const date = document.getElementById('sched_date').value;
+    const time = document.getElementById('sched_time').value;
+    const duration = document.getElementById('sched_totalDuration').innerText;
+    
+    const subtotal = document.getElementById('sched_subtotalVal').value;
+    const taxData = document.getElementById('sched_taxData').value;
+    const grandTotal = document.getElementById('sched_grandTotalVal').value;
+    
+    const techEmail = document.getElementById('sched_techSelect').value;
+    const techName = document.getElementById('sched_techSelect').options[document.getElementById('sched_techSelect').selectedIndex]?.text;
+    
+    let services = [];
+    
+    document.querySelectorAll('.sched-service-item:checked').forEach(cb => { services.push(cb.getAttribute('data-name')); });
+    document.querySelectorAll('.sched-service-counter').forEach(input => {
+        let qty = parseInt(input.value) || 0;
+        if(qty > 0) { services.push(`${input.getAttribute('data-name')} (x${qty})`); }
+    });
+
+    const serviceString = services.join(', ');
+
+    if(!phone || !name || !date || !time || !techEmail || services.length === 0) {
+        alert("Please complete the form: Select a client, at least one service, date, a technician, and an AVAILABLE TIME SLOT."); return;
+    }
+
+    try {
+        let payload = {
+            clientPhone: phone, clientName: name, dateString: date, timeString: time,
+            assignedTechEmail: techEmail, assignedTechName: techName,
+            bookedService: serviceString, bookedDuration: duration, 
+            bookedPrice: subtotal, taxBreakdown: taxData, grandTotal: grandTotal, 
+            status: 'Scheduled', bookedBy: currentUserEmail,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (editingApptId) {
+            await db.collection('Appointments').doc(editingApptId).update(payload);
+            alert("Appointment successfully updated!");
+        } else {
+            payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('Appointments').add(payload);
+            alert("Appointment successfully secured!");
+        }
+        
+        cancelEditMode(); 
+        
+    } catch(e) { alert("Error booking: " + e.message); }
+}
+
+function startScheduleListener() {
+    const listDiv = document.getElementById('upcomingScheduleList');
+    try {
+        scheduleListener = db.collection('Appointments').where('status', 'in', ['Scheduled', 'Action Required']).onSnapshot(snap => {
+            if(snap.empty) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No upcoming appointments scheduled.</p>'; return; }
+            
+            let allAppts = [];
+            snap.forEach(doc => {
+                let appt = doc.data();
+                if(appt.dateString >= todayDateStr || appt.status === 'Action Required') { allAppts.push({id: doc.id, ...appt}); }
+            });
+
+            allAppts.sort((a, b) => {
+                let dateA = a.dateString || ""; let dateB = b.dateString || "";
+                let timeA = a.timeString || ""; let timeB = b.timeString || "";
+                if (dateA === dateB) return timeA.localeCompare(timeB);
+                return dateA.localeCompare(dateB);
+            });
+
+            if(allAppts.length === 0) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No upcoming appointments scheduled.</p>'; return; }
+
+            let html = '';
+            allAppts.forEach(appt => {
+                const isToday = appt.dateString === todayDateStr ? '<span class="ticket-badge" style="background:#e74c3c;">TODAY</span>' : '';
+                let actionReq = appt.status === 'Action Required' ? '<span class="ticket-badge" style="background:var(--error); margin-left:5px;">RESCHEDULE REQUESTED</span>' : '';
+                
+                let timeParts = (appt.timeString || "00:00").split(':');
+                let hr = parseInt(timeParts[0]) || 0; let min = timeParts[1] || "00";
+                let ampm = hr >= 12 ? 'PM' : 'AM'; let hr12 = hr % 12; if(hr12 === 0) hr12 = 12;
+                let displayAmt = parseFloat(appt.grandTotal || appt.bookedPrice || 0).toFixed(2);
+
+                html += `
+                    <div class="ticket" style="border-color: ${appt.status === 'Action Required' ? 'var(--error)' : 'var(--manager)'}; padding: 10px;">
+                        <div style="flex-grow:1;">
+                            <h4 style="margin:0; font-size:1rem; color:var(--manager);">${appt.clientName || 'Unknown'} ${isToday} ${actionReq}</h4>
+                            <p style="margin:0; font-size:0.8rem; color: var(--primary); font-weight: bold;">💅 ${appt.bookedService} (${appt.bookedDuration} mins | ${displayAmt} GHC)</p>
+                            <p style="margin:0; font-size:0.8rem;">📅 ${appt.dateString} at ⏰ ${hr12}:${min} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'}</p>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:5px;">
+                            <button class="btn btn-secondary" style="width:100%; padding:5px 10px; font-size:0.75rem;" onclick="editAppointment('${appt.id}')">Edit</button>
+                            <button class="btn btn-secondary" style="width:100%; padding:5px 10px; font-size:0.75rem; color:var(--error); border-color:var(--error);" onclick="cancelAppointment('${appt.id}')">Cancel</button>
+                        </div>
+                    </div>`;
+            });
+            listDiv.innerHTML = html;
+        });
+    } catch(e) { console.error(e); }
+}
+
+window.cancelAppointment = async function(id) {
+    if(confirm("Are you sure you want to cancel this appointment?")) {
+        await db.collection('Appointments').doc(id).update({ status: 'Cancelled' });
+    }
+}
+
+// ==========================================
+// FOH PIPELINE: REGISTRATION & SEARCH
+// ==========================================
+window.selectClientForSchedule = function(clientData) {
+    document.getElementById('sched_phone').value = clientData.Tel_Number || '';
+    const fullName = `${clientData.Forename || ''} ${clientData.Surname || ''}`.trim() || 'Unknown Client';
+    document.getElementById('sched_name').value = fullName;
+    document.getElementById('sched_displayName').innerText = fullName;
+    document.getElementById('sched_displayPhone').innerText = clientData.Tel_Number || 'No Phone';
+    document.getElementById('sched_search').value = '';
+    document.getElementById('sched_searchResults').style.display = 'none';
+    document.getElementById('sched_selectedClientDisplay').style.display = 'block';
+}
+
+window.selectClientForFOH = function(clientData) {
+    document.getElementById('f_forename').value = clientData.Forename || '';
+    document.getElementById('f_surname').value = clientData.Surname || '';
+    document.getElementById('f_tel').value = clientData.Tel_Number || '';
+    document.getElementById('f_altTel').value = clientData.Tel_Number_Alt || '';
+    document.getElementById('f_gender').value = clientData.Gender || '';
+    document.getElementById('f_email').value = clientData.Email || '';
+    document.getElementById('f_dob').value = clientData.DOB || '';
+    
+    document.getElementById('fohSearchPhone').value = '';
+    document.getElementById('foh_searchResults').style.display = 'none';
+    
+    const msg = document.getElementById('fohSearchMsg');
+    msg.innerText = "Client Loaded. You can update their details and save.";
+    msg.style.color = "var(--success)";
 }
 
 window.liveClientSearchFOH = async function() {
@@ -949,7 +1312,6 @@ window.toggleMedNone = function(checkbox) {
 }
 
 window.openConsultation = async function(id) {
-    window.openConsult = window.openConsultation;
     try {
         const doc = await db.collection('Active_Jobs').doc(id).get();
         if(!doc.exists) return;
@@ -1020,6 +1382,7 @@ window.closeConsultation = function() {
     pendingUpsells = [];
 }
 window.closeConsult = window.closeConsultation;
+window.openConsult = window.openConsultation;
 
 window.addUpsellToTicket = function() {
     const select = document.getElementById('consultUpsellSelect');
@@ -1184,14 +1547,14 @@ function startTechQueueListener() {
                     
                     if (job.status === 'Waiting') {
                         btn.innerText = 'Consultation';
-                        btn.onclick = function() { window.openConsultation(doc.id); };
+                        btn.addEventListener('click', () => window.openConsultation(doc.id));
                     } else {
                         btn.innerText = 'Complete Job';
                         btn.style.background = 'var(--success)';
-                        btn.onclick = async function() { 
+                        btn.addEventListener('click', async () => { 
                             try { await db.collection('Active_Jobs').doc(doc.id).update({ status: 'Ready for Payment' }); }
                             catch(e) { alert("Error: " + e.message); }
-                        };
+                        });
                         
                         let btnEdit = document.createElement('button');
                         btnEdit.className = 'btn btn-secondary';
@@ -1200,7 +1563,7 @@ function startTechQueueListener() {
                         btnEdit.style.marginBottom = '5px';
                         btnEdit.style.fontSize = '0.75rem';
                         btnEdit.innerText = 'Edit Record';
-                        btnEdit.onclick = function() { window.openConsultation(doc.id); };
+                        btnEdit.addEventListener('click', () => window.openConsultation(doc.id));
                         btnWrapper.appendChild(btnEdit);
                     }
                     
@@ -1486,9 +1849,7 @@ window.addStaffAccount = async function() {
             await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
             await secondaryApp.auth().signOut(); 
         } catch (authError) { 
-            if(authError.code !== 'auth/email-already-in-use') { alert("Failed to create login credential.
-
-Error: " + authError.message); return; }
+            if(authError.code !== 'auth/email-already-in-use') { alert(`Failed to create login credential.\n\nError: ${authError.message}`); return; }
         }
     }
     try {
