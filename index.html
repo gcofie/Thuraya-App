@@ -101,6 +101,7 @@
             <label><input type="radio" name="clients_view_toggle" value="checkin" checked onchange="toggleClientsSubView()"> Walk-in &amp; Check-In</label>
             <label><input type="radio" name="clients_view_toggle" value="schedule" id="tab_toggle_schedule" onchange="toggleClientsSubView()"> Book Appointment</label>
             <label><input type="radio" name="clients_view_toggle" value="billing" onchange="toggleClientsSubView()"> Billing &amp; Checkout</label>
+            <label><input type="radio" name="clients_view_toggle" value="history" onchange="toggleClientsSubView()"> 📋 Client History</label>
             <label><input type="radio" name="clients_view_toggle" value="ops" onchange="toggleClientsSubView()"> End of Day Ops</label>
         </div>
 
@@ -249,6 +250,85 @@
             <div class="module-box">
                 <h3>Upcoming Schedule</h3>
                 <div id="upcomingScheduleList"><p class="text-muted">Loading...</p></div>
+            </div>
+        </div>
+
+        <!-- Sub-view: Client History -->
+        <div id="subView_History" style="display:none;">
+            <div class="module-box primary-top">
+                <h3>Client History</h3>
+                <p class="module-subtitle">Search any client to view their full visit record, spend, and consultation notes.</p>
+
+                <!-- Search bar -->
+                <div class="form-group" style="margin-bottom:20px; z-index:50; max-width:480px;">
+                    <label>Search Client (Name or Phone):</label>
+                    <div class="search-box">
+                        <input type="text" id="hist_search" placeholder="Type name or number..."
+                               autocomplete="off" onkeyup="liveClientSearchHistory()">
+                        <div id="hist_searchResults" class="dropdown-results"></div>
+                    </div>
+                </div>
+
+                <!-- Client header — hidden until a client is selected -->
+                <div id="hist_clientHeader" class="hidden"
+                     style="background:linear-gradient(135deg,var(--primary) 0%,#1a252f 100%);
+                            color:white; border-radius:var(--radius); padding:20px 24px;
+                            margin-bottom:22px; display:flex; justify-content:space-between;
+                            align-items:flex-start; flex-wrap:wrap; gap:16px;">
+                    <div>
+                        <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem;
+                                    letter-spacing:2px; margin-bottom:4px;" id="hist_clientName">—</div>
+                        <div style="font-size:0.8rem; opacity:0.75; display:flex; gap:16px; flex-wrap:wrap;">
+                            <span id="hist_clientPhone"></span>
+                            <span id="hist_clientGender"></span>
+                            <span id="hist_clientDob"></span>
+                            <span id="hist_clientEmail"></span>
+                        </div>
+                    </div>
+                    <!-- KPI strip -->
+                    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                        <div style="text-align:center;">
+                            <div style="font-size:1.6rem; font-weight:700; line-height:1;"
+                                 id="hist_kpiVisits">—</div>
+                            <div style="font-size:0.7rem; opacity:0.65; text-transform:uppercase;
+                                        letter-spacing:1px; margin-top:3px;">Visits</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:1.6rem; font-weight:700; line-height:1;
+                                        color:var(--accent);" id="hist_kpiSpend">—</div>
+                            <div style="font-size:0.7rem; opacity:0.65; text-transform:uppercase;
+                                        letter-spacing:1px; margin-top:3px;">Total Spend</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:1.6rem; font-weight:700; line-height:1;"
+                                 id="hist_kpiAvg">—</div>
+                            <div style="font-size:0.7rem; opacity:0.65; text-transform:uppercase;
+                                        letter-spacing:1px; margin-top:3px;">Avg / Visit</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:1.6rem; font-weight:700; line-height:1;"
+                                 id="hist_kpiLast">—</div>
+                            <div style="font-size:0.7rem; opacity:0.65; text-transform:uppercase;
+                                        letter-spacing:1px; margin-top:3px;">Last Visit</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading / empty states -->
+                <div id="hist_loading" class="hidden"
+                     style="text-align:center; padding:40px; color:#aaa;">
+                    <div style="font-size:1.5rem; margin-bottom:8px;">⏳</div>
+                    <p style="font-size:0.9rem;">Loading visit history...</p>
+                </div>
+                <div id="hist_empty" class="hidden"
+                     style="text-align:center; padding:40px; border:2px dashed var(--border);
+                            border-radius:var(--radius); background:#fafafa;">
+                    <div style="font-size:2rem; margin-bottom:8px;">🌸</div>
+                    <p style="color:#aaa; font-size:0.9rem;">No completed visits on record yet.</p>
+                </div>
+
+                <!-- Visit list -->
+                <div id="hist_visitList"></div>
             </div>
         </div>
 

@@ -198,7 +198,7 @@ window.switchModule = function(moduleId) {
 
 window.toggleClientsSubView = function() {
     const view = document.querySelector('input[name="clients_view_toggle"]:checked').value;
-    ['Checkin', 'Schedule', 'Billing', 'Ops'].forEach(x => {
+    ['Checkin', 'Schedule', 'Billing', 'History', 'Ops'].forEach(x => {
         const el = document.getElementById('subView_' + x);
         if (el) el.style.display = (view.toLowerCase() === x.toLowerCase()) ? 'block' : 'none';
     });
@@ -2196,3 +2196,299 @@ window.addNewMenuServiceAdv = async function() {
     } catch (e) { toast('Error saving service configuration.', 'error'); }
     finally { setButtonLoading(btn, false); }
 };
+
+// ============================================================
+//  CLIENT HISTORY — CRM PANEL
+//  Queries: Active_Jobs (status=Closed, clientPhone)
+//  Shows:   visits, services, spend, avg, last consultation
+// ============================================================
+
+let _histSearchTimeout = null;
+let _histCurrentPhone  = null;   // phone of the client currently displayed
+
+/** Search input handler — reuses the shared _clientSearch helper */
+window.liveClientSearchHistory = function() {
+    clearTimeout(_histSearchTimeout);
+    _histSearchTimeout = setTimeout(() => {
+        _clientSearch(
+            document.getElementById('hist_search')?.value || '',
+            'hist_searchResults',
+            window.loadClientHistory
+        );
+    }, 300);
+};
+
+/**
+ * Load and render the full history for a client.
+ * Called either directly or via the search result click.
+ * @param {Object} clientData  — from allClientsCache  { Forename, Surname, Tel_Number, … }
+ */
+window.loadClientHistory = async function(clientData) {
+    const phone = clientData.Tel_Number || '';
+    if (!phone) { toast("Client has no phone number on record.", 'warning'); return; }
+
+    _histCurrentPhone = phone;
+
+    // Show the client header with profile data immediately
+    const fullName = `${clientData.Forename || ''} ${clientData.Surname || ''}`.trim() || 'Unknown';
+    document.getElementById('hist_search').value = fullName;
+    document.getElementById('hist_searchResults').style.display = 'none';
+
+    _histShowState('loading');
+
+    // Populate header fields
+    document.getElementById('hist_clientName').textContent   = fullName;
+    document.getElementById('hist_clientPhone').textContent  = `📞 ${phone}`;
+    document.getElementById('hist_clientGender').textContent = clientData.Gender  ? `👤 ${clientData.Gender}`  : '';
+    document.getElementById('hist_clientEmail').textContent  = clientData.Email   ? `✉ ${clientData.Email}`   : '';
+
+    // Format DOB nicely if present
+    if (clientData.DOB) {
+        try {
+            const dob = new Date(clientData.DOB + 'T00:00:00');
+            document.getElementById('hist_clientDob').textContent =
+                `🎂 ${dob.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}`;
+        } catch { document.getElementById('hist_clientDob').textContent = ''; }
+    } else {
+        document.getElementById('hist_clientDob').textContent = '';
+    }
+
+    document.getElementById('hist_clientHeader').classList.remove('hidden');
+
+    try {
+        // Single query: all closed jobs for this phone, ordered newest first
+        const snap = await db.collection('Active_Jobs')
+            .where('clientPhone', '==', phone)
+            .where('status', '==', 'Closed')
+            .orderBy('closedAt', 'desc')
+            .get();
+
+        if (snap.empty) { _histShowState('empty'); return; }
+
+        const visits = [];
+        snap.forEach(doc => visits.push({ id: doc.id, ...doc.data() }));
+
+        _histRenderKPIs(visits);
+        _histRenderVisitList(visits);
+        _histShowState('results');
+
+    } catch (e) {
+        // Firestore requires a composite index for where + orderBy on different fields.
+        // If the index hasn't been created yet, fall back to client-side sort.
+        if (e.code === 'failed-precondition' || e.message.includes('index')) {
+            try {
+                const snap2 = await db.collection('Active_Jobs')
+                    .where('clientPhone', '==', phone)
+                    .where('status', '==', 'Closed')
+                    .get();
+
+                if (snap2.empty) { _histShowState('empty'); return; }
+
+                const visits = [];
+                snap2.forEach(doc => visits.push({ id: doc.id, ...doc.data() }));
+
+                // Client-side sort by closedAt descending
+                visits.sort((a, b) => {
+                    const tA = a.closedAt?.toDate?.()?.getTime() || 0;
+                    const tB = b.closedAt?.toDate?.()?.getTime() || 0;
+                    return tB - tA;
+                });
+
+                _histRenderKPIs(visits);
+                _histRenderVisitList(visits);
+                _histShowState('results');
+            } catch (e2) {
+                _histShowState('empty');
+                toast("Error loading history: " + e2.message, 'error');
+            }
+        } else {
+            _histShowState('empty');
+            toast("Error loading history: " + e.message, 'error');
+        }
+    }
+};
+
+/** Show/hide the correct state element in the history panel */
+function _histShowState(state) {
+    document.getElementById('hist_loading').classList.toggle('hidden', state !== 'loading');
+    document.getElementById('hist_empty').classList.toggle('hidden',   state !== 'empty');
+    document.getElementById('hist_visitList').style.display = state === 'results' ? 'block' : 'none';
+}
+
+/** Calculate and render the 4 KPI chips in the client header */
+function _histRenderKPIs(visits) {
+    const totalSpend = visits.reduce((s, v) => s + (parseFloat(v.totalGHC || v.grandTotal || 0)), 0);
+    const avgSpend   = visits.length ? totalSpend / visits.length : 0;
+
+    // Last visit date
+    let lastVisitStr = '—';
+    const latestVisit = visits.find(v => v.closedAt);
+    if (latestVisit?.closedAt) {
+        try {
+            const d = latestVisit.closedAt.toDate();
+            lastVisitStr = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' });
+        } catch { lastVisitStr = latestVisit.dateString || '—'; }
+    }
+
+    document.getElementById('hist_kpiVisits').textContent = visits.length;
+    document.getElementById('hist_kpiSpend').textContent  = totalSpend.toFixed(2) + ' ₵';
+    document.getElementById('hist_kpiAvg').textContent    = avgSpend.toFixed(2)   + ' ₵';
+    document.getElementById('hist_kpiLast').textContent   = lastVisitStr;
+}
+
+/** Render each visit as an expandable card */
+function _histRenderVisitList(visits) {
+    const container = document.getElementById('hist_visitList');
+
+    container.innerHTML = visits.map((v, i) => {
+        // Date display
+        let dateStr = v.dateString || '—';
+        if (v.closedAt) {
+            try {
+                const d = v.closedAt.toDate();
+                dateStr = d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+            } catch { /* keep dateString */ }
+        }
+
+        const amount  = parseFloat(v.totalGHC || v.grandTotal || 0).toFixed(2);
+        const method  = v.paymentMethod || '—';
+        const tech    = v.assignedTechName || '—';
+        const service = v.bookedService || 'N/A';
+        const dur     = v.bookedDuration ? `${v.bookedDuration} mins` : '';
+
+        // Payment method icon
+        const mIcon = { 'Cash':'💵', 'Card / POS':'💳', 'Mobile Money':'📱' };
+
+        // Consultation notes block — only if a record exists
+        const cr = v.consultationRecord;
+        let consultHtml = '';
+        if (cr) {
+            const medList = Array.isArray(cr.medicalHistory) && cr.medicalHistory.length
+                ? (cr.medicalHistory[0] === 'None' ? 'None declared' : cr.medicalHistory.join(', '))
+                : '—';
+            const callusLabel  = cr.callusLevel   || '—';
+            const skinLabel    = cr.skinCondition || '—';
+            const notes        = cr.visualNotes   || '';
+            const allergies    = cr.allergies     || '';
+
+            consultHtml = `
+                <div style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);">
+                    <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                                letter-spacing:1.5px; color:var(--accent); margin-bottom:10px;">
+                        Last Consultation Notes
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+                                gap:10px; font-size:0.85rem;">
+                        <div>
+                            <span style="color:#888; font-size:0.75rem; display:block;
+                                         text-transform:uppercase; letter-spacing:0.5px;">Medical</span>
+                            <strong>${_safeText(medList)}</strong>
+                        </div>
+                        ${allergies ? `<div>
+                            <span style="color:#888; font-size:0.75rem; display:block;
+                                         text-transform:uppercase; letter-spacing:0.5px;">Allergies</span>
+                            <strong>${_safeText(allergies)}</strong>
+                        </div>` : ''}
+                        <div>
+                            <span style="color:#888; font-size:0.75rem; display:block;
+                                         text-transform:uppercase; letter-spacing:0.5px;">Callus</span>
+                            <strong>${_safeText(callusLabel)}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#888; font-size:0.75rem; display:block;
+                                         text-transform:uppercase; letter-spacing:0.5px;">Skin</span>
+                            <strong>${_safeText(skinLabel)}</strong>
+                        </div>
+                    </div>
+                    ${notes ? `<div style="margin-top:10px; padding:10px 12px; background:#fafafa;
+                                           border-left:3px solid var(--accent); border-radius:0 4px 4px 0;
+                                           font-size:0.85rem; color:#555; line-height:1.5;">
+                        "${_safeText(notes)}"
+                    </div>` : ''}
+                </div>`;
+        }
+
+        // Tax breakdown tooltip
+        const taxes = _parseTaxBreakdown(v.taxBreakdown);
+        const taxDetail = taxes.length
+            ? taxes.map(t =>
+                `<span style="color:#888; font-size:0.78rem;">
+                    + ${_safeText(t.name)} ${parseFloat(t.amount||0).toFixed(2)} ₵
+                </span>`).join('&nbsp;&nbsp;')
+            : '';
+
+        return `
+            <div style="border:1px solid var(--border); border-radius:var(--radius);
+                        margin-bottom:12px; overflow:hidden; background:white;
+                        box-shadow:var(--shadow-sm); transition:box-shadow 0.2s;"
+                 onmouseenter="this.style.boxShadow='var(--shadow-md)'"
+                 onmouseleave="this.style.boxShadow='var(--shadow-sm)'">
+
+                <!-- Visit header row — always visible -->
+                <div style="display:flex; justify-content:space-between; align-items:center;
+                            padding:14px 18px; cursor:pointer; user-select:none;"
+                     onclick="_histToggleCard(${i})">
+                    <div style="flex-grow:1; min-width:0;">
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <span style="font-size:0.8rem; font-weight:700; color:white;
+                                         background:var(--primary); padding:2px 8px;
+                                         border-radius:4px; white-space:nowrap;">
+                                #${visits.length - i}
+                            </span>
+                            <span style="font-weight:700; color:var(--primary); font-size:0.95rem;">
+                                ${dateStr}
+                            </span>
+                            <span style="font-size:0.8rem; color:#777;">
+                                👩‍🔧 ${_safeText(tech)}
+                            </span>
+                        </div>
+                        <div style="margin-top:5px; font-size:0.85rem; color:#555;
+                                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                                    max-width:420px;">
+                            💅 ${_safeText(service)}${dur ? ` <span style="color:#aaa;">(${dur})</span>` : ''}
+                        </div>
+                    </div>
+                    <div style="text-align:right; flex-shrink:0; margin-left:16px;">
+                        <div style="font-size:1.15rem; font-weight:700; color:var(--success);">
+                            ${amount} ₵
+                        </div>
+                        <div style="font-size:0.78rem; color:#999; margin-top:2px;">
+                            ${mIcon[method] || '💰'} ${_safeText(method)}
+                        </div>
+                        ${taxDetail ? `<div style="margin-top:3px;">${taxDetail}</div>` : ''}
+                    </div>
+                    <div style="margin-left:14px; color:#bbb; font-size:0.85rem;"
+                         id="hist_chevron_${i}">▼</div>
+                </div>
+
+                <!-- Expandable detail — hidden by default, only first card open -->
+                <div id="hist_detail_${i}"
+                     style="display:${i === 0 ? 'block' : 'none'};
+                            padding:0 18px 18px 18px; border-top:1px solid #f0f0f0;">
+                    ${consultHtml ||
+                        `<p style="color:#bbb; font-size:0.85rem; padding-top:14px;
+                                   font-style:italic;">No consultation record for this visit.</p>`}
+                </div>
+            </div>`;
+    }).join('');
+}
+
+/** Toggle expand/collapse on a visit card */
+window._histToggleCard = function(i) {
+    const detail   = document.getElementById(`hist_detail_${i}`);
+    const chevron  = document.getElementById(`hist_chevron_${i}`);
+    if (!detail) return;
+    const isOpen   = detail.style.display !== 'none';
+    detail.style.display  = isOpen ? 'none' : 'block';
+    if (chevron) chevron.textContent = isOpen ? '▼' : '▲';
+};
+
+/** Escape user-supplied text before inserting into innerHTML */
+function _safeText(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
