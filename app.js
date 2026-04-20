@@ -1220,7 +1220,7 @@ function startExpectedTodayListener() {
                             <p>⏰ ${h12}:${mm} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'} | 📞 ${appt.clientPhone || 'N/A'} | ${amt} GHC</p>
                         </div>
                         <div class="ticket-actions">
-                            <button class="btn btn-sm btn-auto" onclick="checkInAppointment('${appt.id}')">Check-In</button>
+                            <button class="btn btn-sm btn-auto" onclick="checkInAppointment('${appt.id}', this)">Check-In</button>
                             <button class="btn btn-secondary btn-sm btn-auto" onclick="editAppointment('${appt.id}')">Edit</button>
                             <button class="btn btn-secondary btn-sm btn-auto" style="color:var(--error); border-color:var(--error);" onclick="cancelAppointment('${appt.id}')">Cancel</button>
                         </div>
@@ -1233,8 +1233,9 @@ function startExpectedTodayListener() {
         });
 }
 
-window.checkInAppointment = async function(id) {
-    const btn = event?.target;
+window.checkInAppointment = async function(id, triggerEl) {
+    // Accept the button element explicitly — global `event` is deprecated
+    const btn = (triggerEl instanceof HTMLElement) ? triggerEl : null;
     if (btn) { btn.disabled = true; btn.textContent = 'Routing...'; }
     try {
         const doc  = await db.collection('Appointments').doc(id).get();
@@ -1245,13 +1246,16 @@ window.checkInAppointment = async function(id) {
             clientPhone: appt.clientPhone, clientName: appt.clientName,
             assignedTechEmail: appt.assignedTechEmail, assignedTechName: appt.assignedTechName,
             bookedService:  appt.bookedService  || "N/A",
-            bookedDuration: appt.bookedDuration || "0",
-            bookedPrice:    appt.bookedPrice    || "0",
-            grandTotal:     appt.grandTotal     || "0",
+            bookedDuration: parseInt(appt.bookedDuration || 0, 10),
+            bookedPrice:    parseFloat(appt.bookedPrice  || 0),
+            grandTotal:     parseFloat(appt.grandTotal   || appt.bookedPrice || 0),
             taxBreakdown:   appt.taxBreakdown   || "[]",
-            status: "Waiting", fohCreator: currentUserEmail,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            dateString: todayDateStr
+            status:         "Waiting",
+            fohCreator:     currentUserEmail,
+            sourceApptId:   id,                // reference back to the Appointment doc
+            apptDate:       appt.dateString,   // original booked date (used by requestReschedule)
+            dateString:     todayDateStr,      // operational date (used by financial reports)
+            createdAt:      firebase.firestore.FieldValue.serverTimestamp()
         });
 
         if (GOOGLE_CHAT_WEBHOOK !== "") {
@@ -1532,10 +1536,23 @@ window.toggleMedNone = function(checkbox) {
     document.querySelectorAll('.med-cb').forEach(cb => { cb.disabled = checkbox.checked; if (checkbox.checked) cb.checked = false; });
 };
 
+let _consultOpening = false; // re-entrancy lock
+
 window.openConsultation = async function(id) {
+    if (_consultOpening) return;          // prevent double-open race
+    _consultOpening = true;
+
+    // Reset state immediately so a failed fetch doesn't leave stale data
+    currentConsultJobId   = null;
+    currentConsultJobData = null;
+    pendingUpsells        = [];
+
     try {
         const doc = await db.collection('Active_Jobs').doc(id).get();
-        if (!doc.exists) return;
+        if (!doc.exists) {
+            toast("This job no longer exists — it may have been closed or reassigned.", 'warning');
+            return;
+        }
         currentConsultJobData = doc.data();
         currentConsultJobId   = id;
         pendingUpsells = [];
@@ -1590,11 +1607,20 @@ window.openConsultation = async function(id) {
 
         document.getElementById('consultationModal').style.display = 'block';
     } catch (e) { toast("Error opening consultation: " + e.message, 'error'); }
+    finally { _consultOpening = false; }
 };
 
 window.closeConsultation = function() {
     document.getElementById('consultationModal').style.display = 'none';
-    currentConsultJobId = null; currentConsultJobData = null; pendingUpsells = [];
+    currentConsultJobId   = null;
+    currentConsultJobData = null;
+    pendingUpsells        = [];
+    _consultOpening       = false;   // safety release in case lock got stuck
+    // Reset save button text for next open
+    const saveBtn = document.getElementById('btnConsultSaveStart');
+    const textEl  = saveBtn?.querySelector('.btn-text');
+    if (textEl) textEl.textContent = 'Save & Start Service';
+    setButtonLoading('btnConsultSaveStart', false);
 };
 window.closeConsult = window.closeConsultation;
 window.openConsult  = window.openConsultation;
@@ -1606,17 +1632,50 @@ window.addUpsellToTicket = function() {
     const sObj = allMenuServicesCache.find(s => s.id === sId);
     if (!sObj) return;
 
-    pendingUpsells.push(sObj);
-    document.getElementById('consultAddedUpsells').innerHTML = pendingUpsells.map(p => `<div>+ ${p.name} (${p.price} GHC)</div>`).join('');
+    // Prevent adding the exact same service more than once
+    if (pendingUpsells.some(p => p.id === sId)) {
+        toast(`"${sObj.name}" is already added to this ticket.`, 'warning');
+        select.value = '';
+        return;
+    }
 
-    let base = parseFloat(currentConsultJobData.bookedPrice || 0);
+    pendingUpsells.push(sObj);
+    _renderUpsellList();
+    select.value = '';
+};
+window.addUpsell = window.addUpsellToTicket;
+
+window.removeUpsell = function(sId) {
+    pendingUpsells = pendingUpsells.filter(p => p.id !== sId);
+    _renderUpsellList();
+};
+
+function _renderUpsellList() {
+    const container = document.getElementById('consultAddedUpsells');
+    if (!pendingUpsells.length) {
+        container.innerHTML = '';
+        // Reset projected total back to original job price
+        const base     = parseFloat(currentConsultJobData?.bookedPrice || 0);
+        const origGrand = parseFloat(currentConsultJobData?.grandTotal  || currentConsultJobData?.bookedPrice || 0);
+        document.getElementById('consultProjectedTotal').innerText = origGrand.toFixed(2) + ' GHC';
+        return;
+    }
+    container.innerHTML = pendingUpsells.map(p => `
+        <div style="display:flex; justify-content:space-between; align-items:center;
+                    padding:6px 10px; background:#f9f9f9; border-radius:4px; margin-top:5px; font-size:0.875rem;">
+            <span>+ ${p.name} <span style="color:var(--accent); font-weight:700;">(${parseFloat(p.price).toFixed(2)} GHC)</span></span>
+            <button onclick="removeUpsell('${p.id}')"
+                    style="background:none; border:none; color:var(--error); cursor:pointer;
+                           font-weight:700; font-size:1rem; padding:0 4px; line-height:1;">✕</button>
+        </div>`).join('');
+
+    // Recalculate projected total from original base price (not from grandTotal which includes tax)
+    let base = parseFloat(currentConsultJobData?.bookedPrice || 0);
     pendingUpsells.forEach(p => base += parseFloat(p.price || 0));
     let taxes = 0;
     liveTaxes.forEach(t => taxes += base * (t.rate / 100));
     document.getElementById('consultProjectedTotal').innerText = (base + taxes).toFixed(2) + ' GHC';
-    select.value = '';
-};
-window.addUpsell = window.addUpsellToTicket;
+}
 
 window.reassignTech = async function() {
     const sel      = document.getElementById('consultReassignTech');
@@ -1634,12 +1693,31 @@ window.reassign = window.reassignTech;
 window.requestReschedule = async function() {
     const ok = await confirm("Cancel this Active Job and send it back to Front of House to Reschedule?");
     if (!ok) return;
+    if (!currentConsultJobId || !currentConsultJobData) return;
+
     try {
         await db.collection('Active_Jobs').doc(currentConsultJobId).delete();
-        const snap = await db.collection('Appointments')
-            .where('clientPhone', '==', currentConsultJobData.clientPhone)
-            .where('dateString',  '==', currentConsultJobData.dateString).get();
-        if (!snap.empty) await db.collection('Appointments').doc(snap.docs[0].id).update({ status: 'Action Required' });
+
+        // Prefer the direct sourceApptId reference; fall back to date+phone query
+        if (currentConsultJobData.sourceApptId) {
+            try {
+                await db.collection('Appointments')
+                    .doc(currentConsultJobData.sourceApptId)
+                    .update({ status: 'Action Required' });
+            } catch (e) { console.warn('Could not update source appointment:', e); }
+        } else {
+            // Legacy fallback: query by client phone + appointment date
+            const lookupDate = currentConsultJobData.apptDate || currentConsultJobData.dateString;
+            const snap = await db.collection('Appointments')
+                .where('clientPhone', '==', currentConsultJobData.clientPhone)
+                .where('dateString',  '==', lookupDate)
+                .where('status', 'in', ['Arrived', 'Scheduled'])
+                .get();
+            if (!snap.empty) {
+                await db.collection('Appointments').doc(snap.docs[0].id).update({ status: 'Action Required' });
+            }
+        }
+
         toast("Ticket removed. Front of House has been notified.", 'info');
         closeConsultation();
     } catch (e) { toast("Error rescheduling: " + e.message, 'error'); }
@@ -1647,6 +1725,20 @@ window.requestReschedule = async function() {
 window.reqReschedule = window.requestReschedule;
 
 window.saveConsultationAndStart = async function() {
+    // Guard: should never happen, but protect against stale state
+    if (!currentConsultJobId || !currentConsultJobData) {
+        toast("No active consultation job. Please close and reopen the form.", 'error');
+        return;
+    }
+
+    // Validate: medical section must be acknowledged
+    const medChecked = document.querySelectorAll('.med-cb:checked').length > 0;
+    const noneChecked = document.getElementById('med_none')?.checked;
+    if (!medChecked && !noneChecked) {
+        toast("Please complete Section II — tick the relevant conditions or confirm 'None of the above'.", 'warning');
+        return;
+    }
+
     const btn = document.getElementById('btnConsultSaveStart');
     captureButtonText(btn);
     setButtonLoading(btn, true, 'Saving...');
@@ -1680,8 +1772,8 @@ window.saveConsultationAndStart = async function() {
     };
 
     let base       = parseFloat(currentConsultJobData.bookedPrice || 0);
-    let serviceStr = currentConsultJobData.bookedService;
-    let dur        = parseInt(currentConsultJobData.bookedDuration || 0);
+    let serviceStr = currentConsultJobData.bookedService || '';
+    let dur        = parseInt(currentConsultJobData.bookedDuration || 0, 10);
 
     pendingUpsells.forEach(p => {
         base += parseFloat(p.price || 0);
@@ -1699,13 +1791,15 @@ window.saveConsultationAndStart = async function() {
 
     try {
         await db.collection('Active_Jobs').doc(currentConsultJobId).update({
-            status: 'In Progress',
+            status:             'In Progress',
             consultationRecord: consultData,
-            bookedPrice:   base,
-            bookedService: serviceStr,
-            bookedDuration:dur,
-            taxBreakdown:  JSON.stringify(newTaxArr),
-            grandTotal:    base + totalTaxes
+            bookedPrice:        base,
+            bookedService:      serviceStr,
+            bookedDuration:     dur,          // always a Number
+            taxBreakdown:       JSON.stringify(newTaxArr),
+            grandTotal:         base + totalTaxes,
+            lastSavedAt:        firebase.firestore.FieldValue.serverTimestamp(),
+            lastSavedBy:        currentUserEmail
         });
         toast("Consultation saved. Service started.", 'success');
         closeConsultation();
