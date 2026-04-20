@@ -3,31 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>THURAYA — Salon Operations OS</title>
+    <title>THURAYA — Salon Operations</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<!-- ======================================================
-     TOAST NOTIFICATION CONTAINER
-     ====================================================== -->
 <div id="toastContainer"></div>
 
-<!-- ======================================================
-     HEADER
-     ====================================================== -->
+<!-- HEADER -->
 <div class="header" id="mainHeader">
     <h1>THURAYA</h1>
     <p>Client Services &amp; Operations</p>
 </div>
 
-<!-- ======================================================
-     LOGIN SCREEN
-     ====================================================== -->
+<!-- LOGIN -->
 <div id="loginScreen" class="container">
     <div class="card login-card">
-        <h2 class="login-title">Staff Portal</h2>
-        <p class="login-subtitle">Secure operational access requires authorised Thuraya credentials.</p>
+        <h2 class="login-title">Welcome Back</h2>
+        <p class="login-subtitle">Sign in with your authorised Thuraya account to continue.</p>
 
         <button class="btn-google" id="btnGoogleLogin" onclick="signInWithGoogle()">
             <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -36,24 +29,28 @@
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
-            Sign in with Google
+            Continue with Google
         </button>
 
-        <div class="login-divider">OR USE TEST CREDENTIALS</div>
-        <div>
-            <input type="email" id="testEmail" placeholder="Email Address" style="margin-bottom:10px;">
-            <input type="password" id="testPassword" placeholder="Password" style="margin-bottom:15px;">
-            <button class="btn btn-secondary" id="btnEmailLogin" onclick="signInWithEmail()">
-                <span class="btn-text">Log In with Email</span>
+        <div class="login-divider">or sign in with email</div>
+        <div class="login-email-form">
+            <div class="form-group">
+                <label for="testEmail">Email Address</label>
+                <input type="email" id="testEmail" placeholder="you@thuraya.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="testPassword">Password</label>
+                <input type="password" id="testPassword" placeholder="Enter your password" autocomplete="current-password">
+            </div>
+            <button class="btn" id="btnEmailLogin" onclick="signInWithEmail()">
+                <span class="btn-text">Sign In</span>
             </button>
         </div>
         <p id="errorMsg" class="error-msg"></p>
     </div>
 </div>
 
-<!-- ======================================================
-     MAIN APP DASHBOARD
-     ====================================================== -->
+<!-- DASHBOARD -->
 <div id="appDashboard" class="container">
 
     <div class="dashboard-header">
@@ -61,10 +58,9 @@
             <span id="userNameDisplay">Loading...</span>
             <span id="userRoleDisplay" class="role-tag">ROLE</span>
         </div>
-        <button class="btn-logout" id="btnLogout" onclick="logOut()">Sign Out / Clock Out</button>
+        <button class="btn-logout" id="btnLogout" onclick="logOut()">Sign Out</button>
     </div>
 
-    <!-- Navigation -->
     <div id="topNavMenu">
         <div class="nav-tab" id="tabClients">
             <input type="radio" name="main_nav" id="nav_clients" value="clientsView" onchange="switchModule(this.value)">
@@ -88,91 +84,91 @@
         </div>
         <div class="nav-tab" id="tabAdmin">
             <input type="radio" name="main_nav" id="nav_admin" value="adminView" onchange="switchModule(this.value)">
-            <label for="nav_admin">⚙️ System Admin</label>
+            <label for="nav_admin">⚙️ Administration</label>
         </div>
     </div>
 
-    <!-- ====================================================
-         CLIENTS VIEW
-         ==================================================== -->
+    <!-- CLIENTS VIEW -->
     <div id="clientsView" class="app-module">
 
         <div class="category-tabs">
-            <label><input type="radio" name="clients_view_toggle" value="checkin" checked onchange="toggleClientsSubView()"> Walk-in &amp; Check-In</label>
-            <label><input type="radio" name="clients_view_toggle" value="schedule" id="tab_toggle_schedule" onchange="toggleClientsSubView()"> Book Appointment</label>
-            <label><input type="radio" name="clients_view_toggle" value="billing" onchange="toggleClientsSubView()"> Billing &amp; Checkout</label>
-            <label><input type="radio" name="clients_view_toggle" value="history" onchange="toggleClientsSubView()"> 📋 Client History</label>
-            <label><input type="radio" name="clients_view_toggle" value="ops" onchange="toggleClientsSubView()"> End of Day Ops</label>
+            <label class="cat-tab"><input type="radio" name="clients_view_toggle" value="checkin" checked onchange="toggleClientsSubView()"> Walk-in &amp; Check-In</label>
+            <label class="cat-tab"><input type="radio" name="clients_view_toggle" value="schedule" id="tab_toggle_schedule" onchange="toggleClientsSubView()"> Book Appointment</label>
+            <label class="cat-tab"><input type="radio" name="clients_view_toggle" value="billing" onchange="toggleClientsSubView()"> Billing &amp; Checkout</label>
+            <label class="cat-tab"><input type="radio" name="clients_view_toggle" value="history" onchange="toggleClientsSubView()"> 📋 Client History</label>
+            <label class="cat-tab"><input type="radio" name="clients_view_toggle" value="ops" onchange="toggleClientsSubView()"> End of Day</label>
         </div>
 
-        <!-- Sub-view: Check In -->
+        <!-- Check In -->
         <div id="subView_Checkin">
             <div class="grid-2">
 
                 <div class="module-box accent-top" id="fohIntakeForm">
                     <h3 class="accent" style="border-bottom:none; padding-bottom:0;">Client Registration</h3>
-                    <p class="module-subtitle">Search, save, or update client details in the master database.</p>
+                    <p class="module-subtitle">Search for an existing client or register a new one below.</p>
 
-                    <div class="form-group" style="margin-bottom:22px; padding-bottom:15px; border-bottom:1px dashed var(--border); z-index:60;">
-                        <label>Search Existing Client (Name or Phone):</label>
+                    <div class="form-group search-section">
+                        <label>Search Existing Client</label>
                         <div class="search-box">
-                            <input type="text" id="fohSearchPhone" placeholder="Type to search..." autocomplete="off" onkeyup="liveClientSearchFOH()">
+                            <input type="text" id="fohSearchPhone" placeholder="Name or phone number..." autocomplete="off" onkeyup="liveClientSearchFOH()">
                             <button type="button" class="btn btn-auto" onclick="liveClientSearchFOH()">Search</button>
                             <div id="foh_searchResults" class="dropdown-results"></div>
                         </div>
-                        <p id="fohSearchMsg" style="font-weight:600; margin-top:10px; font-size:0.85rem;"></p>
+                        <p id="fohSearchMsg" class="search-status-msg"></p>
                     </div>
 
                     <div class="grid-2">
-                        <div class="form-group"><label>Forename: <span class="required-star">*</span></label><input type="text" id="f_forename" required></div>
-                        <div class="form-group"><label>Surname: <span class="required-star">*</span></label><input type="text" id="f_surname" required></div>
+                        <div class="form-group"><label>First Name <span class="required-star">*</span></label><input type="text" id="f_forename" required></div>
+                        <div class="form-group"><label>Last Name <span class="required-star">*</span></label><input type="text" id="f_surname" required></div>
                     </div>
                     <div class="grid-2">
-                        <div class="form-group"><label>Primary Tel: <span class="required-star">*</span></label><input type="tel" id="f_tel" placeholder="10 digits" maxlength="10" required></div>
-                        <div class="form-group"><label>Alternative Tel:</label><input type="tel" id="f_altTel" placeholder="10 digits" maxlength="10"></div>
+                        <div class="form-group"><label>Primary Phone <span class="required-star">*</span></label><input type="tel" id="f_tel" placeholder="10 digits" maxlength="10" required></div>
+                        <div class="form-group"><label>Alternative Phone</label><input type="tel" id="f_altTel" placeholder="10 digits" maxlength="10"></div>
                     </div>
                     <div class="grid-2">
                         <div class="form-group">
-                            <label>Gender: <span class="required-star">*</span></label>
+                            <label>Gender <span class="required-star">*</span></label>
                             <select id="f_gender" required>
                                 <option value="" disabled selected>Select...</option>
                                 <option value="Female">Female</option>
                                 <option value="Male">Male</option>
-                                <option value="Other">Other</option>
+                                <option value="Other">Other / Prefer not to say</option>
                             </select>
                         </div>
-                        <div class="form-group"><label>Email:</label><input type="email" id="f_email"></div>
+                        <div class="form-group"><label>Email Address</label><input type="email" id="f_email"></div>
                     </div>
                     <div class="grid-2">
-                        <div class="form-group"><label>Date of Birth:</label><input type="date" id="f_dob"></div>
+                        <div class="form-group"><label>Date of Birth</label><input type="date" id="f_dob"></div>
                         <div></div>
                     </div>
 
-                    <button type="button" class="btn" id="btnRegisterClient" style="margin-top:15px;" onclick="registerClientOnly()">
-                        <span class="btn-text">Save Client Record</span>
-                    </button>
+                    <div class="form-action-row">
+                        <button type="button" class="btn" id="btnRegisterClient" onclick="registerClientOnly()">
+                            <span class="btn-text">Save Client Record</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="module-box accent-top" style="background:#fafafa;">
                     <h3 class="accent">Expected Today</h3>
-                    <p class="module-subtitle">Clients scheduled for today. Click Check-In to route them to the floor.</p>
+                    <p class="module-subtitle">Scheduled clients arriving today. Check them in to route to the floor.</p>
                     <div id="expectedTodayList" style="display:flex; flex-direction:column; gap:10px;">
-                        <p class="text-muted">Loading...</p>
+                        <p class="text-muted">Checking schedule...</p>
                     </div>
                 </div>
 
             </div>
         </div>
 
-        <!-- Sub-view: Schedule -->
+        <!-- Book Appointment -->
         <div id="subView_Schedule" style="display:none;">
             <div class="module-box primary-top">
                 <h3>Book Appointment</h3>
 
-                <div class="form-group" style="margin-bottom:20px; z-index:50;">
-                    <label>1. Search Client (Name or Phone): <span class="required-star">*</span></label>
+                <div class="form-group search-section">
+                    <label>1. Select Client <span class="required-star">*</span></label>
                     <div class="search-box">
-                        <input type="text" id="sched_search" placeholder="Type to search..." autocomplete="off" onkeyup="liveClientSearch()">
+                        <input type="text" id="sched_search" placeholder="Search by name or phone..." autocomplete="off" onkeyup="liveClientSearch()">
                         <button type="button" class="btn btn-auto" onclick="liveClientSearch()">Search</button>
                         <div id="sched_searchResults" class="dropdown-results"></div>
                     </div>
@@ -182,166 +178,149 @@
                 <input type="hidden" id="sched_name">
 
                 <div id="sched_selectedClientDisplay" class="selected-client-badge hidden">
-                    Selected: <span id="sched_displayName"></span> (<span id="sched_displayPhone"></span>)
-                    <button class="clear-btn" onclick="clearScheduleClient()">✕</button>
+                    <span>Selected: <strong id="sched_displayName"></strong> &nbsp;(<span id="sched_displayPhone"></span>)</span>
+                    <button class="clear-btn" onclick="clearScheduleClient()" aria-label="Clear selection">✕</button>
                 </div>
 
-                <div class="form-group" style="margin-top:25px; border-top:1px solid var(--border); padding-top:20px;">
-                    <h3 style="text-align:center; margin-bottom:15px;">FROM OUR MENU</h3>
+                <div class="form-section-divider">
+                    <h4 class="form-section-label">2. Choose Services</h4>
+                </div>
 
-                    <div class="dept-tabs">
-                        <label><input type="radio" name="dept_toggle" value="Hand" checked onchange="toggleDeptView()"> HAND THERAPY MENU</label>
-                        <label><input type="radio" name="dept_toggle" value="Foot" onchange="toggleDeptView()"> FOOT THERAPY MENU</label>
+                <div class="dept-tabs">
+                    <label><input type="radio" name="dept_toggle" value="Hand" checked onchange="toggleDeptView()"> Hand Therapy</label>
+                    <label><input type="radio" name="dept_toggle" value="Foot" onchange="toggleDeptView()"> Foot Therapy</label>
+                </div>
+
+                <div id="sched_serviceMenu" style="margin-bottom:20px;">
+                    <p class="text-muted" style="text-align:center;">Loading services...</p>
+                </div>
+
+                <div id="sched_breakdown">
+                    <h4 class="breakdown-heading">Selected Services</h4>
+                    <div id="sched_breakdownList"></div>
+                    <div id="sched_taxBreakdown" style="margin-top:10px; padding-top:10px; border-top:1px dashed #ddd; display:none;"></div>
+                    <div class="breakdown-total-row">
+                        <span>Grand Total</span>
+                        <span><span id="sched_totalDuration" class="text-accent">0</span> mins &nbsp;·&nbsp; <span id="sched_totalCost" class="text-success">0.00</span> GHC</span>
                     </div>
-
-                    <div id="sched_serviceMenu" style="margin-bottom:20px;">
-                        <p class="text-muted" style="text-align:center;">Loading live menu...</p>
-                    </div>
-
-                    <div id="sched_breakdown">
-                        <h4 style="color:var(--primary); margin-bottom:10px; font-size:0.9rem; border-bottom:1px dashed var(--border); padding-bottom:5px; text-transform:uppercase; letter-spacing:1px;">Selected Services</h4>
-                        <div id="sched_breakdownList"></div>
-                        <div id="sched_taxBreakdown" style="margin-top:10px; padding-top:10px; border-top:1px dashed #ddd; display:none;"></div>
-                        <div class="flex-between fw-bold" style="font-size:1.05rem; border-top:1px solid var(--border); padding-top:10px; margin-top:10px;">
-                            <span>Grand Total:</span>
-                            <span><span id="sched_totalDuration" class="text-accent">0</span> mins | <span id="sched_totalCost" class="text-success">0.00</span> GHC</span>
-                        </div>
-                        <input type="hidden" id="sched_subtotalVal" value="0">
-                        <input type="hidden" id="sched_taxData" value="[]">
-                        <input type="hidden" id="sched_grandTotalVal" value="0">
-                        <div style="text-align:right; margin-top:12px;">
-                            <button class="btn btn-secondary btn-auto btn-sm" onclick="clearAllSelections()">Clear All Selections</button>
-                        </div>
+                    <input type="hidden" id="sched_subtotalVal" value="0">
+                    <input type="hidden" id="sched_taxData" value="[]">
+                    <input type="hidden" id="sched_grandTotalVal" value="0">
+                    <div style="text-align:right; margin-top:12px;">
+                        <button class="btn btn-ghost btn-auto btn-sm" onclick="clearAllSelections()">Clear Selections</button>
                     </div>
                 </div>
 
-                <div class="grid-2" style="align-items:start; border-top:1px solid var(--border); padding-top:20px;">
+                <div class="form-section-divider">
+                    <h4 class="form-section-label">3. Schedule</h4>
+                </div>
+
+                <div class="grid-2" style="align-items:start;">
                     <div>
                         <div class="form-group">
-                            <label>Date: <span class="required-star">*</span></label>
+                            <label>Date <span class="required-star">*</span></label>
                             <input type="date" id="sched_date" onchange="generateTimeSlots()">
                         </div>
-                        <div class="form-group" style="margin-bottom:22px;">
-                            <label>Assign Technician: <span class="required-star">*</span></label>
+                        <div class="form-group">
+                            <label>Technician <span class="required-star">*</span></label>
                             <select id="sched_techSelect" style="border-color:var(--accent); background:#fffaf0;" onchange="generateTimeSlots()">
-                                <option value="" disabled selected>Select Technician...</option>
+                                <option value="" disabled selected>Select a technician...</option>
                             </select>
                         </div>
                     </div>
                     <div>
                         <div class="form-group">
-                            <label>Available Time Slots: <span class="required-star">*</span></label>
+                            <label>Available Times <span class="required-star">*</span></label>
                             <input type="hidden" id="sched_time">
-                            <div id="sched_timeSlots" style="background:#fff; border:1px solid var(--border); border-radius:6px; padding:14px; min-height:110px;">
-                                <p class="text-muted">⚠️ Select a service, date, and technician to see available times.</p>
+                            <div id="sched_timeSlots" class="time-slots-container">
+                                <p class="text-muted">Select a service, date, and technician to see available times.</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex-row" style="margin-top:15px;">
+                <div class="form-action-row" style="margin-top:20px;">
                     <button id="btnConfirmBooking" class="btn" onclick="bookAppointment()">
-                        <span class="btn-text">Confirm &amp; Book Appointment</span>
+                        <span class="btn-text">Confirm Appointment</span>
                     </button>
-                    <button id="btnCancelEdit" class="btn btn-secondary btn-auto hidden" style="border-color:var(--error); color:var(--error);" onclick="cancelEditMode()">Cancel Edit</button>
+                    <button id="btnCancelEdit" class="btn btn-ghost btn-auto hidden" style="border-color:var(--error); color:var(--error);" onclick="cancelEditMode()">Cancel Edit</button>
                 </div>
             </div>
 
             <div class="module-box">
                 <h3>Upcoming Schedule</h3>
-                <div id="upcomingScheduleList"><p class="text-muted">Loading...</p></div>
+                <div id="upcomingScheduleList"><p class="text-muted">Loading schedule...</p></div>
             </div>
         </div>
 
-        <!-- Sub-view: Client History -->
+        <!-- Client History -->
         <div id="subView_History" style="display:none;">
             <div class="module-box primary-top">
                 <h3>Client History</h3>
                 <p class="module-subtitle">Search any client to view their full visit record, spend, and consultation notes.</p>
 
-                <!-- Search bar -->
-                <div class="form-group" style="margin-bottom:20px; z-index:50; max-width:480px;">
-                    <label>Search Client (Name or Phone):</label>
+                <div class="form-group search-section" style="max-width:480px;">
+                    <label>Find Client</label>
                     <div class="search-box">
-                        <input type="text" id="hist_search" placeholder="Type name or number..."
+                        <input type="text" id="hist_search" placeholder="Search by name or phone..."
                                autocomplete="off" onkeyup="liveClientSearchHistory()">
                         <div id="hist_searchResults" class="dropdown-results"></div>
                     </div>
                 </div>
 
-                <!-- Client header — hidden until a client is selected -->
-                <div id="hist_clientHeader" class="hidden"
-                     style="background:linear-gradient(135deg,var(--primary) 0%,#1a252f 100%);
-                            color:white; border-radius:var(--radius); padding:20px 24px;
-                            margin-bottom:22px; display:flex; justify-content:space-between;
-                            align-items:flex-start; flex-wrap:wrap; gap:16px;">
+                <div id="hist_clientHeader" class="hidden client-history-header">
                     <div>
-                        <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem;
-                                    letter-spacing:2px; margin-bottom:4px;" id="hist_clientName">—</div>
-                        <div style="font-size:0.8rem; opacity:0.75; display:flex; gap:16px; flex-wrap:wrap;">
+                        <div class="client-history-name" id="hist_clientName">—</div>
+                        <div class="client-history-meta">
                             <span id="hist_clientPhone"></span>
                             <span id="hist_clientGender"></span>
                             <span id="hist_clientDob"></span>
                             <span id="hist_clientEmail"></span>
                         </div>
                     </div>
-                    <!-- KPI strip -->
-                    <div style="display:flex; gap:20px; flex-wrap:wrap;">
-                        <div style="text-align:center;">
-                            <div style="font-size:1.6rem; font-weight:700; line-height:1;"
-                                 id="hist_kpiVisits">—</div>
-                            <div style="font-size:0.7rem; opacity:0.65; text-transform:uppercase;
-                                        letter-spacing:1px; margin-top:3px;">Visits</div>
+                    <div class="client-history-kpis">
+                        <div class="history-kpi">
+                            <div class="history-kpi-value" id="hist_kpiVisits">—</div>
+                            <div class="history-kpi-label">Visits</div>
                         </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:1.6rem; font-weight:700; line-height:1;
-                                        color:var(--accent);" id="hist_kpiSpend">—</div>
-                            <div style="font-size:0.7rem; opacity:0.65; text-transform:uppercase;
-                                        letter-spacing:1px; margin-top:3px;">Total Spend</div>
+                        <div class="history-kpi">
+                            <div class="history-kpi-value accent" id="hist_kpiSpend">—</div>
+                            <div class="history-kpi-label">Total Spend</div>
                         </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:1.6rem; font-weight:700; line-height:1;"
-                                 id="hist_kpiAvg">—</div>
-                            <div style="font-size:0.7rem; opacity:0.65; text-transform:uppercase;
-                                        letter-spacing:1px; margin-top:3px;">Avg / Visit</div>
+                        <div class="history-kpi">
+                            <div class="history-kpi-value" id="hist_kpiAvg">—</div>
+                            <div class="history-kpi-label">Avg / Visit</div>
                         </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:1.6rem; font-weight:700; line-height:1;"
-                                 id="hist_kpiLast">—</div>
-                            <div style="font-size:0.7rem; opacity:0.65; text-transform:uppercase;
-                                        letter-spacing:1px; margin-top:3px;">Last Visit</div>
+                        <div class="history-kpi">
+                            <div class="history-kpi-value" id="hist_kpiLast">—</div>
+                            <div class="history-kpi-label">Last Visit</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Loading / empty states -->
-                <div id="hist_loading" class="hidden"
-                     style="text-align:center; padding:40px; color:#aaa;">
-                    <div style="font-size:1.5rem; margin-bottom:8px;">⏳</div>
-                    <p style="font-size:0.9rem;">Loading visit history...</p>
+                <div id="hist_loading" class="hidden state-panel">
+                    <div class="state-icon">⏳</div>
+                    <p>Loading visit history...</p>
                 </div>
-                <div id="hist_empty" class="hidden"
-                     style="text-align:center; padding:40px; border:2px dashed var(--border);
-                            border-radius:var(--radius); background:#fafafa;">
-                    <div style="font-size:2rem; margin-bottom:8px;">🌸</div>
-                    <p style="color:#aaa; font-size:0.9rem;">No completed visits on record yet.</p>
+                <div id="hist_empty" class="hidden state-panel state-panel--dashed">
+                    <div class="state-icon">🌸</div>
+                    <p>No completed visits on record yet.</p>
                 </div>
 
-                <!-- Visit list -->
                 <div id="hist_visitList"></div>
             </div>
         </div>
 
-        <!-- Sub-view: Billing -->
+        <!-- Billing -->
         <div id="subView_Billing" style="display:none;">
             <div class="module-box success-top">
                 <h3 class="success">Billing &amp; Checkout</h3>
-                <p class="module-subtitle">Jobs marked as complete by Technicians and ready for payment.</p>
+                <p class="module-subtitle">Services completed by the team and ready for payment.</p>
                 <div id="fohPendingCheckoutList">
-                    <p class="text-muted">Loading pending checkouts...</p>
+                    <p class="text-muted">Checking for completed jobs...</p>
                 </div>
                 <div id="checkoutPanel" style="display:none;" class="checkout-panel-separator">
-                    <h4 style="color:var(--primary); margin-bottom:12px;">Process Payment</h4>
+                    <h4 class="checkout-panel-title">Process Payment</h4>
                     <div class="ticket" style="border-color:var(--success);">
                         <div class="ticket-info">
                             <h4 id="checkoutClientName" style="color:var(--primary); font-size:1.15rem;">...</h4>
@@ -354,9 +333,9 @@
                         </div>
                         <div class="checkout-form-col">
                             <div class="form-group">
-                                <label>Payment Method: <span class="required-star">*</span></label>
+                                <label>Payment Method <span class="required-star">*</span></label>
                                 <select id="checkoutPaymentMethod" style="border-color:var(--success);">
-                                    <option value="" disabled selected>Select...</option>
+                                    <option value="" disabled selected>Select method...</option>
                                     <option value="Cash">Cash</option>
                                     <option value="Card / POS">Card / POS</option>
                                     <option value="Mobile Money">Mobile Money</option>
@@ -373,10 +352,10 @@
             </div>
         </div>
 
-        <!-- Sub-view: End of Day Ops -->
+        <!-- End of Day -->
         <div id="subView_Ops" style="display:none;">
             <div class="module-box primary-top">
-                <h3>End of Day Financials</h3>
+                <h3>End of Day Summary</h3>
                 <div class="flex-row">
                     <div class="metric-card success-bg">
                         <div class="metric-label">Total Daily Revenue</div>
@@ -388,7 +367,7 @@
                     </div>
                 </div>
                 <div style="margin-top:22px;">
-                    <h4 style="color:var(--primary); margin-bottom:12px;">Active Tech Roster</h4>
+                    <h4 style="color:var(--primary); margin-bottom:12px; font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Active Technician Roster</h4>
                     <div id="fohRosterList"></div>
                 </div>
             </div>
@@ -396,9 +375,7 @@
 
     </div><!-- /clientsView -->
 
-    <!-- ====================================================
-         ATELIER VIEW (TECH)
-         ==================================================== -->
+    <!-- ATELIER VIEW -->
     <div id="atelierView" class="app-module">
         <div class="module-box accent-top">
             <h3 class="accent">My Daily Earnings</h3>
@@ -408,167 +385,163 @@
                     <div class="metric-value" id="techServiceCount">0</div>
                 </div>
                 <div class="metric-card success-bg">
-                    <div class="metric-label">Total Generated</div>
+                    <div class="metric-label">Revenue Generated</div>
                     <div class="metric-value success" id="techDailyRevenue">0 GHC</div>
                 </div>
             </div>
         </div>
 
         <div class="module-box">
-            <h3>Atelier Active Queue</h3>
-            <p class="module-subtitle">Waiting clients assigned to your station.</p>
+            <h3>Active Queue</h3>
+            <p class="module-subtitle">Clients currently assigned to your station.</p>
             <div id="techLiveQueue">
-                <p class="text-muted">Queue is currently empty.</p>
+                <p class="text-muted">Your queue is currently empty.</p>
             </div>
         </div>
     </div>
 
-    <!-- ====================================================
-         MENU VIEW
-         ==================================================== -->
+    <!-- MENU VIEW -->
     <div id="menuView" class="app-module">
         <div class="module-box manager-top">
             <h3 class="manager">Service Menu &amp; Pricing</h3>
 
-            <div id="managerMenuControls" style="display:none; background:#fafafa; padding:20px; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:25px;">
-                <h4 style="margin-bottom:15px; font-size:1rem; color:var(--manager); border-bottom:2px solid var(--manager); padding-bottom:5px;">[Manager] Advanced Service Creator</h4>
+            <div id="managerMenuControls" style="display:none;" class="manager-panel">
+                <h4 class="manager-panel-title">Add New Service</h4>
                 <div class="grid-2">
-                    <div class="form-group"><label>1. Service Category</label><select id="adv_category" onchange="updateAdvForm()"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
-                    <div class="form-group"><label>2. Service Type</label><select id="adv_type"><option value="Main Therapy">Main Therapy (Single Select)</option></select></div>
+                    <div class="form-group"><label>Service Category</label><select id="adv_category" onchange="updateAdvForm()"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
+                    <div class="form-group"><label>Service Type</label><select id="adv_type"><option value="Main Therapy">Main Therapy (Single Select)</option></select></div>
                 </div>
-                <h5 style="margin:10px 0; color:var(--primary);">3. Service Details</h5>
+                <div class="form-section-label" style="margin:14px 0 12px;">Service Details</div>
                 <div class="grid-3">
-                    <div class="form-group"><label>Service Name:</label><input type="text" id="adv_name"></div>
-                    <div class="form-group"><label>Duration (mins):</label><input type="number" id="adv_duration"></div>
-                    <div class="form-group"><label>Price (GHC):</label><input type="number" id="adv_price"></div>
-                    <div class="form-group"><label>Pricing Type:</label><select id="adv_pricing_type"><option value="Fixed">Fixed Price</option><option value="Per Unit">Per Unit (e.g., per nail)</option></select></div>
-                    <div class="form-group"><label>Availability:</label><select id="adv_status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                    <div class="form-group"><label>Service Name</label><input type="text" id="adv_name"></div>
+                    <div class="form-group"><label>Duration (mins)</label><input type="number" id="adv_duration"></div>
+                    <div class="form-group"><label>Price (GHC)</label><input type="number" id="adv_price"></div>
+                    <div class="form-group"><label>Pricing Type</label><select id="adv_pricing_type"><option value="Fixed">Fixed Price</option><option value="Per Unit">Per Unit</option></select></div>
+                    <div class="form-group"><label>Status</label><select id="adv_status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
                 </div>
-                <div class="form-group"><label>Description:</label><textarea id="adv_desc" rows="2"></textarea></div>
+                <div class="form-group"><label>Description</label><textarea id="adv_desc" rows="2"></textarea></div>
                 <div class="grid-2">
                     <div>
-                        <h5 style="margin-bottom:10px; color:var(--primary);">4. Selection Rules</h5>
-                        <div class="form-group"><label>Applies To (Department):</label><select id="adv_applies_to"><option value="Hand">Hand Only</option><option value="Foot">Foot Only</option><option value="Both">Both (Hand &amp; Foot)</option></select></div>
-                        <div class="form-group"><label>Selection Type:</label><select id="adv_selection"><option value="Single">Single Select (Main Base Ritual)</option><option value="Multi">Multi Select (Add-on)</option></select></div>
+                        <div class="form-section-label" style="margin-bottom:12px;">Selection Rules</div>
+                        <div class="form-group"><label>Department</label><select id="adv_applies_to"><option value="Hand">Hand Only</option><option value="Foot">Foot Only</option><option value="Both">Both (Hand &amp; Foot)</option></select></div>
+                        <div class="form-group"><label>Selection Type</label><select id="adv_selection"><option value="Single">Single Select (Base Service)</option><option value="Multi">Multi Select (Add-on)</option></select></div>
                     </div>
                     <div>
-                        <h5 style="margin-bottom:10px; color:var(--primary);">5. Display Settings</h5>
-                        <div class="form-group"><label>Category Section Name (Header):</label><input type="text" id="adv_section" placeholder="e.g., I. HAND THERAPIES"></div>
-                        <div class="form-group"><label>Highlight Tag:</label><select id="adv_tag"><option value="None">None</option><option value="New">New</option><option value="Popular">Popular</option><option value="Recommended">Recommended</option></select></div>
+                        <div class="form-section-label" style="margin-bottom:12px;">Display Settings</div>
+                        <div class="form-group"><label>Section Header</label><input type="text" id="adv_section" placeholder="e.g., I. HAND THERAPIES"></div>
+                        <div class="form-group"><label>Highlight Tag</label><select id="adv_tag"><option value="None">None</option><option value="New">New</option><option value="Popular">Popular</option><option value="Recommended">Recommended</option></select></div>
                     </div>
                 </div>
-                <div style="text-align:right; border-top:1px solid var(--border); padding-top:15px;">
-                    <button class="btn btn-secondary btn-auto" style="margin-right:10px;" onclick="clearAdvForm()">Clear Form</button>
+                <div class="manager-panel-footer">
+                    <button class="btn btn-ghost btn-auto" onclick="clearAdvForm()">Clear</button>
                     <button class="btn btn-manager btn-auto" id="btnSaveServiceConfig" onclick="addNewMenuServiceAdv()">
-                        <span class="btn-text">Save Service Configuration</span>
+                        <span class="btn-text">Save Service</span>
                     </button>
                 </div>
             </div>
 
             <div class="dept-tabs">
-                <label><input type="radio" name="admin_dept_toggle" value="Hand" checked onchange="toggleAdminDeptView()"> HAND THERAPY MENU</label>
-                <label><input type="radio" name="admin_dept_toggle" value="Foot" onchange="toggleAdminDeptView()"> FOOT THERAPY MENU</label>
+                <label><input type="radio" name="admin_dept_toggle" value="Hand" checked onchange="toggleAdminDeptView()"> Hand Therapy</label>
+                <label><input type="radio" name="admin_dept_toggle" value="Foot" onchange="toggleAdminDeptView()"> Foot Therapy</label>
             </div>
 
-            <div id="menuManagerList"><p class="text-muted" style="text-align:center;">Loading menu database...</p></div>
+            <div id="menuManagerList"><p class="text-muted" style="text-align:center;">Loading service menu...</p></div>
 
             <div id="seedMenuBtnContainer" style="display:none; margin-top:15px; padding-top:15px; border-top:1px dashed var(--border); text-align:right;">
-                <button class="btn btn-secondary btn-auto" style="font-size:0.8rem;" onclick="seedDefaultMenu()">[Dev] Initialize Default Menu</button>
+                <button class="btn btn-ghost btn-auto btn-sm" onclick="seedDefaultMenu()">Initialise Default Menu</button>
             </div>
         </div>
     </div>
 
-    <!-- ====================================================
-         HR & FINANCE VIEW
-         ==================================================== -->
+    <!-- HR & FINANCE VIEW -->
     <div id="hrView" class="app-module">
 
         <div class="module-box manager-top">
             <h3 class="manager">Consultation Form Builder</h3>
-            <p class="module-subtitle">Add extra custom fields to the Technician's intake form.</p>
+            <p class="module-subtitle">Add custom fields to the technician intake form for this location.</p>
             <div class="grid-3" style="align-items:end;">
-                <div class="form-group"><label>Question Prompt / Label:</label><input type="text" id="bld_label" placeholder="e.g. Current Medications"></div>
+                <div class="form-group"><label>Question / Prompt</label><input type="text" id="bld_label" placeholder="e.g. Current Medications"></div>
                 <div class="form-group">
-                    <label>Answer Type:</label>
+                    <label>Answer Type</label>
                     <select id="bld_type" onchange="document.getElementById('bld_opts_wrap').style.display=(this.value==='text'?'none':'block')">
-                        <option value="text">Text Box</option>
-                        <option value="checkbox">Multiple Choice (Checkboxes)</option>
-                        <option value="radio">Single Select (Radio)</option>
+                        <option value="text">Free Text</option>
+                        <option value="checkbox">Multiple Choice</option>
+                        <option value="radio">Single Select</option>
                     </select>
                 </div>
-                <div class="form-group hidden" id="bld_opts_wrap"><label>Options (comma separated):</label><input type="text" id="bld_opts" placeholder="e.g. Asthma, Diabetes"></div>
+                <div class="form-group hidden" id="bld_opts_wrap"><label>Options (comma separated)</label><input type="text" id="bld_opts" placeholder="Option A, Option B, Option C"></div>
             </div>
             <div style="text-align:right;">
                 <button class="btn btn-manager btn-auto" onclick="addConsultQuestion()">
-                    <span class="btn-text">Save Question to Template</span>
+                    <span class="btn-text">Add Question</span>
                 </button>
             </div>
-            <div id="consultBuilderList" style="margin-top:15px; border-top:1px dashed var(--border); padding-top:15px;"></div>
+            <div id="consultBuilderList" style="margin-top:18px; border-top:1px dashed var(--border); padding-top:18px;"></div>
         </div>
 
         <div class="module-box manager-top">
             <h3 class="manager">Tax Configuration</h3>
-            <p class="module-subtitle">Define taxes and levies. These automatically apply on top of base service prices during checkout.</p>
+            <p class="module-subtitle">Configure taxes and levies that apply automatically during checkout.</p>
 
             <div class="grid-3" style="align-items:end;">
-                <div class="form-group"><label>Tax Name (e.g., VAT):</label><input type="text" id="cfgTaxName"></div>
-                <div class="form-group"><label>Rate (%) (e.g., 15):</label><input type="number" id="cfgTaxRate" step="0.1"></div>
+                <div class="form-group"><label>Tax Name</label><input type="text" id="cfgTaxName" placeholder="e.g. VAT"></div>
+                <div class="form-group"><label>Rate (%)</label><input type="number" id="cfgTaxRate" step="0.1" placeholder="e.g. 15"></div>
                 <button class="btn btn-manager" style="margin-bottom:15px;" id="btnAddTax" onclick="addTax()">
-                    <span class="btn-text">Add / Update Tax</span>
+                    <span class="btn-text">Save Tax</span>
                 </button>
             </div>
             <div id="taxConfigList" style="margin-top:15px; border-top:1px dashed var(--border); padding-top:15px;">
-                <p class="text-muted">Loading active taxes...</p>
+                <p class="text-muted">No taxes configured yet.</p>
             </div>
 
             <div class="tax-simulator-panel">
-                <h4>Tax Simulator &amp; Price Preview</h4>
+                <h4>Price Simulator</h4>
                 <div class="grid-2" style="align-items:start;">
                     <div>
                         <div class="form-group">
-                            <label>Test Price (GHC):</label>
-                            <input type="number" id="previewBasePrice" placeholder="e.g., 200" oninput="calculatePreview()">
+                            <label>Base Price (GHC)</label>
+                            <input type="number" id="previewBasePrice" placeholder="e.g. 200" oninput="calculatePreview()">
                         </div>
                         <div class="form-group" style="margin-bottom:15px;">
-                            <label style="font-weight:400; cursor:pointer; margin-bottom:5px; font-size:0.875rem;">
+                            <label style="font-weight:400; cursor:pointer; margin-bottom:8px; font-size:0.875rem; display:flex; align-items:center; gap:8px;">
                                 <input type="radio" name="tax_inclusive_toggle" value="exclusive" checked onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--manager);">
-                                Price is Tax <strong>Exclusive</strong> <span style="color:#888;">(Add taxes on top)</span>
-                            </label><br>
-                            <label style="font-weight:400; cursor:pointer; font-size:0.875rem; margin-top:6px; display:flex; align-items:center; gap:8px;">
+                                Tax <strong>Exclusive</strong> <span style="color:#888;">(taxes added on top)</span>
+                            </label>
+                            <label style="font-weight:400; cursor:pointer; font-size:0.875rem; display:flex; align-items:center; gap:8px;">
                                 <input type="radio" name="tax_inclusive_toggle" value="inclusive" onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--manager);">
-                                Price is Tax <strong>Inclusive</strong> <span style="color:#888;">(Extract taxes from total)</span>
+                                Tax <strong>Inclusive</strong> <span style="color:#888;">(taxes extracted from price)</span>
                             </label>
                         </div>
                         <div class="form-group">
-                            <label>Apply Taxes to Simulation:</label>
+                            <label>Taxes to Apply</label>
                             <div id="previewTaxToggles" style="background:white; padding:10px; border:1px solid var(--border); border-radius:6px;">
-                                <p class="text-muted" style="margin:0;">Add a tax above to see toggles here.</p>
+                                <p class="text-muted" style="margin:0;">Save a tax above to see options here.</p>
                             </div>
                         </div>
                     </div>
                     <div class="tax-preview-output">
-                        <div class="tax-preview-row"><span>Base Price (Subtotal):</span><span id="prevBaseOut">0.00 GHC</span></div>
+                        <div class="tax-preview-row"><span>Base Price:</span><span id="prevBaseOut">0.00 GHC</span></div>
                         <div id="prevTaxBreakdown" style="padding-bottom:8px; border-bottom:1px solid #eee; margin-bottom:8px;"></div>
-                        <div class="tax-preview-total"><span>Grand Total:</span><span id="prevTotalOut">0.00 GHC</span></div>
+                        <div class="tax-preview-total"><span>Total:</span><span id="prevTotalOut">0.00 GHC</span></div>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="module-box manager-top">
-            <h3 class="manager">Payroll &amp; Revenue Analytics</h3>
+            <h3 class="manager">Revenue Analytics</h3>
             <div class="grid-3" style="align-items:end;">
-                <div class="form-group"><label>Start Date:</label><input type="date" id="reportStart"></div>
-                <div class="form-group"><label>End Date:</label><input type="date" id="reportEnd"></div>
+                <div class="form-group"><label>Start Date</label><input type="date" id="reportStart"></div>
+                <div class="form-group"><label>End Date</label><input type="date" id="reportEnd"></div>
                 <button class="btn btn-manager" style="margin-bottom:15px;" id="btnGenerateReport" onclick="generateReport()">
-                    <span class="btn-text">Run Report</span>
+                    <span class="btn-text">Generate Report</span>
                 </button>
             </div>
             <div id="reportResults" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
-                <h4 class="report-result-header">Total Salon Revenue: <span id="reportTotalRevenue">0.00 GHC</span></h4>
+                <h4 class="report-result-header">Total Revenue: <span id="reportTotalRevenue">0.00 GHC</span></h4>
                 <div class="overflow-x" style="margin-top:15px;">
                     <table class="breakdown-table">
-                        <thead><tr><th>Technician</th><th style="text-align:center;">Services Performed</th><th style="text-align:right;">Revenue Generated (GHC)</th></tr></thead>
+                        <thead><tr><th>Technician</th><th style="text-align:center;">Services</th><th style="text-align:right;">Revenue (GHC)</th></tr></thead>
                         <tbody id="reportTechBody"></tbody>
                     </table>
                 </div>
@@ -577,85 +550,82 @@
 
     </div><!-- /hrView -->
 
-    <!-- ====================================================
-         ADMIN VIEW
-         ==================================================== -->
+    <!-- ADMIN VIEW -->
     <div id="adminView" class="app-module">
         <div class="module-box admin-top">
-            <div class="flex-between" style="margin-bottom:18px;">
-                <h3 style="margin:0; border:none; padding:0; color:var(--admin);">Staff Matrix &amp; Access Control</h3>
-                <button class="btn btn-secondary btn-auto btn-sm" onclick="loadStaffDirectory()">Refresh Directory</button>
+            <div class="flex-between" style="margin-bottom:20px;">
+                <h3 style="margin:0; border:none; padding:0; color:var(--admin);">Staff Access &amp; Permissions</h3>
+                <button class="btn btn-ghost btn-auto btn-sm" onclick="loadStaffDirectory()">Refresh</button>
             </div>
             <div class="admin-form-panel">
-                <h4>Register / Update Staff</h4>
+                <h4>Register or Update Staff</h4>
                 <div class="grid-3" style="margin-bottom:15px;">
-                    <div class="form-group"><label>Full Name: <span class="required-star">*</span></label><input type="text" id="admin_newName" placeholder="e.g., Sarah Jenkins"></div>
-                    <div class="form-group"><label>Email Address: <span class="required-star">*</span></label><input type="email" id="admin_newEmail" placeholder="e.g., sarah@thuraya.com"></div>
-                    <div class="form-group"><label>Temporary Password:</label><input type="text" id="admin_newPassword" placeholder="(Optional) Min 6 chars"></div>
+                    <div class="form-group"><label>Full Name <span class="required-star">*</span></label><input type="text" id="admin_newName" placeholder="e.g. Sarah Jenkins"></div>
+                    <div class="form-group"><label>Email Address <span class="required-star">*</span></label><input type="email" id="admin_newEmail" placeholder="e.g. sarah@thuraya.com"></div>
+                    <div class="form-group"><label>Set Password</label><input type="text" id="admin_newPassword" placeholder="Leave blank to keep existing"></div>
                 </div>
                 <div class="form-group">
-                    <label>Assign Departments: <span class="required-star">*</span></label>
+                    <label>Departments &amp; Access <span class="required-star">*</span></label>
                     <div class="role-checkbox-grid">
                         <label><input type="checkbox" class="role-checkbox" value="FOH"> Front of House</label>
                         <label><input type="checkbox" class="role-checkbox" value="Tech"> Technician</label>
-                        <label class="text-accent"><input type="checkbox" class="role-checkbox" value="Test Tech"> Test Tech (24/7)</label>
+                        <label><input type="checkbox" class="role-checkbox" value="Test Tech"> Senior Technician</label>
                         <label class="text-supply"><input type="checkbox" class="role-checkbox" value="Supply Chain"> Supply Chain</label>
                         <label class="text-manager"><input type="checkbox" class="role-checkbox" value="Manager"> Manager</label>
                         <label class="text-admin"><input type="checkbox" class="role-checkbox" value="System Admin"> System Admin</label>
                     </div>
                 </div>
             </div>
-            <button class="btn btn-admin btn-auto" id="btnSaveStaffAccount" onclick="addStaffAccount()">
-                <span class="btn-text">Save Matrix Settings &amp; Create/Update User</span>
-            </button>
-            <div class="overflow-x" style="margin-top:20px;">
+            <div class="form-action-row">
+                <button class="btn btn-admin btn-auto" id="btnSaveStaffAccount" onclick="addStaffAccount()">
+                    <span class="btn-text">Save Staff Profile</span>
+                </button>
+            </div>
+            <div class="overflow-x" style="margin-top:22px;">
                 <div id="adminStaffList"><p class="text-muted">Loading directory...</p></div>
             </div>
         </div>
     </div>
 
-    <!-- ====================================================
-         SUPPLY VIEW
-         ==================================================== -->
+    <!-- SUPPLY VIEW -->
     <div id="supplyView" class="app-module">
         <div class="module-box supply-top">
             <h3 class="supply">Supply Chain &amp; Inventory</h3>
             <div class="empty-state">
-                <h4>Digital Stockroom Infrastructure Installed.</h4>
-                <p>Module configuration pending next phase.</p>
+                <div class="empty-state-icon">📦</div>
+                <h4>Coming Soon</h4>
+                <p>Inventory management will be available in the next release.</p>
             </div>
         </div>
     </div>
 
 </div><!-- /appDashboard -->
 
-<!-- ======================================================
-     CONSULTATION MODAL
-     ====================================================== -->
+<!-- CONSULTATION MODAL -->
 <div id="consultationModal" class="consult-overlay">
     <div class="consult-modal">
-        <button class="consult-close" onclick="closeConsultation()">&times;</button>
-        <h2>Consultation &amp; Assessment</h2>
+        <button class="consult-close" onclick="closeConsultation()" aria-label="Close">&times;</button>
+        <h2>Client Consultation</h2>
         <p class="consult-client-label">Client: <span id="consultClientName">...</span></p>
 
-        <div class="consult-section-title">II. MEDICAL HISTORY &amp; SAFETY</div>
+        <div class="consult-section-title">I. Medical History &amp; Safety</div>
         <div class="checkbox-grid">
             <label><input type="checkbox" class="med-cb" value="Diabetes"> Diabetes</label>
-            <label><input type="checkbox" class="med-cb" value="Fungal infections"> Fungal infections</label>
+            <label><input type="checkbox" class="med-cb" value="Fungal infections"> Fungal Infections</label>
             <label><input type="checkbox" class="med-cb" value="Psoriasis / Eczema"> Psoriasis / Eczema</label>
             <label><input type="checkbox" class="med-cb" value="Verrucas / Warts"> Verrucas / Warts</label>
-            <label><input type="checkbox" class="med-cb" value="Skin infections"> Skin infections</label>
-            <label><input type="checkbox" class="med-cb" value="Cuts / Open wounds"> Cuts / Open wounds</label>
+            <label><input type="checkbox" class="med-cb" value="Skin infections"> Skin Infections</label>
+            <label><input type="checkbox" class="med-cb" value="Cuts / Open wounds"> Cuts / Open Wounds</label>
             <label class="text-manager fw-bold"><input type="checkbox" id="med_none" onchange="toggleMedNone(this)"> None of the above</label>
         </div>
         <div class="grid-2">
-            <div class="form-group"><label>Allergies:</label><input type="text" id="med_allergies" placeholder="Any known allergies..."></div>
-            <div class="form-group"><label>Other medical conditions:</label><input type="text" id="med_other" placeholder="List any other conditions..."></div>
+            <div class="form-group"><label>Known Allergies</label><input type="text" id="med_allergies" placeholder="List any known allergies..."></div>
+            <div class="form-group"><label>Other Medical Notes</label><input type="text" id="med_other" placeholder="Any other relevant conditions..."></div>
         </div>
 
-        <div class="consult-section-title">III. FOOT &amp; NAIL CONDITION ASSESSMENT</div>
-        <div style="margin-bottom:15px;">
-            <label style="font-weight:700; margin-bottom:10px; display:block;">Callus Level:</label>
+        <div class="consult-section-title">II. Condition Assessment</div>
+        <div style="margin-bottom:18px;">
+            <label class="field-label-block">Callus Level</label>
             <div class="radio-group">
                 <label><input type="radio" name="cond_callus" value="Minimal"> Minimal</label>
                 <label><input type="radio" name="cond_callus" value="Moderate"> Moderate</label>
@@ -664,7 +634,7 @@
             </div>
         </div>
         <div style="margin-bottom:18px;">
-            <label style="font-weight:700; margin-bottom:10px; display:block;">Skin Condition:</label>
+            <label class="field-label-block">Skin Condition</label>
             <div class="radio-group">
                 <label><input type="radio" name="cond_skin" value="Normal"> Normal</label>
                 <label><input type="radio" name="cond_skin" value="Dry"> Dry</label>
@@ -672,39 +642,41 @@
                 <label><input type="radio" name="cond_skin" value="Sensitive"> Sensitive</label>
             </div>
         </div>
-        <div class="form-group"><label>Visual Mapping Notes:</label><textarea id="cond_notes" rows="3" placeholder="Add specific notes about the client's hands/feet here..."></textarea></div>
+        <div class="form-group">
+            <label>Technician Notes</label>
+            <textarea id="cond_notes" rows="3" placeholder="Observations about the client's hands or feet..."></textarea>
+        </div>
 
         <div id="dynamicConsultForm"></div>
 
-        <div class="consult-section-title accent">SERVICE MODIFICATION (UPSELL)</div>
+        <div class="consult-section-title accent">III. Service Additions</div>
         <div class="upsell-panel">
-            <p class="current-ticket-label">Current Ticket: <strong id="consultCurrentTicket" style="color:var(--primary);">...</strong></p>
+            <p class="current-ticket-label">Current booking: <strong id="consultCurrentTicket" style="color:var(--primary);">...</strong></p>
             <div class="search-box">
-                <select id="consultUpsellSelect" style="flex:1;"><option value="">Select a service or add-on...</option></select>
-                <button class="btn btn-accent btn-auto" onclick="addUpsellToTicket()">Add to Ticket</button>
+                <select id="consultUpsellSelect" style="flex:1;"><option value="">Add a service or upgrade...</option></select>
+                <button class="btn btn-accent btn-auto" onclick="addUpsellToTicket()">Add</button>
             </div>
             <div id="consultAddedUpsells" class="upsell-added"></div>
             <div class="upsell-total-row">
-                Projected Total: <span id="consultProjectedTotal">0.00 GHC</span>
+                Updated Total: <span id="consultProjectedTotal">0.00 GHC</span>
             </div>
         </div>
 
         <div class="consult-footer">
             <div class="consult-footer-left">
-                <select id="consultReassignTech" style="min-width:150px; padding:8px; border-radius:6px; border:1px solid #ccc; font-family:inherit;">
-                    <option value="">Reassign to...</option>
+                <select id="consultReassignTech" class="reassign-select">
+                    <option value="">Reassign technician...</option>
                 </select>
-                <button class="btn btn-secondary btn-auto btn-sm" onclick="reassignTech()">Reassign</button>
-                <button class="btn btn-secondary btn-auto btn-sm" style="color:var(--error); border-color:var(--error);" onclick="requestReschedule()">Reschedule / Cancel</button>
+                <button class="btn btn-ghost btn-auto btn-sm" onclick="reassignTech()">Reassign</button>
+                <button class="btn btn-ghost btn-auto btn-sm btn-ghost--danger" onclick="requestReschedule()">Reschedule</button>
             </div>
-            <button id="btnConsultSaveStart" class="btn btn-success btn-auto" style="font-size:1rem;" onclick="saveConsultationAndStart()">
+            <button id="btnConsultSaveStart" class="btn btn-success btn-auto" onclick="saveConsultationAndStart()">
                 <span class="btn-text">Save &amp; Start Service</span>
             </button>
         </div>
     </div>
 </div>
 
-<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>

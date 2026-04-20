@@ -202,6 +202,11 @@ window.toggleClientsSubView = function() {
         const el = document.getElementById('subView_' + x);
         if (el) el.style.display = (view.toLowerCase() === x.toLowerCase()) ? 'block' : 'none';
     });
+    // Sync active class on cat-tabs for browsers without :has() support
+    document.querySelectorAll('.cat-tab').forEach(t => {
+        const inp = t.querySelector('input[type="radio"]');
+        t.classList.toggle('cat-tab--active', inp?.checked || false);
+    });
 };
 
 window.toggleDeptView = function() {
