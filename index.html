@@ -2046,6 +2046,7 @@
     }
 
     window.openConsultation = async function(id) {
+        window.openConsult = window.openConsultation;
         try {
             const doc = await db.collection('Active_Jobs').doc(id).get();
             if(!doc.exists) return;
