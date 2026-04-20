@@ -701,7 +701,7 @@
     let currentUserEmail = "", currentUserName = "", currentRoles = []; 
     let allTechs = [], allClientsCache = [], allMenuServicesCache = [], liveTaxes = []; 
     let isFetchingClients = false, searchTimeout = null, fohSearchTimeout = null, editingApptId = null; 
-    let curConsultId = null, curConsultData = null, upsls = [];
+    let currentConsultJobId = null, currentConsultJobData = null, pendingUpsells = [];
     
     function getLocalDateString() {
         const now = new Date();
@@ -883,23 +883,7 @@
         const password = document.getElementById('testPassword').value;
         if(!email || !password) { showError("Enter email and password."); return; }
         document.getElementById('errorMsg').style.display = 'none'; 
-        auth.signInWithEmailAndPassword(email, password).catch(error => {
-            const code = error && error.code ? error.code : '';
-            if (
-                code === 'auth/invalid-login-credentials' ||
-                code === 'auth/wrong-password' ||
-                code === 'auth/user-not-found' ||
-                code === 'auth/invalid-credential'
-            ) {
-                showError("Invalid email or password.");
-            } else if (code === 'auth/invalid-email') {
-                showError("Enter a valid email address.");
-            } else if (code === 'auth/too-many-requests') {
-                showError("Too many failed attempts. Try again later.");
-            } else {
-                showError(error.message || "Login failed.");
-            }
-        }); 
+        auth.signInWithEmailAndPassword(email, password).catch(error => showError(error.message)); 
     }
 
     function signInWithGoogle() { document.getElementById('errorMsg').style.display = 'none'; auth.signInWithPopup(provider).catch(error => showError(error.message)); }
@@ -2062,7 +2046,6 @@
     }
 
     window.openConsultation = async function(id) {
-        window.openConsult = window.openConsultation;
         try {
             const doc = await db.collection('Active_Jobs').doc(id).get();
             if(!doc.exists) return;
@@ -2089,6 +2072,7 @@
             document.getElementById('consultModal').style.display = 'block';
         } catch(e) { alert("Error opening consultation: " + e.message); }
     }
+    window.openConsult = window.openConsultation;
 
     window.closeConsult = function() {
         document.getElementById('consultModal').style.display = 'none';
@@ -2213,52 +2197,58 @@
                 .where('assignedTechEmail', '==', currentUserEmail)
                 .where('status', 'in', ['Waiting', 'In Progress'])
                 .onSnapshot(snap => {
-                    if(snap.empty) { queueDiv.innerHTML = '<p style="color: #999; font-style: italic;">Queue is currently empty.</p>'; return; }
-                    
+                    if (snap.empty) {
+                        queueDiv.innerHTML = '<p style="color: #999; font-style: italic;">Queue is currently empty.</p>';
+                        return;
+                    }
+
                     queueDiv.innerHTML = '';
                     snap.forEach(doc => {
-                        let job = doc.data();
-                        
-                        let div = document.createElement('div');
+                        const job = doc.data();
+
+                        const div = document.createElement('div');
                         div.className = 'ticket';
                         div.style.borderColor = job.status === 'Waiting' ? 'var(--accent)' : 'var(--manager)';
-                        
-                        let infoDiv = document.createElement('div');
+
+                        const infoDiv = document.createElement('div');
                         infoDiv.style.flexGrow = '1';
                         infoDiv.innerHTML = `
                             <h4 style="margin:0; font-size:1.1rem;">${job.clientName}</h4>
                             <span class="ticket-badge" style="background:${job.status === 'Waiting' ? '#f39c12' : '#2980b9'}; margin-bottom:5px;">${job.status.toUpperCase()}</span>
                             <p style="margin:0; font-size:0.85rem; color:var(--primary);">💅 <strong>${job.bookedService}</strong></p>
                         `;
-                        
-                        let btnWrapper = document.createElement('div');
+
+                        const btnWrapper = document.createElement('div');
                         btnWrapper.style.width = '140px';
-                        
-                        let btn = document.createElement('button');
+
+                        const btn = document.createElement('button');
                         btn.className = 'btn';
                         btn.style.width = '100%';
                         btn.style.padding = '8px';
                         btn.style.fontSize = '0.8rem';
-                        
+
                         if (job.status === 'Waiting') {
                             btn.innerText = 'Consultation';
-                            btn.onclick = function() { openConsult(doc.id); };
+                            btn.addEventListener('click', () => openConsultation(doc.id));
                         } else {
                             btn.innerText = 'Complete & Bill';
                             btn.style.background = 'var(--success)';
-                            btn.onclick = async function() { 
-                                try { await db.collection('Active_Jobs').doc(doc.id).update({ status: 'Ready for Payment' }); }
-                                catch(e) { alert("Error: " + e.message); }
-                            };
+                            btn.addEventListener('click', async () => {
+                                try {
+                                    await db.collection('Active_Jobs').doc(doc.id).update({ status: 'Ready for Payment' });
+                                } catch (e) {
+                                    alert("Error: " + e.message);
+                                }
+                            });
                         }
-                        
+
                         btnWrapper.appendChild(btn);
                         div.appendChild(infoDiv);
                         div.appendChild(btnWrapper);
                         queueDiv.appendChild(div);
                     });
                 });
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     }
 
     function startFohBillingListener() {
@@ -2308,9 +2298,9 @@
                         btn.style.padding = '5px 15px';
                         btn.style.fontSize = '0.8rem';
                         btn.innerText = 'Checkout';
-                        btn.onclick = function() {
+                        btn.addEventListener('click', () => {
                             openCheckout(doc.id, job.clientName, job.bookedService, subtotal, taxHtml, grandTotal);
-                        };
+                        });
                         
                         div.appendChild(infoDiv);
                         div.appendChild(btn);
