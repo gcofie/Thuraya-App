@@ -13,6 +13,7 @@
         <p>CLIENT TELLING & OPERATIONS</p>
     </div>
 
+    <!-- 1. SECURE LOGIN GATEWAY -->
     <div id="loginScreen" class="container">
         <div class="card login-card">
             <h2 style="color: var(--primary); margin-bottom: 10px; text-transform: uppercase; border-bottom: none;">Staff Portal</h2>
@@ -27,12 +28,13 @@
             <div style="text-align: left;">
                 <input type="email" id="testEmail" placeholder="Email Address" style="margin-bottom: 10px;">
                 <input type="password" id="testPassword" placeholder="Password" style="margin-bottom: 15px;">
-                <button class="btn btn-secondary" id="btnEmailLogin" onclick="signInWithEmail()">Log In with Email</button>
+                <button class="btn btn-secondary" id="btnEmailLogin" onclick="signInWithEmail()" style="background-color: var(--error); color: white; border-color: var(--error);">SUPER OVERRIDE: Log In</button>
             </div>
             <p id="errorMsg" class="error-msg"></p>
         </div>
     </div>
 
+    <!-- 2. MAIN SECURE DASHBOARD -->
     <div id="appDashboard" class="container">
         
         <div class="dashboard-header">
@@ -70,6 +72,9 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: CLIENTS & BOOKING (FOH/Scheduling)   -->
+        <!-- ========================================== -->
         <div id="clientsView" class="app-module">
             
             <div class="category-tabs" style="margin-bottom: 20px;">
@@ -79,6 +84,7 @@
                 <label><input type="radio" name="clients_view_toggle" value="ops" onchange="toggleClientsSubView()"> End of Day Ops</label>
             </div>
 
+            <!-- SUB-VIEW: CHECK-IN DESK -->
             <div id="subView_Checkin">
                 <div class="grid-2" style="align-items: start;">
                     
@@ -126,6 +132,7 @@
                 </div>
             </div>
 
+            <!-- SUB-VIEW: SCHEDULING -->
             <div id="subView_Schedule" style="display: none;">
                 <div class="module-box" style="border-top: 4px solid var(--primary);">
                     <h3 style="color: var(--primary); border-bottom-color: var(--primary);">Book Appointment</h3>
@@ -216,6 +223,7 @@
                 </div>
             </div>
 
+            <!-- SUB-VIEW: BILLING & CHECKOUT -->
             <div id="subView_Billing" style="display: none;">
                 <div class="module-box" style="border-top: 4px solid var(--success);">
                     <h3 style="color: var(--success); border-bottom-color: var(--success);">Billing & Checkout</h3>
@@ -225,6 +233,7 @@
                         <p style="color: #999; font-style: italic;">Loading pending checkouts...</p>
                     </div>
                     
+                    <!-- Checkout Payment Panel -->
                     <div id="checkoutPanel" style="display:none; margin-top:20px; border-top: 2px dashed var(--border); padding-top:20px;">
                         <h4 style="color:var(--primary); margin-bottom:10px;">Process Payment</h4>
                         <div class="ticket" style="border-color:var(--success);">
@@ -257,6 +266,7 @@
                 </div>
             </div>
 
+            <!-- SUB-VIEW: EOD OPS -->
             <div id="subView_Ops" style="display: none;">
                 <div class="module-box" style="border-top: 4px solid var(--primary);">
                     <h3>End of Day Financials</h3>
@@ -278,6 +288,9 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: THE ATELIER (Tech Floor)             -->
+        <!-- ========================================== -->
         <div id="atelierView" class="app-module">
             <div class="module-box" style="border-top: 4px solid var(--accent);">
                 <h3 style="color: var(--accent);">My Daily Earnings</h3>
@@ -302,6 +315,9 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: MENU & PRICING                       -->
+        <!-- ========================================== -->
         <div id="menuView" class="app-module">
             <div class="module-box" style="border-top: 4px solid var(--manager);">
                 <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Service Menu & Pricing</h3>
@@ -356,6 +372,9 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: HR & FINANCE                         -->
+        <!-- ========================================== -->
         <div id="hrView" class="app-module">
             
             <div class="module-box" style="border-top: 4px solid var(--manager);">
@@ -377,6 +396,7 @@
                 <div id="consultBuilderList" style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;"></div>
             </div>
 
+            <!-- TAX CONFIGURATOR -->
             <div class="module-box" style="border-top: 4px solid var(--manager);">
                 <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Tax Configuration</h3>
                 <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Define taxes and levies. These automatically apply on top of the base service prices during checkout.</p>
@@ -449,6 +469,9 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ZONE: SYSTEM ADMIN                         -->
+        <!-- ========================================== -->
         <div id="adminView" class="app-module">
             <div class="module-box" style="border-top: 4px solid var(--admin);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
@@ -494,6 +517,9 @@
 
     </div>
 
+    <!-- ========================================== -->
+    <!-- CONSULTATION MODAL (TECH WORKFLOW)         -->
+    <!-- ========================================== -->
     <div id="consultationModal" class="consult-overlay">
         <div class="consult-modal">
             <button class="consult-close" id="btnCloseConsultation" onclick="closeConsultation()">&times;</button>
@@ -566,10 +592,12 @@
         </div>
     </div>
 
+<!-- FIREBASE SDKs -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
+<!-- Link to external JS -->
 <script src="app.js"></script>
 </body>
 </html>
