@@ -1600,7 +1600,7 @@ function startExpectedTodayListener() {
                             <p>💅 <strong>${appt.bookedService || 'N/A'}</strong></p>
                             <p>⏰ ${h12}:${mm} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'} | 📞 ${appt.clientPhone || 'N/A'} | ${amt} GHC</p>
                         </div>
-                        <div class="ticket-actions">
+                        <div class="ticket-actions" style="flex-direction:row; flex-wrap:wrap; gap:6px; align-items:center; justify-content:flex-end;">
                             <button class="btn btn-sm btn-auto" onclick="checkInAppointment('${appt.id}', this)">Check-In</button>
                             <button class="btn btn-secondary btn-sm btn-auto" onclick="editAppointment('${appt.id}')">Edit</button>
                             <button class="btn btn-secondary btn-sm btn-auto" style="color:var(--error); border-color:var(--error);" onclick="cancelAppointment('${appt.id}')">Cancel</button>
