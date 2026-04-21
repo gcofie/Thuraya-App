@@ -225,6 +225,14 @@ window.toggleAdminDeptView = function() {
     });
 };
 
+window.toggleMenuViewDept = function() {
+    const view = document.querySelector('input[name="menu_view_dept_toggle"]:checked')?.value;
+    ['Hand', 'Foot'].forEach(dept => {
+        const el = document.getElementById('menu_view_dept_' + dept);
+        if (el) el.style.display = (view === dept) ? 'block' : 'none';
+    });
+};
+
 // ============================================================
 //  AUTH
 // ============================================================
@@ -278,6 +286,9 @@ auth.onAuthStateChanged(async (user) => {
                     try { startTechQueueListener(); } catch (e) { }
                 }
                 if (isManager || isFOH || isTech || isAdmin) document.getElementById('tabMenu').style.display = 'flex';
+                if (isAdmin || isManager) {
+                    document.getElementById('tabMenuSettings').style.display = 'flex';
+                }
                 if (isAdmin || isManager) document.getElementById('tabHR').style.display = 'flex';
                 if (isAdmin || isManager || isSupply) document.getElementById('tabSupply').style.display = 'flex';
                 if (isAdmin) {
@@ -503,24 +514,27 @@ window.calculatePreview = function() {
 };
 
 // ============================================================
-//  SERVICE MENU
+//  SERVICE MENU — single snapshot, renders into 3 targets:
+//   1. sched_serviceMenu      — booking form (selectable cards)
+//   2. menuViewReadOnly       — Service Menu tab (read-only, all roles)
+//   3. menuManagerList        — Menu Settings tab (edit cards, Manager/Admin only)
 // ============================================================
 
 function fetchLiveMenu(hasEditAccess) {
-    if (hasEditAccess) {
-        ['managerMenuControls', 'seedMenuBtnContainer'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'block';
-        });
-    }
+    // Show seed button for Manager/Admin
+    const seedBtn = document.getElementById('seedMenuBtnContainer');
+    if (seedBtn && hasEditAccess) seedBtn.style.display = 'block';
 
     db.collection('Menu_Services').onSnapshot(snap => {
-        const menuContainer = document.getElementById('sched_serviceMenu');
-        const adminList     = document.getElementById('menuManagerList');
+        const bookingContainer  = document.getElementById('sched_serviceMenu');
+        const readOnlyContainer = document.getElementById('menuViewReadOnly');
+        const adminList         = document.getElementById('menuManagerList');
 
         if (snap.empty) {
-            if (adminList)     adminList.innerHTML     = '<p class="text-muted" style="text-align:center;">Menu database is empty. Manager must initialise.</p>';
-            if (menuContainer) menuContainer.innerHTML = '<p class="text-muted" style="text-align:center;">No services available.</p>';
+            const emptyMsg = '<p class="text-muted" style="text-align:center;">No services configured yet.</p>';
+            if (bookingContainer)  bookingContainer.innerHTML  = emptyMsg;
+            if (readOnlyContainer) readOnlyContainer.innerHTML = emptyMsg;
+            if (adminList) adminList.innerHTML = '<p class="text-muted" style="text-align:center;">No services configured. Use the form above to add the first service.</p>';
             return;
         }
 
@@ -529,9 +543,10 @@ function fetchLiveMenu(hasEditAccess) {
         services.sort((a, b) => (a.category || "").localeCompare(b.category || ""));
         allMenuServicesCache = services;
 
+        // Populate upsell select in consultation modal
         const uSel = document.getElementById('consultUpsellSelect');
         if (uSel) {
-            uSel.innerHTML = '<option value="">Select a service or add-on...</option>';
+            uSel.innerHTML = '<option value="">Add a service or upgrade...</option>';
             allMenuServicesCache.forEach(s => {
                 if (s.status === "Active") {
                     uSel.innerHTML += `<option value="${s.id}">${s.name} (${s.price} GHC)</option>`;
@@ -539,6 +554,7 @@ function fetchLiveMenu(hasEditAccess) {
             });
         }
 
+        // Build dept data structure
         let dbData = { Hand: {}, Foot: {} };
         services.forEach(s => {
             const cat = s.category || "Uncategorized";
@@ -555,38 +571,33 @@ function fetchLiveMenu(hasEditAccess) {
             }
         });
 
-        let bookingHtml = '', adminHtml = '';
-
-        ['Hand', 'Foot'].forEach(dept => {
-            const disp = dept === 'Hand' ? 'block' : 'none';
-            bookingHtml += `<div id="menu_dept_${dept}" style="display:${disp};">`;
-            adminHtml   += `<div id="admin_dept_${dept}" style="display:${disp};">`;
-
-            let col1 = '', col2 = '', adminSecs = '';
-            let toggleCol = true;
-
-            const numRegex  = /^(\d+|I{1,3}|IV|V|VI)\./;
-            const sortedCats = Object.keys(dbData[dept]).sort((a, b) => {
+        const numRegex = /^(\d+|I{1,3}|IV|V|VI)\./;
+        function sortedCatsFor(dept) {
+            return Object.keys(dbData[dept]).sort((a, b) => {
                 const aU = a.trim().toUpperCase(), bU = b.trim().toUpperCase();
                 const aNum = numRegex.test(aU), bNum = numRegex.test(bU);
                 if (aNum && !bNum) return -1;
                 if (!aNum && bNum) return 1;
                 return aU.localeCompare(bU, undefined, { numeric: true, sensitivity: 'base' });
             });
+        }
 
-            sortedCats.forEach(cat => {
-                let hint = '';
-                if (dbData[dept][cat].length > 0) {
-                    hint = dbData[dept][cat][0].inputType === 'radio'
-                        ? "<span class='section-hint'>(SELECT ONE ONLY)</span>"
-                        : "<span class='section-hint'>(SELECT ANY / MULTIPLE)</span>";
-                }
+        // ── 1. BOOKING HTML (selectable cards) ──────────────────────────────
+        let bookingHtml = '';
+        ['Hand', 'Foot'].forEach(dept => {
+            const disp = dept === 'Hand' ? 'block' : 'none';
+            bookingHtml += `<div id="menu_dept_${dept}" style="display:${disp};">`;
+            let col1 = '', col2 = '', toggleCol = true;
 
-                let sectionHtml  = `<div class="menu-col"><div class="menu-section-title"><span>${cat}</span>${hint}</div>`;
-                let aSectionHtml = `<div class="menu-section-title">${cat}</div><div class="grid-2">`;
+            sortedCatsFor(dept).forEach(cat => {
+                const firstType = dbData[dept][cat][0]?.inputType;
+                const hint = firstType === 'radio'
+                    ? "<span class='section-hint'>(Select one)</span>"
+                    : "<span class='section-hint'>(Select any)</span>";
+                let sectionHtml = `<div class="menu-col"><div class="menu-section-title"><span>${cat}</span>${hint}</div>`;
 
                 dbData[dept][cat].forEach(s => {
-                    const type     = s.inputType || "radio";
+                    const type = s.inputType || "radio";
                     const safeName = s.name || "Unnamed";
                     const safeDur  = s.duration || 0;
                     const safePrc  = s.price || 0;
@@ -598,34 +609,87 @@ function fetchLiveMenu(hasEditAccess) {
                         sectionHtml += `
                             <div class="service-card" style="align-items:center;">
                                 <label style="margin-left:0; cursor:default;">
-                                    <strong>${safeName} ${tagHtml}</strong>
-                                    ${descHtml}
-                                    ${priceTag}
+                                    <strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}
                                 </label>
                                 <div class="counter-box">
                                     <button class="btn btn-secondary btn-sm btn-auto" onclick="updateCounter('${s.id}',-1)">−</button>
                                     <input type="number" id="sched_qty_${s.id}" class="sched-service-counter"
-                                        data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}"
-                                        value="0" min="0" readonly>
+                                        data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}" value="0" min="0" readonly>
                                     <button class="btn btn-secondary btn-sm btn-auto" onclick="updateCounter('${s.id}',1)">+</button>
                                 </div>
                             </div>`;
                     } else {
                         const inputName = type === 'radio' ? `sched_base_${dept}` : `sched_cb_${s.id}`;
                         const inputHtml = type === 'radio'
-                            ? `<input type="radio"    name="${inputName}" class="sched-service-item" id="sched_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`
+                            ? `<input type="radio" name="${inputName}" class="sched-service-item" id="sched_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`
                             : `<input type="checkbox" class="sched-service-item" id="sched_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`;
-
                         sectionHtml += `
                             <div class="service-card" onclick="toggleServiceCard(event,this,'${s.id}','${type}','${inputName}')">
                                 ${inputHtml}
-                                <label>
-                                    <strong>${safeName} ${tagHtml}</strong>
-                                    ${descHtml}
-                                    ${priceTag}
-                                </label>
+                                <label><strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}</label>
                             </div>`;
                     }
+                });
+
+                sectionHtml += '</div>';
+                if (toggleCol) col1 += sectionHtml; else col2 += sectionHtml;
+                toggleCol = !toggleCol;
+            });
+
+            bookingHtml += `<div class="grid-2" style="align-items:start;">${col1}${col2}</div></div>`;
+        });
+        if (bookingContainer) bookingContainer.innerHTML = bookingHtml;
+
+        // ── 2. READ-ONLY DISPLAY (Service Menu tab) ──────────────────────────
+        let readOnlyHtml = '';
+        ['Hand', 'Foot'].forEach(dept => {
+            const disp = dept === 'Hand' ? 'block' : 'none';
+            readOnlyHtml += `<div id="menu_view_dept_${dept}" style="display:${disp};">`;
+            let col1 = '', col2 = '', toggleCol = true;
+
+            sortedCatsFor(dept).forEach(cat => {
+                let sectionHtml = `<div class="menu-col"><div class="menu-section-title"><span>${cat}</span></div>`;
+
+                dbData[dept][cat].forEach(s => {
+                    const safeName = s.name || "Unnamed";
+                    const safeDur  = s.duration || 0;
+                    const safePrc  = s.price || 0;
+                    const descHtml = s.desc ? `<span class="service-desc">${s.desc}</span>` : '';
+                    const tagHtml  = (s.tag && s.tag !== "None") ? `<span class="hl-tag">${s.tag}</span>` : '';
+                    const priceTag = `<span class="service-price-tag">${safeDur > 0 ? safeDur + ' mins | ' : ''}${safePrc} GHC</span>`;
+                    sectionHtml += `
+                        <div class="service-card" style="cursor:default;">
+                            <label style="margin-left:0; cursor:default; pointer-events:none;">
+                                <strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}
+                            </label>
+                        </div>`;
+                });
+
+                sectionHtml += '</div>';
+                if (toggleCol) col1 += sectionHtml; else col2 += sectionHtml;
+                toggleCol = !toggleCol;
+            });
+
+            readOnlyHtml += `<div class="grid-2" style="align-items:start;">${col1}${col2}</div></div>`;
+        });
+        if (readOnlyContainer) readOnlyContainer.innerHTML = readOnlyHtml;
+
+        // ── 3. ADMIN EDIT CARDS (Menu Settings tab) ──────────────────────────
+        let adminHtml = '';
+        ['Hand', 'Foot'].forEach(dept => {
+            const disp = dept === 'Hand' ? 'block' : 'none';
+            adminHtml += `<div id="admin_dept_${dept}" style="display:${disp};">`;
+            let adminSecs = '';
+
+            sortedCatsFor(dept).forEach(cat => {
+                let aSectionHtml = `<div class="menu-section-title">${cat}</div><div class="grid-2">`;
+
+                dbData[dept][cat].forEach(s => {
+                    const type     = s.inputType || "radio";
+                    const safeName = s.name || "Unnamed";
+                    const safeDur  = s.duration || 0;
+                    const safePrc  = s.price || 0;
+                    const tagHtml  = (s.tag && s.tag !== "None") ? `<span class="hl-tag">${s.tag}</span>` : '';
 
                     if (hasEditAccess) {
                         aSectionHtml += `
@@ -640,7 +704,7 @@ function fetchLiveMenu(hasEditAccess) {
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:5px;">
                                     <button class="btn btn-success btn-sm btn-auto" onclick="updateMenuService('${s.id}')">Save</button>
-                                    <button class="btn btn-error  btn-sm btn-auto" onclick="deleteMenuService('${s.id}')">Del</button>
+                                    <button class="btn btn-error  btn-sm btn-auto" onclick="deleteMenuService('${s.id}')">Delete</button>
                                 </div>
                             </div>`;
                     } else {
@@ -654,20 +718,13 @@ function fetchLiveMenu(hasEditAccess) {
                     }
                 });
 
-                sectionHtml  += '</div>';
                 aSectionHtml += '</div>';
-
-                if (toggleCol) col1 += sectionHtml; else col2 += sectionHtml;
-                toggleCol = !toggleCol;
                 adminSecs += aSectionHtml;
             });
 
-            bookingHtml += `<div class="grid-2" style="align-items:start;">${col1}${col2}</div></div>`;
-            adminHtml   += adminSecs + '</div>';
+            adminHtml += adminSecs + '</div>';
         });
-
-        if (adminList)     adminList.innerHTML     = adminHtml;
-        if (menuContainer) menuContainer.innerHTML = bookingHtml;
+        if (adminList) adminList.innerHTML = adminHtml;
 
     }, error => {
         const el = document.getElementById('sched_serviceMenu');

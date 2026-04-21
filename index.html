@@ -74,6 +74,10 @@
             <input type="radio" name="main_nav" id="nav_menu" value="menuView" onchange="switchModule(this.value)">
             <label for="nav_menu">📋 Service Menu</label>
         </div>
+        <div class="nav-tab" id="tabMenuSettings">
+            <input type="radio" name="main_nav" id="nav_menu_settings" value="menuSettingsView" onchange="switchModule(this.value)">
+            <label for="nav_menu_settings">🛠 Menu Settings</label>
+        </div>
         <div class="nav-tab" id="tabHR">
             <input type="radio" name="main_nav" id="nav_hr" value="hrView" onchange="switchModule(this.value)">
             <label for="nav_hr">👥 HR &amp; Finance</label>
@@ -400,12 +404,29 @@
         </div>
     </div>
 
-    <!-- MENU VIEW -->
+    <!-- SERVICE MENU VIEW — read-only, all roles -->
     <div id="menuView" class="app-module">
-        <div class="module-box manager-top">
-            <h3 class="manager">Service Menu &amp; Pricing</h3>
+        <div class="module-box primary-top">
+            <h3>Service Menu</h3>
+            <p class="module-subtitle">Current Hand and Foot therapy offerings with pricing.</p>
 
-            <div id="managerMenuControls" style="display:none;" class="manager-panel">
+            <div class="dept-tabs">
+                <label><input type="radio" name="menu_view_dept_toggle" value="Hand" checked onchange="toggleMenuViewDept()"> Hand Therapy</label>
+                <label><input type="radio" name="menu_view_dept_toggle" value="Foot" onchange="toggleMenuViewDept()"> Foot Therapy</label>
+            </div>
+
+            <div id="menuViewReadOnly">
+                <p class="text-muted" style="text-align:center;">Loading service menu...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MENU SETTINGS VIEW — Manager + Admin only -->
+    <div id="menuSettingsView" class="app-module">
+        <div class="module-box manager-top">
+            <h3 class="manager">Menu Settings</h3>
+
+            <div class="manager-panel" id="managerMenuControls">
                 <h4 class="manager-panel-title">Add New Service</h4>
                 <div class="grid-2">
                     <div class="form-group"><label>Service Category</label><select id="adv_category" onchange="updateAdvForm()"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
