@@ -554,32 +554,129 @@ function fetchLiveMenu(hasEditAccess) {
             });
         }
 
-        // Build dept data structure
+        // ── Build dept data structure ─────────────────────────────────────────
+        // Normalise category strings (trim + collapse whitespace) so minor
+        // storage inconsistencies don't create phantom duplicate sections.
         let dbData = { Hand: {}, Foot: {} };
         services.forEach(s => {
-            const cat = s.category || "Uncategorized";
-            if (s.department === "Both") {
-                ['Hand','Foot'].forEach(dept => {
-                    if (!dbData[dept][cat]) dbData[dept][cat] = [];
-                    dbData[dept][cat].push(s);
-                });
-            } else {
-                const dept = s.department || "Hand";
-                if (!dbData[dept]) dbData[dept] = {};
-                if (!dbData[dept][cat]) dbData[dept][cat] = [];
-                dbData[dept][cat].push(s);
-            }
+            const rawCat = (s.category || "Uncategorized").trim().replace(/\s+/g, ' ');
+            const dept   = s.department || "Hand";
+
+            const addTo = (d) => {
+                if (!dbData[d]) dbData[d] = {};
+                if (!dbData[d][rawCat]) dbData[d][rawCat] = [];
+                dbData[d][rawCat].push(s);
+            };
+
+            if (s.department === "Both") { addTo("Hand"); addTo("Foot"); }
+            else addTo(dept);
         });
 
-        const numRegex = /^(\d+|I{1,3}|IV|V|VI)\./;
+        // Within every category, sort: radio → checkbox → counter
+        const typeOrder = { radio: 0, checkbox: 1, counter: 2 };
+        Object.values(dbData).forEach(deptObj => {
+            Object.values(deptObj).forEach(arr => {
+                arr.sort((a, b) => {
+                    const ta = typeOrder[a.inputType] ?? 1;
+                    const tb = typeOrder[b.inputType] ?? 1;
+                    return ta - tb;
+                });
+            });
+        });
+
+        const numRegex = /^(\d+|I{1,3}|IV|V|VI|VII|VIII|IX|X)\./i;
+
         function sortedCatsFor(dept) {
             return Object.keys(dbData[dept]).sort((a, b) => {
                 const aU = a.trim().toUpperCase(), bU = b.trim().toUpperCase();
                 const aNum = numRegex.test(aU), bNum = numRegex.test(bU);
+
+                // Numbered sections (I., II., A., B.) always before un-numbered
                 if (aNum && !bNum) return -1;
                 if (!aNum && bNum) return 1;
+
+                // Among same-numbered tier: radio-dominant categories before multi-select
+                const aRadio = (dbData[dept][a][0]?.inputType || 'checkbox') === 'radio';
+                const bRadio = (dbData[dept][b][0]?.inputType || 'checkbox') === 'radio';
+                if (aRadio && !bRadio) return -1;
+                if (!aRadio && bRadio) return 1;
+
                 return aU.localeCompare(bU, undefined, { numeric: true, sensitivity: 'base' });
             });
+        }
+
+        // ── Shared helper: build card HTML for one service ───────────────────
+        // prefix = 'sched' or 'menu', dept used for radio group name
+        function buildCard(s, dept, prefix, toggleFn, counterFn) {
+            const type     = s.inputType || "radio";
+            const safeName = s.name     || "Unnamed";
+            const safeDur  = s.duration || 0;
+            const safePrc  = s.price    || 0;
+            const descHtml = s.desc ? `<span class="service-desc">${s.desc}</span>` : '';
+            const tagHtml  = (s.tag && s.tag !== "None") ? `<span class="hl-tag">${s.tag}</span>` : '';
+            const priceTag = `<span class="service-price-tag">${safeDur > 0 ? safeDur + ' mins | ' : ''}${safePrc} GHC</span>`;
+
+            if (type === 'counter') {
+                return `
+                    <div class="service-card" style="align-items:center;">
+                        <label style="margin-left:0; cursor:default;">
+                            <strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}
+                        </label>
+                        <div class="counter-box">
+                            <button class="btn btn-secondary btn-sm btn-auto" onclick="${counterFn}('${s.id}',-1)">−</button>
+                            <input type="number" id="${prefix}_qty_${s.id}" class="${prefix}-service-counter"
+                                data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}" value="0" min="0" readonly>
+                            <button class="btn btn-secondary btn-sm btn-auto" onclick="${counterFn}('${s.id}',1)">+</button>
+                        </div>
+                    </div>`;
+            }
+
+            const inputName = type === 'radio' ? `${prefix}_base_${dept}` : `${prefix}_cb_${s.id}`;
+            const inputHtml = type === 'radio'
+                ? `<input type="radio"    name="${inputName}" class="${prefix}-service-item" id="${prefix}_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`
+                : `<input type="checkbox"                    class="${prefix}-service-item" id="${prefix}_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`;
+
+            return `
+                <div class="service-card" onclick="${toggleFn}(event,this,'${s.id}','${type}','${inputName}')">
+                    ${inputHtml}
+                    <label><strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}</label>
+                </div>`;
+        }
+
+        // Build one full category section — items already sorted radio→checkbox→counter
+        // Renders a sub-divider between the single-select block and multi-select block
+        function buildCategorySection(dept, cat, services, prefix, toggleFn, counterFn) {
+            const singles = services.filter(s => (s.inputType || 'radio') === 'radio');
+            const multis  = services.filter(s => (s.inputType || 'radio') !== 'radio');
+
+            let sectionHtml = `<div class="menu-col">`;
+
+            if (singles.length > 0 && multis.length === 0) {
+                // Pure single-select section
+                sectionHtml += `<div class="menu-section-title"><span>${cat}</span><span class="section-hint">Select one</span></div>`;
+                singles.forEach(s => { sectionHtml += buildCard(s, dept, prefix, toggleFn, counterFn); });
+
+            } else if (multis.length > 0 && singles.length === 0) {
+                // Pure multi-select section
+                sectionHtml += `<div class="menu-section-title"><span>${cat}</span><span class="section-hint">Select any</span></div>`;
+                multis.forEach(s => { sectionHtml += buildCard(s, dept, prefix, toggleFn, counterFn); });
+
+            } else {
+                // Mixed section: single-select items first, then a divider, then multi-select
+                sectionHtml += `<div class="menu-section-title"><span>${cat}</span></div>`;
+
+                // Single-select sub-block
+                sectionHtml += `<div class="menu-subgroup-label">Choose your ritual <span class="section-hint">Select one</span></div>`;
+                singles.forEach(s => { sectionHtml += buildCard(s, dept, prefix, toggleFn, counterFn); });
+
+                // Multi-select sub-block
+                sectionHtml += `<div class="menu-subgroup-divider"></div>`;
+                sectionHtml += `<div class="menu-subgroup-label">Enhancements &amp; Add-ons <span class="section-hint">Select any</span></div>`;
+                multis.forEach(s => { sectionHtml += buildCard(s, dept, prefix, toggleFn, counterFn); });
+            }
+
+            sectionHtml += '</div>';
+            return sectionHtml;
         }
 
         // ── 1. BOOKING HTML (selectable cards) ──────────────────────────────
@@ -590,49 +687,8 @@ function fetchLiveMenu(hasEditAccess) {
             let col1 = '', col2 = '', toggleCol = true;
 
             sortedCatsFor(dept).forEach(cat => {
-                const firstType = dbData[dept][cat][0]?.inputType;
-                const hint = firstType === 'radio'
-                    ? "<span class='section-hint'>(Select one)</span>"
-                    : "<span class='section-hint'>(Select any)</span>";
-                let sectionHtml = `<div class="menu-col"><div class="menu-section-title"><span>${cat}</span>${hint}</div>`;
-
-                dbData[dept][cat].forEach(s => {
-                    const type = s.inputType || "radio";
-                    const safeName = s.name || "Unnamed";
-                    const safeDur  = s.duration || 0;
-                    const safePrc  = s.price || 0;
-                    const descHtml = s.desc ? `<span class="service-desc">${s.desc}</span>` : '';
-                    const tagHtml  = (s.tag && s.tag !== "None") ? `<span class="hl-tag">${s.tag}</span>` : '';
-                    const priceTag = `<span class="service-price-tag">${safeDur > 0 ? safeDur + ' mins | ' : ''}${safePrc} GHC</span>`;
-
-                    if (type === 'counter') {
-                        sectionHtml += `
-                            <div class="service-card" style="align-items:center;">
-                                <label style="margin-left:0; cursor:default;">
-                                    <strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}
-                                </label>
-                                <div class="counter-box">
-                                    <button class="btn btn-secondary btn-sm btn-auto" onclick="updateCounter('${s.id}',-1)">−</button>
-                                    <input type="number" id="sched_qty_${s.id}" class="sched-service-counter"
-                                        data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}" value="0" min="0" readonly>
-                                    <button class="btn btn-secondary btn-sm btn-auto" onclick="updateCounter('${s.id}',1)">+</button>
-                                </div>
-                            </div>`;
-                    } else {
-                        const inputName = type === 'radio' ? `sched_base_${dept}` : `sched_cb_${s.id}`;
-                        const inputHtml = type === 'radio'
-                            ? `<input type="radio" name="${inputName}" class="sched-service-item" id="sched_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`
-                            : `<input type="checkbox" class="sched-service-item" id="sched_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`;
-                        sectionHtml += `
-                            <div class="service-card" onclick="toggleServiceCard(event,this,'${s.id}','${type}','${inputName}')">
-                                ${inputHtml}
-                                <label><strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}</label>
-                            </div>`;
-                    }
-                });
-
-                sectionHtml += '</div>';
-                if (toggleCol) col1 += sectionHtml; else col2 += sectionHtml;
+                const html = buildCategorySection(dept, cat, dbData[dept][cat], 'sched', 'toggleServiceCard', 'updateCounter');
+                if (toggleCol) col1 += html; else col2 += html;
                 toggleCol = !toggleCol;
             });
 
@@ -648,51 +704,8 @@ function fetchLiveMenu(hasEditAccess) {
             let col1 = '', col2 = '', toggleCol = true;
 
             sortedCatsFor(dept).forEach(cat => {
-                const firstType = dbData[dept][cat][0]?.inputType;
-                const hint = firstType === 'radio'
-                    ? "<span class='section-hint'>(Select one)</span>"
-                    : "<span class='section-hint'>(Select any)</span>";
-                let sectionHtml = `<div class="menu-col"><div class="menu-section-title"><span>${cat}</span>${hint}</div>`;
-
-                dbData[dept][cat].forEach(s => {
-                    const type     = s.inputType || "radio";
-                    const safeName = s.name || "Unnamed";
-                    const safeDur  = s.duration || 0;
-                    const safePrc  = s.price || 0;
-                    const descHtml = s.desc ? `<span class="service-desc">${s.desc}</span>` : '';
-                    const tagHtml  = (s.tag && s.tag !== "None") ? `<span class="hl-tag">${s.tag}</span>` : '';
-                    const priceTag = `<span class="service-price-tag">${safeDur > 0 ? safeDur + ' mins | ' : ''}${safePrc} GHC</span>`;
-
-                    // Use menu_cb_* / menu_qty_* IDs and menu_base_* group names
-                    // so these don't collide with the booking form's sched_cb_* inputs
-                    if (type === 'counter') {
-                        sectionHtml += `
-                            <div class="service-card" style="align-items:center;">
-                                <label style="margin-left:0; cursor:default;">
-                                    <strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}
-                                </label>
-                                <div class="counter-box">
-                                    <button class="btn btn-secondary btn-sm btn-auto" onclick="updateMenuCounter('${s.id}',-1)">−</button>
-                                    <input type="number" id="menu_qty_${s.id}" class="menu-service-counter"
-                                        data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}" value="0" min="0" readonly>
-                                    <button class="btn btn-secondary btn-sm btn-auto" onclick="updateMenuCounter('${s.id}',1)">+</button>
-                                </div>
-                            </div>`;
-                    } else {
-                        const inputName = type === 'radio' ? `menu_base_${dept}` : `menu_cb_${s.id}`;
-                        const inputHtml = type === 'radio'
-                            ? `<input type="radio" name="${inputName}" class="menu-service-item" id="menu_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`
-                            : `<input type="checkbox" class="menu-service-item" id="menu_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`;
-                        sectionHtml += `
-                            <div class="service-card" onclick="toggleMenuServiceCard(event,this,'${s.id}','${type}','${inputName}')">
-                                ${inputHtml}
-                                <label><strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}</label>
-                            </div>`;
-                    }
-                });
-
-                sectionHtml += '</div>';
-                if (toggleCol) col1 += sectionHtml; else col2 += sectionHtml;
+                const html = buildCategorySection(dept, cat, dbData[dept][cat], 'menu', 'toggleMenuServiceCard', 'updateMenuCounter');
+                if (toggleCol) col1 += html; else col2 += html;
                 toggleCol = !toggleCol;
             });
 
@@ -705,12 +718,13 @@ function fetchLiveMenu(hasEditAccess) {
         ['Hand', 'Foot'].forEach(dept => {
             const disp = dept === 'Hand' ? 'block' : 'none';
             adminHtml += `<div id="admin_dept_${dept}" style="display:${disp};">`;
-            let adminSecs = '';
 
             sortedCatsFor(dept).forEach(cat => {
-                let aSectionHtml = `<div class="menu-section-title">${cat}</div><div class="grid-2">`;
+                // Within the settings tab, preserve the same single-then-multi order
+                const catServices = dbData[dept][cat];
+                let aSectionHtml = `<div class="menu-section-title"><span>${cat}</span></div><div class="grid-2">`;
 
-                dbData[dept][cat].forEach(s => {
+                catServices.forEach(s => {
                     const type     = s.inputType || "radio";
                     const safeName = s.name || "Unnamed";
                     const safeDur  = s.duration || 0;
@@ -745,10 +759,10 @@ function fetchLiveMenu(hasEditAccess) {
                 });
 
                 aSectionHtml += '</div>';
-                adminSecs += aSectionHtml;
+                adminHtml += aSectionHtml;
             });
 
-            adminHtml += adminSecs + '</div>';
+            adminHtml += '</div>';
         });
         if (adminList) adminList.innerHTML = adminHtml;
 

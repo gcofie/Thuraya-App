@@ -583,6 +583,22 @@ textarea { resize: vertical; }
 }
 .section-hint  { font-size: 0.7rem; color: #aaa; letter-spacing: 0; font-weight: 400; text-transform: none; }
 .service-desc  { display: block; font-size: 0.78rem; color: #999; font-weight: 400; margin-top: 3px; line-height: 1.4; }
+
+/* Sub-group labels and dividers within a mixed category */
+.menu-subgroup-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #aaa;
+    margin: 10px 0 6px;
+    padding-left: 2px;
+}
+.menu-subgroup-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 14px 0 4px;
+}
 .hl-tag {
     background: var(--accent); color: white;
     font-size: 0.63rem; padding: 2px 6px; border-radius: 4px;
