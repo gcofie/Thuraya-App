@@ -820,6 +820,51 @@ window.seedDefaultMenu = async function() {
     } catch (e) { toast("Error seeding menu: " + e.message, 'error'); }
 };
 
+// One-time migration: rewrites legacy category names in Firestore to their
+// canonical equivalents. Safe to run multiple times — skips docs already correct.
+window.runCategoryMigration = async function() {
+    const MIGRATIONS = {
+        'I. HAND THERAPIES': 'I. HAND THERAPY RITUALS',
+    };
+
+    const ok = await confirm(
+        'This will permanently update service documents in Firestore, ' +
+        'renaming legacy category labels to their canonical names.\n\n' +
+        'It is safe to run more than once. Proceed?'
+    );
+    if (!ok) return;
+
+    const btn = document.getElementById('btnRunCategoryMigration');
+    captureButtonText(btn); setButtonLoading(btn, true, 'Migrating...');
+
+    try {
+        const snap = await db.collection('Menu_Services').get();
+        const batch = db.batch();
+        let count = 0;
+
+        snap.forEach(doc => {
+            const cat = (doc.data().category || '').trim().replace(/\s+/g, ' ');
+            const canonical = MIGRATIONS[cat] ?? MIGRATIONS[cat.toUpperCase()];
+            if (canonical) {
+                batch.update(doc.ref, { category: canonical });
+                count++;
+            }
+        });
+
+        if (count === 0) {
+            toast('Nothing to migrate — all categories are already up to date.', 'info');
+            return;
+        }
+
+        await batch.commit();
+        toast(`Migration complete. ${count} service${count !== 1 ? 's' : ''} updated.`, 'success', 7000);
+    } catch (e) {
+        toast('Migration error: ' + e.message, 'error');
+    } finally {
+        setButtonLoading(btn, false);
+    }
+};
+
 // ============================================================
 //  SERVICE CARD SELECTION
 // ============================================================

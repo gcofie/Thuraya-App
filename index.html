@@ -486,7 +486,10 @@
 
             <div id="menuManagerList"><p class="text-muted" style="text-align:center;">Loading service menu...</p></div>
 
-            <div id="seedMenuBtnContainer" style="display:none; margin-top:15px; padding-top:15px; border-top:1px dashed var(--border); text-align:right;">
+            <div id="seedMenuBtnContainer" style="display:none; margin-top:15px; padding-top:15px; border-top:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <button class="btn btn-manager btn-auto btn-sm" id="btnRunCategoryMigration" onclick="runCategoryMigration()">
+                    <span class="btn-text">Fix Category Names in Database</span>
+                </button>
                 <button class="btn btn-ghost btn-auto btn-sm" onclick="seedDefaultMenu()">Initialise Default Menu</button>
             </div>
         </div>
