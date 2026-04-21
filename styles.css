@@ -940,8 +940,35 @@ textarea { resize: vertical; }
 }
 
 /* ===================================================
-   CONSULTATION MODAL
+   PROMO CODE INPUT ROW (booking form)
    =================================================== */
+.promo-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+.promo-applied-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #f0fff4;
+    border: 1px solid var(--success);
+    color: var(--success);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+.discount-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: var(--success);
+    font-weight: 700;
+    border-bottom: 1px solid #f5f5f5;
+    padding-bottom: 4px;
+}
 .consult-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;

@@ -78,6 +78,10 @@
             <input type="radio" name="main_nav" id="nav_menu_settings" value="menuSettingsView" onchange="switchModule(this.value)">
             <label for="nav_menu_settings">🛠 Menu Settings</label>
         </div>
+        <div class="nav-tab" id="tabPromos">
+            <input type="radio" name="main_nav" id="nav_promos" value="promosView" onchange="switchModule(this.value)">
+            <label for="nav_promos">🎟 Sales &amp; Promos</label>
+        </div>
         <div class="nav-tab" id="tabHR">
             <input type="radio" name="main_nav" id="nav_hr" value="hrView" onchange="switchModule(this.value)">
             <label for="nav_hr">👥 HR &amp; Finance</label>
@@ -180,6 +184,10 @@
 
                 <input type="hidden" id="sched_phone">
                 <input type="hidden" id="sched_name">
+                <input type="hidden" id="sched_promoId"          value="">
+                <input type="hidden" id="sched_promoCodeVal"     value="">
+                <input type="hidden" id="sched_discountAmount"   value="0">
+                <input type="hidden" id="sched_originalGrandTotal" value="0">
 
                 <div id="sched_selectedClientDisplay" class="selected-client-badge hidden">
                     <span>Selected: <strong id="sched_displayName"></strong> &nbsp;(<span id="sched_displayPhone"></span>)</span>
@@ -242,6 +250,22 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 4. Promo / Coupon Code -->
+                <div class="form-section-divider">
+                    <h4 class="form-section-label">4. Promo Code <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#aaa;">(optional)</span></h4>
+                </div>
+                <div class="promo-input-row">
+                    <div class="form-group" style="flex:1; margin-bottom:0;">
+                        <input type="text" id="sched_promoCode" placeholder="Enter code..." autocomplete="off"
+                               style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-auto" id="btnApplyPromo" onclick="applyPromoCode()">
+                        <span class="btn-text">Apply</span>
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-auto hidden" id="btnClearPromo" onclick="clearPromoCode()">✕</button>
+                </div>
+                <div id="sched_promoStatus" style="margin-top:8px; font-size:0.875rem; display:none;"></div>
 
                 <div class="form-action-row" style="margin-top:20px;">
                     <button id="btnConfirmBooking" class="btn" onclick="bookAppointment()">
@@ -332,6 +356,7 @@
                             <div class="checkout-summary">
                                 <div class="checkout-row"><span>Subtotal:</span><span id="checkoutSubtotal">0.00 GHC</span></div>
                                 <div id="checkoutTaxList" style="border-bottom:1px solid #e0e0e0; padding-bottom:5px; margin-bottom:5px;"></div>
+                                <div id="checkoutDiscountLine" style="display:none;"></div>
                                 <div class="checkout-total"><span>Grand Total:</span><span id="checkoutTotal">0.00 GHC</span></div>
                             </div>
                         </div>
@@ -347,6 +372,7 @@
                             </div>
                             <input type="hidden" id="checkoutJobId">
                             <input type="hidden" id="checkoutGrandTotalVal">
+                            <input type="hidden" id="checkoutPromoIdVal">
                             <button class="btn btn-success" id="btnConfirmPayment" onclick="confirmPayment()">
                                 <span class="btn-text">Confirm &amp; Close Job</span>
                             </button>
@@ -493,6 +519,83 @@
                 <button class="btn btn-ghost btn-auto btn-sm" onclick="seedDefaultMenu()">Initialise Default Menu</button>
             </div>
         </div>
+    </div>
+
+    <!-- SALES & PROMOS VIEW — Manager + Admin only -->
+    <div id="promosView" class="app-module">
+
+        <!-- Create coupon / package -->
+        <div class="module-box manager-top">
+            <h3 class="manager">Create Coupon or Package</h3>
+            <p class="module-subtitle">Codes can be entered at booking to apply a discount to the grand total.</p>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Code <span class="required-star">*</span></label>
+                    <input type="text" id="promo_code" placeholder="e.g. SUMMER20"
+                           style="text-transform:uppercase; font-weight:700; letter-spacing:2px;"
+                           oninput="this.value=this.value.toUpperCase().replace(/\s/g,'')">
+                    <span style="font-size:0.75rem;color:#aaa;margin-top:4px;display:block;">No spaces. Used exactly as typed at checkout.</span>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="promo_desc" placeholder="e.g. Summer campaign — 20% off">
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <div class="form-group">
+                    <label>Discount Type <span class="required-star">*</span></label>
+                    <select id="promo_type" onchange="togglePromoValueLabel()">
+                        <option value="percent">Percentage off (%)</option>
+                        <option value="flat">Flat amount off (GHC)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label id="promo_value_label">Discount Value (%) <span class="required-star">*</span></label>
+                    <input type="number" id="promo_value" placeholder="e.g. 20" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Minimum Spend (GHC)</label>
+                    <input type="number" id="promo_min_spend" placeholder="0 = no minimum" min="0" step="0.01" value="0">
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <div class="form-group">
+                    <label>Max Uses</label>
+                    <input type="number" id="promo_max_uses" placeholder="Leave blank for unlimited" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Expiry Date</label>
+                    <input type="date" id="promo_expires">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="promo_active">
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-action-row">
+                <button class="btn btn-manager btn-auto" id="btnSavePromo" onclick="savePromo()">
+                    <span class="btn-text">Save Promo Code</span>
+                </button>
+                <button class="btn btn-ghost btn-auto" onclick="clearPromoForm()">Clear</button>
+            </div>
+        </div>
+
+        <!-- Active promos list -->
+        <div class="module-box">
+            <div class="flex-between" style="margin-bottom:14px;">
+                <h3 style="margin:0;border:none;padding:0;">Active Codes</h3>
+                <button class="btn btn-ghost btn-auto btn-sm" onclick="loadPromos()">Refresh</button>
+            </div>
+            <div id="promoList"><p class="text-muted">Loading...</p></div>
+        </div>
+
     </div>
 
     <!-- HR & FINANCE VIEW -->

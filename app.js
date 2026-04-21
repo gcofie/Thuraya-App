@@ -36,6 +36,8 @@ let allTechs = [], allClientsCache = [], allMenuServicesCache = [], liveTaxes = 
 let isFetchingClients = false, searchTimeout = null, fohSearchTimeout = null, editingApptId = null;
 let currentConsultJobId = null, currentConsultJobData = null, pendingUpsells = [];
 let consultTemplate = [];
+// Active promo applied in the booking form
+let _activePromo = null; // { id, code, type, value, discountAmount }
 
 // Listener references (for cleanup)
 let expectedTodayListener = null, scheduleListener = null,
@@ -288,6 +290,8 @@ auth.onAuthStateChanged(async (user) => {
                 if (isManager || isFOH || isTech || isAdmin) document.getElementById('tabMenu').style.display = 'flex';
                 if (isAdmin || isManager) {
                     document.getElementById('tabMenuSettings').style.display = 'flex';
+                    document.getElementById('tabPromos').style.display = 'flex';
+                    try { loadPromos(); } catch (e) { }
                 }
                 if (isAdmin || isManager) document.getElementById('tabHR').style.display = 'flex';
                 if (isAdmin || isManager || isSupply) document.getElementById('tabSupply').style.display = 'flex';
@@ -1130,11 +1134,40 @@ function calculateScheduleTotals() {
     const brkDiv  = document.getElementById('sched_breakdown');
     const brkList = document.getElementById('sched_breakdownList');
     if (subtotalCost > 0 || totalMins > 0) {
-        if (brkList) brkList.innerHTML = breakdownHtml;
+        let displayHtml = breakdownHtml;
+
+        // Promo discount line
+        let finalTotal = grandTotal;
+        let discountAmt = 0;
+        if (_activePromo && grandTotal > 0) {
+            if (_activePromo.minSpend > 0 && grandTotal < _activePromo.minSpend) {
+                // Minimum spend not met — clear promo silently and show warning
+                _showPromoStatus(`Minimum spend of ${_activePromo.minSpend.toFixed(2)} GHC not reached.`, false);
+                _activePromo = null;
+                _syncPromoHiddenInputs(0, 0);
+            } else {
+                discountAmt = _activePromo.type === 'percent'
+                    ? grandTotal * (_activePromo.value / 100)
+                    : Math.min(_activePromo.value, grandTotal);
+                discountAmt = Math.round(discountAmt * 100) / 100;
+                finalTotal  = Math.max(0, grandTotal - discountAmt);
+                displayHtml += `<div class="discount-row"><span>🎟 ${_activePromo.code} discount</span><span>−${discountAmt.toFixed(2)} GHC</span></div>`;
+                _syncPromoHiddenInputs(grandTotal, discountAmt);
+            }
+        } else {
+            _syncPromoHiddenInputs(0, 0);
+        }
+
+        if (brkList) brkList.innerHTML = displayHtml;
         if (brkDiv)  brkDiv.style.display = 'block';
+
+        // Update cost display to show discounted total
+        document.getElementById('sched_totalCost').innerText = finalTotal.toFixed(2);
+        document.getElementById('sched_grandTotalVal').value = finalTotal;
     } else {
         if (brkList) brkList.innerHTML = '';
         if (brkDiv)  brkDiv.style.display = 'none';
+        _syncPromoHiddenInputs(0, 0);
     }
 
     generateTimeSlots();
@@ -1244,10 +1277,15 @@ window.bookAppointment = async function() {
             clientPhone: phone, clientName: name, dateString: date, timeString: time,
             assignedTechEmail: techEmail, assignedTechName: techName,
             bookedService:  services.join(', '),
-            bookedDuration: parseInt(duration, 10)    || 0,   // always Number
-            bookedPrice:    parseFloat(subtotal)      || 0,   // always Number
-            grandTotal:     parseFloat(grandTotal)    || 0,   // always Number
-            taxBreakdown:   taxData,                          // JSON string
+            bookedDuration: parseInt(duration, 10)    || 0,
+            bookedPrice:    parseFloat(subtotal)      || 0,
+            grandTotal:     parseFloat(grandTotal)    || 0,
+            taxBreakdown:   taxData,
+            // Promo fields — empty strings/0 when no promo applied
+            promoCode:      document.getElementById('sched_promoCodeVal').value     || '',
+            promoId:        document.getElementById('sched_promoId').value          || '',
+            discountAmount: parseFloat(document.getElementById('sched_discountAmount').value) || 0,
+            originalGrandTotal: parseFloat(document.getElementById('sched_originalGrandTotal').value) || parseFloat(grandTotal) || 0,
             status: 'Scheduled', bookedBy: currentUserEmail,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -1260,6 +1298,7 @@ window.bookAppointment = async function() {
             await db.collection('Appointments').add(payload);
             toast("Appointment booked successfully.", 'success');
         }
+        clearPromoCode();
         cancelEditMode();
     } catch (e) { toast("Error booking: " + e.message, 'error'); }
     finally { setButtonLoading(btn, false); }
@@ -1587,16 +1626,21 @@ window.checkInAppointment = async function(id, triggerEl) {
         await db.collection("Active_Jobs").add({
             clientPhone: appt.clientPhone, clientName: appt.clientName,
             assignedTechEmail: appt.assignedTechEmail, assignedTechName: appt.assignedTechName,
-            bookedService:  appt.bookedService  || "N/A",
-            bookedDuration: parseInt(appt.bookedDuration || 0, 10),
-            bookedPrice:    parseFloat(appt.bookedPrice  || 0),
-            grandTotal:     parseFloat(appt.grandTotal   || appt.bookedPrice || 0),
-            taxBreakdown:   appt.taxBreakdown   || "[]",
+            bookedService:      appt.bookedService  || "N/A",
+            bookedDuration:     parseInt(appt.bookedDuration || 0, 10),
+            bookedPrice:        parseFloat(appt.bookedPrice  || 0),
+            grandTotal:         parseFloat(appt.grandTotal   || appt.bookedPrice || 0),
+            taxBreakdown:       appt.taxBreakdown   || "[]",
+            // Promo passthrough — zero/empty when no promo was applied
+            promoCode:          appt.promoCode          || '',
+            promoId:            appt.promoId            || '',
+            discountAmount:     parseFloat(appt.discountAmount     || 0),
+            originalGrandTotal: parseFloat(appt.originalGrandTotal || appt.grandTotal || appt.bookedPrice || 0),
             status:         "Waiting",
             fohCreator:     currentUserEmail,
-            sourceApptId:   id,                // reference back to the Appointment doc
-            apptDate:       appt.dateString,   // original booked date (used by requestReschedule)
-            dateString:     todayDateStr,      // operational date (used by financial reports)
+            sourceApptId:   id,
+            apptDate:       appt.dateString,
+            dateString:     todayDateStr,
             createdAt:      firebase.firestore.FieldValue.serverTimestamp()
         });
 
@@ -1652,16 +1696,16 @@ function startFohBillingListener() {
 
             snap.forEach(doc => {
                 const job = doc.data();
-                const taxes = _parseTaxBreakdown(job.taxBreakdown); // fix 6: safe parse
+                const taxes = _parseTaxBreakdown(job.taxBreakdown);
 
-                // Fix 9: coerce to Number at read time — defensive against string-stored legacy values
                 const subtotal   = parseFloat(job.bookedPrice || 0);
                 const grandTotal = parseFloat(job.grandTotal  || job.bookedPrice || 0);
+                const discount   = parseFloat(job.discountAmount || 0);
+                const original   = parseFloat(job.originalGrandTotal || grandTotal);
 
-                // Fix 3: verify arithmetic consistency and flag mismatches visually
-                const taxSum     = taxes.reduce((s, t) => s + parseFloat(t.amount || 0), 0);
-                const expected   = subtotal + taxSum;
-                const mismatch   = Math.abs(expected - grandTotal) > 0.02;
+                const taxSum   = taxes.reduce((s, t) => s + parseFloat(t.amount || 0), 0);
+                const expected = subtotal + taxSum - discount;
+                const mismatch = Math.abs(expected - grandTotal) > 0.02;
 
                 const taxLines = taxes.map(t =>
                     `<div class="checkout-row" style="font-size:0.8rem;color:#888;">
@@ -1669,13 +1713,18 @@ function startFohBillingListener() {
                         <span>${parseFloat(t.amount||0).toFixed(2)} GHC</span>
                      </div>`).join('');
 
+                const discountLine = discount > 0
+                    ? `<div class="checkout-row" style="color:var(--success);font-weight:700;">
+                           <span>🎟 ${job.promoCode || 'Promo'} discount</span>
+                           <span>−${discount.toFixed(2)} GHC</span>
+                       </div>` : '';
+
                 const mismatchBanner = mismatch
                     ? `<div style="color:var(--error);font-size:0.75rem;margin-top:5px;padding:4px 6px;
                                    background:#fff0f0;border-radius:4px;border:1px solid var(--error);">
                            ⚠ Total mismatch — verify before charging (expected ${expected.toFixed(2)} GHC)
                        </div>` : '';
 
-                // Fix 5: highlight the card whose job is currently open in the panel
                 const isActive = doc.id === _activeCheckoutJobId;
                 const div = document.createElement('div');
                 div.className = 'ticket';
@@ -1687,29 +1736,23 @@ function startFohBillingListener() {
                         <h4 class="text-success">${job.clientName || 'Unknown'}</h4>
                         <p style="font-size:0.82rem;color:#666;margin-bottom:6px;">💅 ${job.bookedService || 'N/A'}</p>
                         <div style="background:#f5f5f5;padding:8px 10px;border-radius:4px;font-size:0.875rem;">
-                            <div class="checkout-row">
-                                <span>Subtotal:</span>
-                                <strong>${subtotal.toFixed(2)} GHC</strong>
-                            </div>
+                            <div class="checkout-row"><span>Subtotal:</span><strong>${subtotal.toFixed(2)} GHC</strong></div>
                             ${taxLines}
+                            ${discountLine}
                             <div class="checkout-row" style="font-weight:700;color:var(--success);
                                  border-top:1px solid #ddd;padding-top:5px;margin-top:4px;">
-                                <span>Grand Total:</span>
-                                <span>${grandTotal.toFixed(2)} GHC</span>
+                                <span>Grand Total:</span><span>${grandTotal.toFixed(2)} GHC</span>
                             </div>
                             ${mismatchBanner}
                         </div>
                     </div>`;
 
                 const checkoutBtn = document.createElement('button');
-                checkoutBtn.className = isActive
-                    ? 'btn btn-manager btn-auto btn-sm'
-                    : 'btn btn-success btn-auto btn-sm';
+                checkoutBtn.className = isActive ? 'btn btn-manager btn-auto btn-sm' : 'btn btn-success btn-auto btn-sm';
                 checkoutBtn.textContent = isActive ? '▶ In Progress' : 'Checkout';
-                // Pass parsed taxes array — no raw HTML strings passed around (fix 6 & 9)
                 checkoutBtn.onclick = () => window.openCheckout(
                     doc.id, job.clientName, job.bookedService,
-                    subtotal, taxes, grandTotal
+                    subtotal, taxes, grandTotal, discount, job.promoCode || '', job.promoId || ''
                 );
                 div.appendChild(checkoutBtn);
                 listDiv.appendChild(div);
@@ -1721,19 +1764,19 @@ function startFohBillingListener() {
  * Open the checkout panel for a specific job.
  * Fix 9: accepts Numbers + parsed tax array — no raw HTML or untyped strings.
  */
-window.openCheckout = function(id, name, services, subtotal, taxes, grandTotal) {
-    _activeCheckoutJobId = id; // fix 4 & 5: track which job is open
+window.openCheckout = function(id, name, services, subtotal, taxes, grandTotal, discountAmt, promoCode, promoId) {
+    _activeCheckoutJobId = id;
 
     document.getElementById('checkoutJobId').value          = id;
     document.getElementById('checkoutClientName').innerText = name     || 'Unknown';
     document.getElementById('checkoutServices').innerText   = services || '';
     document.getElementById('checkoutSubtotal').innerText   = parseFloat(subtotal   || 0).toFixed(2) + ' GHC';
     document.getElementById('checkoutTotal').innerText      = parseFloat(grandTotal || 0).toFixed(2) + ' GHC';
-    // Fix 9: store as clean fixed-precision string — parseFloat in confirmPayment will always succeed
     document.getElementById('checkoutGrandTotalVal').value  = parseFloat(grandTotal || 0).toFixed(2);
+    document.getElementById('checkoutPromoIdVal').value     = promoId  || '';
     document.getElementById('checkoutPaymentMethod').value  = '';
 
-    // Rebuild tax list from the parsed array — no raw HTML passed (fix 6)
+    // Tax lines
     const taxListEl = document.getElementById('checkoutTaxList');
     if (taxes && taxes.length > 0) {
         taxListEl.innerHTML = taxes.map(t =>
@@ -1745,6 +1788,20 @@ window.openCheckout = function(id, name, services, subtotal, taxes, grandTotal) 
     } else {
         taxListEl.innerHTML = '<div style="color:#aaa;font-size:0.8rem;padding:2px 0;">No taxes applied</div>';
         taxListEl.style.display = 'block';
+    }
+
+    // Discount line
+    const discountEl = document.getElementById('checkoutDiscountLine');
+    const d = parseFloat(discountAmt || 0);
+    if (discountEl) {
+        if (d > 0) {
+            discountEl.innerHTML = `<div class="checkout-row" style="color:var(--success);font-weight:700;">
+                <span>🎟 ${promoCode || 'Promo'} discount</span><span>−${d.toFixed(2)} GHC</span></div>`;
+            discountEl.style.display = 'block';
+        } else {
+            discountEl.innerHTML = '';
+            discountEl.style.display = 'none';
+        }
     }
 
     const panel = document.getElementById('checkoutPanel');
@@ -1777,24 +1834,34 @@ window.confirmPayment = async function() {
     captureButtonText(btn);
     setButtonLoading(btn, true, 'Processing...');
     try {
-        // Fix 3: write both totalGHC and grandTotal as the same authoritative Number
-        await db.collection('Active_Jobs').doc(id).update({
+        const batch = db.batch();
+
+        // Close the job
+        batch.update(db.collection('Active_Jobs').doc(id), {
             status:        'Closed',
             paymentMethod: method,
-            totalGHC:      price,    // used by financial listeners / reports
-            grandTotal:    price,    // kept in sync so billing UI is always consistent
+            totalGHC:      price,
+            grandTotal:    price,
             closedAt:      firebase.firestore.FieldValue.serverTimestamp(),
             closedBy:      currentUserEmail
         });
 
-        // Fix 8: receipt toast — confirms client, amount, and method to the cashier
+        // If a promo was used, increment its usedCount atomically
+        const promoId = document.getElementById('checkoutPromoIdVal')?.value || '';
+        if (promoId) {
+            batch.update(db.collection('Promos').doc(promoId), {
+                usedCount: firebase.firestore.FieldValue.increment(1)
+            });
+        }
+
+        await batch.commit();
+
         const methodIcon = { 'Cash': '💵', 'Card / POS': '💳', 'Mobile Money': '📱' };
         toast(
             `${methodIcon[method] || '✓'} Payment confirmed — ${name} — ${price.toFixed(2)} GHC via ${method}`,
             'success', 7000
         );
 
-        // Fix 10: close panel explicitly after payment — don't rely on snapshot to do it
         _closeCheckoutPanel();
     } catch (e) {
         toast("Error processing payment: " + e.message, 'error');
@@ -2813,3 +2880,342 @@ function _safeText(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 }
+
+// ============================================================
+//  PROMO / COUPON ENGINE
+//  Collection: Promos  { code, type, value, minSpend,
+//                        maxUses, usedCount, expiresAt,
+//                        active, description, createdBy }
+// ============================================================
+
+// ── Booking-form helpers ─────────────────────────────────────
+
+function _showPromoStatus(msg, success) {
+    const el = document.getElementById('sched_promoStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = success ? 'var(--success)' : 'var(--error)';
+    el.style.display = 'block';
+}
+
+function _syncPromoHiddenInputs(originalGrandTotal, discountAmount) {
+    const codeEl    = document.getElementById('sched_promoCodeVal');
+    const idEl      = document.getElementById('sched_promoId');
+    const discEl    = document.getElementById('sched_discountAmount');
+    const origEl    = document.getElementById('sched_originalGrandTotal');
+    if (codeEl)  codeEl.value  = _activePromo ? _activePromo.code : '';
+    if (idEl)    idEl.value    = _activePromo ? _activePromo.id   : '';
+    if (discEl)  discEl.value  = discountAmount;
+    if (origEl)  origEl.value  = originalGrandTotal;
+}
+
+window.applyPromoCode = async function() {
+    const btn       = document.getElementById('btnApplyPromo');
+    const codeInput = document.getElementById('sched_promoCode');
+    const code      = (codeInput?.value || '').trim().toUpperCase();
+
+    if (!code) { toast('Enter a promo code first.', 'warning'); return; }
+
+    // Must have at least one service selected to validate minimum spend
+    const currentTotal = parseFloat(document.getElementById('sched_grandTotalVal')?.value || 0);
+
+    captureButtonText(btn);
+    setButtonLoading(btn, true, 'Checking...');
+
+    try {
+        const snap = await db.collection('Promos')
+            .where('code', '==', code)
+            .where('active', '==', true)
+            .limit(1)
+            .get();
+
+        if (snap.empty) {
+            _showPromoStatus('Code not found or no longer active.', false);
+            setButtonLoading(btn, false);
+            return;
+        }
+
+        const doc   = snap.docs[0];
+        const promo = doc.data();
+
+        // Expiry check
+        if (promo.expiresAt) {
+            const expires = promo.expiresAt.toDate ? promo.expiresAt.toDate() : new Date(promo.expiresAt);
+            if (expires < new Date()) {
+                _showPromoStatus('This code has expired.', false);
+                setButtonLoading(btn, false);
+                return;
+            }
+        }
+
+        // Usage limit check
+        if (promo.maxUses && promo.usedCount >= promo.maxUses) {
+            _showPromoStatus('This code has reached its usage limit.', false);
+            setButtonLoading(btn, false);
+            return;
+        }
+
+        // Minimum spend check — only if services are selected
+        const minSpend = parseFloat(promo.minSpend || 0);
+        if (minSpend > 0 && currentTotal > 0 && currentTotal < minSpend) {
+            _showPromoStatus(`Minimum spend of ${minSpend.toFixed(2)} GHC required.`, false);
+            setButtonLoading(btn, false);
+            return;
+        }
+
+        // Valid — store and recalculate
+        _activePromo = {
+            id:    doc.id,
+            code:  promo.code,
+            type:  promo.type,
+            value: parseFloat(promo.value || 0),
+            minSpend,
+        };
+
+        const discLabel = promo.type === 'percent'
+            ? `${promo.value}% off`
+            : `${parseFloat(promo.value).toFixed(2)} GHC off`;
+
+        _showPromoStatus(`✓ "${promo.description || code}" applied — ${discLabel}`, true);
+
+        // Show clear button, hide apply
+        document.getElementById('btnApplyPromo').classList.add('hidden');
+        document.getElementById('btnClearPromo').classList.remove('hidden');
+
+        calculateScheduleTotals();
+    } catch (e) {
+        toast('Error checking code: ' + e.message, 'error');
+    } finally {
+        setButtonLoading(btn, false);
+    }
+};
+
+window.clearPromoCode = function() {
+    _activePromo = null;
+    const codeInput = document.getElementById('sched_promoCode');
+    if (codeInput) codeInput.value = '';
+    const statusEl = document.getElementById('sched_promoStatus');
+    if (statusEl) statusEl.style.display = 'none';
+    document.getElementById('btnApplyPromo')?.classList.remove('hidden');
+    document.getElementById('btnClearPromo')?.classList.add('hidden');
+    _syncPromoHiddenInputs(0, 0);
+    calculateScheduleTotals();
+};
+
+// ── Promo Management tab ─────────────────────────────────────
+
+window.togglePromoValueLabel = function() {
+    const type  = document.getElementById('promo_type')?.value;
+    const label = document.getElementById('promo_value_label');
+    if (label) label.innerHTML = type === 'percent'
+        ? 'Discount Value (%) <span class="required-star">*</span>'
+        : 'Discount Amount (GHC) <span class="required-star">*</span>';
+};
+
+window.clearPromoForm = function() {
+    ['promo_code','promo_desc','promo_value','promo_min_spend',
+     'promo_max_uses','promo_expires'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = id === 'promo_min_spend' ? '0' : '';
+    });
+    const typeEl = document.getElementById('promo_type');
+    if (typeEl) typeEl.value = 'percent';
+    const activeEl = document.getElementById('promo_active');
+    if (activeEl) activeEl.value = 'true';
+    togglePromoValueLabel();
+    const saveBtn = document.getElementById('btnSavePromo');
+    if (saveBtn) {
+        saveBtn.dataset.editId = '';
+        const t = saveBtn.querySelector('.btn-text');
+        if (t) t.textContent = 'Save Promo Code';
+    }
+};
+
+window.savePromo = async function() {
+    const btn      = document.getElementById('btnSavePromo');
+    const code     = (document.getElementById('promo_code')?.value || '').trim().toUpperCase();
+    const desc     = document.getElementById('promo_desc')?.value.trim() || '';
+    const type     = document.getElementById('promo_type')?.value || 'percent';
+    const value    = parseFloat(document.getElementById('promo_value')?.value || 0);
+    const minSpend = parseFloat(document.getElementById('promo_min_spend')?.value || 0);
+    const maxUsesRaw = document.getElementById('promo_max_uses')?.value.trim();
+    const maxUses  = maxUsesRaw ? parseInt(maxUsesRaw) : null;
+    const expiresRaw = document.getElementById('promo_expires')?.value;
+    const active   = document.getElementById('promo_active')?.value === 'true';
+    const editId   = btn?.dataset.editId || '';
+
+    if (!code)             { toast('A promo code is required.', 'warning'); return; }
+    if (isNaN(value) || value <= 0) { toast('Enter a valid discount value greater than zero.', 'warning'); return; }
+    if (type === 'percent' && value > 100) { toast('Percentage discount cannot exceed 100%.', 'warning'); return; }
+
+    // Code uniqueness check on new saves
+    if (!editId) {
+        const existing = await db.collection('Promos').where('code', '==', code).limit(1).get();
+        if (!existing.empty) { toast(`Code "${code}" already exists. Edit or deactivate the existing one.`, 'warning'); return; }
+    }
+
+    captureButtonText(btn);
+    setButtonLoading(btn, true, 'Saving...');
+
+    const payload = {
+        code, description: desc, type, value,
+        minSpend: minSpend || 0,
+        maxUses:  maxUses ?? null,
+        expiresAt: expiresRaw
+            ? firebase.firestore.Timestamp.fromDate(new Date(expiresRaw + 'T23:59:59'))
+            : null,
+        active,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: currentUserEmail,
+    };
+
+    try {
+        if (editId) {
+            await db.collection('Promos').doc(editId).update(payload);
+            toast(`Promo "${code}" updated.`, 'success');
+        } else {
+            await db.collection('Promos').add({
+                ...payload,
+                usedCount: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: currentUserEmail,
+            });
+            toast(`Promo "${code}" created.`, 'success');
+        }
+        clearPromoForm();
+        loadPromos();
+    } catch (e) {
+        toast('Error saving promo: ' + e.message, 'error');
+    } finally {
+        setButtonLoading(btn, false);
+    }
+};
+
+window.loadPromos = async function() {
+    const listEl = document.getElementById('promoList');
+    if (!listEl) return;
+    listEl.innerHTML = '<p class="text-muted">Loading...</p>';
+
+    try {
+        const snap = await db.collection('Promos').orderBy('createdAt', 'desc').get();
+        if (snap.empty) {
+            listEl.innerHTML = '<p class="text-muted">No promo codes created yet.</p>';
+            return;
+        }
+
+        const now = new Date();
+        let html = `
+            <div class="overflow-x">
+            <table class="breakdown-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Description</th>
+                        <th>Discount</th>
+                        <th>Min Spend</th>
+                        <th style="text-align:center;">Uses</th>
+                        <th>Expiry</th>
+                        <th style="text-align:center;">Status</th>
+                        <th style="text-align:center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        snap.forEach(doc => {
+            const p = doc.data();
+            const discLabel = p.type === 'percent'
+                ? `${p.value}%`
+                : `${parseFloat(p.value).toFixed(2)} GHC`;
+
+            let expiryLabel = '—';
+            let isExpired   = false;
+            if (p.expiresAt) {
+                const d = p.expiresAt.toDate ? p.expiresAt.toDate() : new Date(p.expiresAt);
+                expiryLabel = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' });
+                isExpired   = d < now;
+            }
+
+            const limitReached = p.maxUses && p.usedCount >= p.maxUses;
+            const effectivelyActive = p.active && !isExpired && !limitReached;
+
+            const statusBadge = effectivelyActive
+                ? `<span class="ticket-badge" style="background:var(--success);">Active</span>`
+                : `<span class="ticket-badge" style="background:#aaa;">${isExpired ? 'Expired' : limitReached ? 'Limit Reached' : 'Inactive'}</span>`;
+
+            const usesLabel = p.maxUses
+                ? `${p.usedCount || 0} / ${p.maxUses}`
+                : `${p.usedCount || 0}`;
+
+            html += `
+                <tr>
+                    <td><strong style="letter-spacing:1px;">${_safeText(p.code)}</strong></td>
+                    <td style="color:#777;font-size:0.85rem;">${_safeText(p.description || '—')}</td>
+                    <td><strong>${discLabel} off</strong></td>
+                    <td>${parseFloat(p.minSpend||0) > 0 ? parseFloat(p.minSpend).toFixed(2)+' GHC' : '—'}</td>
+                    <td style="text-align:center;">${usesLabel}</td>
+                    <td style="font-size:0.85rem;${isExpired?'color:var(--error);':''}">${expiryLabel}</td>
+                    <td style="text-align:center;">${statusBadge}</td>
+                    <td style="text-align:center;">
+                        <div style="display:flex;gap:5px;justify-content:center;">
+                            <button class="btn btn-secondary btn-sm btn-auto" onclick="editPromo('${doc.id}')">Edit</button>
+                            <button class="btn btn-ghost btn-sm btn-auto" style="color:var(--error);border-color:var(--error);" onclick="togglePromoActive('${doc.id}', ${p.active})">
+                                ${p.active ? 'Deactivate' : 'Activate'}
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        listEl.innerHTML = html;
+    } catch (e) {
+        listEl.innerHTML = `<p style="color:var(--error);">Error loading promos: ${e.message}</p>`;
+    }
+};
+
+window.editPromo = async function(id) {
+    try {
+        const doc = await db.collection('Promos').doc(id).get();
+        if (!doc.exists) return;
+        const p = doc.data();
+
+        document.getElementById('promo_code').value      = p.code     || '';
+        document.getElementById('promo_desc').value      = p.description || '';
+        document.getElementById('promo_type').value      = p.type     || 'percent';
+        document.getElementById('promo_value').value     = p.value    || '';
+        document.getElementById('promo_min_spend').value = p.minSpend || 0;
+        document.getElementById('promo_max_uses').value  = p.maxUses  || '';
+        document.getElementById('promo_active').value    = String(p.active !== false);
+
+        if (p.expiresAt) {
+            const d = p.expiresAt.toDate ? p.expiresAt.toDate() : new Date(p.expiresAt);
+            document.getElementById('promo_expires').value = d.toISOString().split('T')[0];
+        } else {
+            document.getElementById('promo_expires').value = '';
+        }
+
+        togglePromoValueLabel();
+
+        const saveBtn = document.getElementById('btnSavePromo');
+        if (saveBtn) {
+            saveBtn.dataset.editId = id;
+            const t = saveBtn.querySelector('.btn-text');
+            if (t) t.textContent = 'Update Promo Code';
+        }
+
+        // Scroll to form
+        document.getElementById('btnSavePromo')?.closest('.module-box')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { toast('Error loading promo: ' + e.message, 'error'); }
+};
+
+window.togglePromoActive = async function(id, currentActive) {
+    const label = currentActive ? 'deactivate' : 'activate';
+    const ok = await confirm(`Are you sure you want to ${label} this promo code?`);
+    if (!ok) return;
+    try {
+        await db.collection('Promos').doc(id).update({ active: !currentActive });
+        toast(`Promo ${label}d.`, 'info');
+        loadPromos();
+    } catch (e) { toast('Error updating promo: ' + e.message, 'error'); }
+};
