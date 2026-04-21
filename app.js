@@ -32,7 +32,7 @@ try { secondaryApp = firebase.app("SecondaryApp"); }
 catch (e) { secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp"); }
 
 let currentUserEmail = "", currentUserName = "", currentRoles = [];
-let allTechs = [], allClientsCache = [], allMenuServicesCache = [], liveTaxes = [];
+let allTechs = [], allClientsCache = [], allMenuServicesCache = [], liveTaxes = [], liveTaxesInclusive = false;
 let isFetchingClients = false, searchTimeout = null, fohSearchTimeout = null, editingApptId = null;
 let currentConsultJobId = null, currentConsultJobData = null, pendingUpsells = [];
 let consultTemplate = [];
@@ -404,11 +404,74 @@ async function fetchAllTechs() {
 
 function startTaxListener() {
     db.collection('Tax_Settings').doc('current_taxes').onSnapshot(doc => {
-        liveTaxes = (doc.exists && doc.data().rates) ? doc.data().rates : [];
+        const data = doc.exists ? doc.data() : {};
+        liveTaxes          = data.rates     || [];
+        liveTaxesInclusive = data.inclusive === true;
+
+        // Sync the inclusive/exclusive radio in Tax Configuration
+        const yesEl = document.getElementById('cfg_inclusive_yes');
+        const noEl  = document.getElementById('cfg_inclusive_no');
+        if (yesEl && noEl) {
+            yesEl.checked = liveTaxesInclusive;
+            noEl.checked  = !liveTaxesInclusive;
+        }
+        // Sync the Price Simulator toggle (read-only preview)
+        const simYes = document.querySelector('input[name="tax_inclusive_toggle"][value="inclusive"]');
+        const simNo  = document.querySelector('input[name="tax_inclusive_toggle"][value="exclusive"]');
+        if (simYes && simNo) {
+            simYes.checked = liveTaxesInclusive;
+            simNo.checked  = !liveTaxesInclusive;
+        }
+
         renderTaxConfigUI();
         updatePreviewToggles();
         calculateScheduleTotals();
     });
+}
+
+/** Persist the tax inclusive/exclusive setting to Firestore */
+window.saveTaxInclusiveSetting = async function(isInclusive) {
+    try {
+        await db.collection('Tax_Settings').doc('current_taxes')
+            .set({ inclusive: isInclusive }, { merge: true });
+        toast(`Pricing set to tax-${isInclusive ? 'inclusive' : 'exclusive'}.`, 'info');
+    } catch (e) { toast('Error saving setting: ' + e.message, 'error'); }
+};
+
+/**
+ * _applyTaxes — single source of truth for all tax arithmetic.
+ *
+ * TAX-INCLUSIVE (liveTaxesInclusive = true):
+ *   Listed price already contains tax.
+ *   basePrice  = listedTotal / (1 + combinedRate)  — extract pre-tax amount
+ *   grandTotal = listedTotal                         — unchanged; client pays listed price
+ *
+ * TAX-EXCLUSIVE (liveTaxesInclusive = false):
+ *   Listed price is pre-tax.
+ *   basePrice  = listedTotal                         — unchanged
+ *   grandTotal = listedTotal × (1 + combinedRate)    — add tax on top
+ *
+ * @param {number} listedTotal  Sum of service prices as stored in the menu
+ * @returns {{ basePrice, grandTotal, taxLines, taxHtml }}
+ */
+function _applyTaxes(listedTotal) {
+    if (!liveTaxes.length || listedTotal === 0) {
+        return { basePrice: listedTotal, grandTotal: listedTotal, taxLines: [], taxHtml: '' };
+    }
+    const combinedRate = liveTaxes.reduce((s, t) => s + t.rate, 0) / 100;
+    const basePrice    = liveTaxesInclusive ? listedTotal / (1 + combinedRate) : listedTotal;
+    const grandTotal   = liveTaxesInclusive ? listedTotal : listedTotal * (1 + combinedRate);
+
+    const taxLines = liveTaxes.map(t => ({
+        name: t.name, rate: t.rate,
+        amount: basePrice * (t.rate / 100),
+    }));
+    const taxHtml = taxLines.map(l =>
+        `<div style="display:flex;justify-content:space-between;font-size:0.85rem;color:#888;margin-bottom:3px;">
+            <span>+ ${l.name} (${l.rate}%)</span><span>${l.amount.toFixed(2)} GHC</span>
+         </div>`).join('');
+
+    return { basePrice, grandTotal, taxLines, taxHtml };
 }
 
 window.editTax = function(name, rate) {
@@ -981,18 +1044,15 @@ function calculateMenuTotals() {
         }
     });
 
-    // Apply live taxes
-    let totalTaxAmt = 0, taxBreakdownHtml = '';
-    if (subtotalCost > 0 && liveTaxes.length > 0) {
-        taxBreakdownHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:5px;font-weight:600;color:#555;"><span>Subtotal:</span><span>${subtotalCost.toFixed(2)} GHC</span></div>`;
-        liveTaxes.forEach(t => {
-            const tAmt = subtotalCost * (t.rate / 100);
-            totalTaxAmt += tAmt;
-            taxBreakdownHtml += `<div style="display:flex;justify-content:space-between;font-size:0.85rem;color:#888;margin-bottom:3px;"><span>+ ${t.name} (${t.rate}%)</span><span>${tAmt.toFixed(2)} GHC</span></div>`;
-        });
-    }
+    // Apply taxes — inclusive or exclusive via _applyTaxes
+    const { basePrice, grandTotal, taxLines, taxHtml: taxBreakdownHtml } = _applyTaxes(subtotalCost);
 
-    const grandTotal = subtotalCost + totalTaxAmt;
+    if (subtotalCost > 0 && taxLines.length > 0) {
+        const subtotalLine = `<div style="display:flex;justify-content:space-between;margin-bottom:5px;font-weight:600;color:#555;"><span>Subtotal (ex. tax):</span><span>${basePrice.toFixed(2)} GHC</span></div>`;
+        if (taxEl) { taxEl.innerHTML = subtotalLine + taxBreakdownHtml; taxEl.style.display = 'block'; }
+    } else {
+        if (taxEl) taxEl.style.display = 'none';
+    }
 
     const taxEl  = document.getElementById('menu_taxBreakdown');
     const brkDiv = document.getElementById('menu_breakdown');
@@ -1048,29 +1108,22 @@ function calculateScheduleTotals() {
         }
     });
 
-    // Tax engine
-    let totalTaxAmt = 0, taxBreakdownHtml = '', taxDataArr = [];
+    // Tax engine — inclusive or exclusive, handled by _applyTaxes
+    const { basePrice, grandTotal, taxLines, taxHtml: taxBreakdownHtml } = _applyTaxes(subtotalCost);
+    const taxDataArr = taxLines.map(l => ({ name: l.name, rate: l.rate, amount: l.amount }));
 
-    if (subtotalCost > 0 && liveTaxes.length > 0) {
-        taxBreakdownHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:5px; font-weight:600; color:#555;"><span>Subtotal:</span><span>${subtotalCost.toFixed(2)} GHC</span></div>`;
-        liveTaxes.forEach(t => {
-            const tAmt = subtotalCost * (t.rate / 100);
-            totalTaxAmt += tAmt;
-            taxDataArr.push({ name: t.name, rate: t.rate, amount: tAmt });
-            taxBreakdownHtml += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#888; margin-bottom:3px;"><span>+ ${t.name} (${t.rate}%)</span><span>${tAmt.toFixed(2)} GHC</span></div>`;
-        });
+    if (subtotalCost > 0 && taxLines.length > 0) {
+        const subtotalLine = `<div style="display:flex;justify-content:space-between;margin-bottom:5px;font-weight:600;color:#555;"><span>Subtotal (ex. tax):</span><span>${basePrice.toFixed(2)} GHC</span></div>`;
         const taxEl = document.getElementById('sched_taxBreakdown');
-        if (taxEl) { taxEl.innerHTML = taxBreakdownHtml; taxEl.style.display = 'block'; }
+        if (taxEl) { taxEl.innerHTML = subtotalLine + taxBreakdownHtml; taxEl.style.display = 'block'; }
     } else {
         const taxEl = document.getElementById('sched_taxBreakdown');
         if (taxEl) taxEl.style.display = 'none';
     }
 
-    const grandTotal = subtotalCost + totalTaxAmt;
-
     document.getElementById('sched_totalDuration').innerText = totalMins;
     document.getElementById('sched_totalCost').innerText     = grandTotal.toFixed(2);
-    document.getElementById('sched_subtotalVal').value       = subtotalCost;
+    document.getElementById('sched_subtotalVal').value       = basePrice;       // pre-tax amount
     document.getElementById('sched_taxData').value           = JSON.stringify(taxDataArr);
     document.getElementById('sched_grandTotalVal').value     = grandTotal;
 
@@ -2064,12 +2117,13 @@ function _renderUpsellList() {
                            font-weight:700; font-size:1rem; padding:0 4px; line-height:1;">✕</button>
         </div>`).join('');
 
-    // Recalculate projected total from original base price (not from grandTotal which includes tax)
+    // Recalculate projected total.
+    // bookedPrice on the job is the pre-tax base. Upsell prices from the menu
+    // are "listed" prices, so _applyTaxes handles inclusive/exclusive correctly.
     let base = parseFloat(currentConsultJobData?.bookedPrice || 0);
     pendingUpsells.forEach(p => base += parseFloat(p.price || 0));
-    let taxes = 0;
-    liveTaxes.forEach(t => taxes += base * (t.rate / 100));
-    document.getElementById('consultProjectedTotal').innerText = (base + taxes).toFixed(2) + ' GHC';
+    const { grandTotal: projTotal } = _applyTaxes(base);
+    document.getElementById('consultProjectedTotal').innerText = projTotal.toFixed(2) + ' GHC';
 }
 
 window.reassignTech = async function() {
@@ -2166,33 +2220,32 @@ window.saveConsultationAndStart = async function() {
         assessedAt:   firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    let base       = parseFloat(currentConsultJobData.bookedPrice || 0);
-    let serviceStr = currentConsultJobData.bookedService || '';
-    let dur        = parseInt(currentConsultJobData.bookedDuration || 0, 10);
+    // Build the new listed total: existing job's grand total + upsell listed prices.
+    // grandTotal on the job is what the client was originally quoted (inclusive or not).
+    // Upsell prices come from the menu and are also listed prices.
+    let listedTotal = parseFloat(currentConsultJobData.grandTotal
+                        || currentConsultJobData.bookedPrice || 0);
+    let serviceStr  = currentConsultJobData.bookedService || '';
+    let dur         = parseInt(currentConsultJobData.bookedDuration || 0, 10);
 
     pendingUpsells.forEach(p => {
-        base += parseFloat(p.price || 0);
-        dur  += parseInt(p.duration || 0);
-        serviceStr += `, ${p.name}`;
+        listedTotal += parseFloat(p.price || 0);
+        dur         += parseInt(p.duration || 0);
+        serviceStr  += `, ${p.name}`;
     });
 
-    let totalTaxes = 0;
-    const newTaxArr = [];
-    liveTaxes.forEach(t => {
-        const tAmt = base * (t.rate / 100);
-        totalTaxes += tAmt;
-        newTaxArr.push({ name: t.name, rate: t.rate, amount: tAmt });
-    });
+    const { basePrice: taxedBase, grandTotal: newGrand, taxLines } = _applyTaxes(listedTotal);
+    const newTaxArr = taxLines.map(l => ({ name: l.name, rate: l.rate, amount: l.amount }));
 
     try {
         await db.collection('Active_Jobs').doc(currentConsultJobId).update({
             status:             'In Progress',
             consultationRecord: consultData,
-            bookedPrice:        base,
+            bookedPrice:        taxedBase,            // pre-tax subtotal
             bookedService:      serviceStr,
-            bookedDuration:     dur,          // always a Number
+            bookedDuration:     dur,
             taxBreakdown:       JSON.stringify(newTaxArr),
-            grandTotal:         base + totalTaxes,
+            grandTotal:         newGrand,             // what the client pays
             lastSavedAt:        firebase.firestore.FieldValue.serverTimestamp(),
             lastSavedBy:        currentUserEmail
         });

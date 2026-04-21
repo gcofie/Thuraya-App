@@ -532,6 +532,23 @@
                     <span class="btn-text">Save Tax</span>
                 </button>
             </div>
+
+            <!-- Global inclusive/exclusive setting — applies to ALL billing calculations -->
+            <div style="background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:4px;">
+                <label style="font-weight:700; font-size:0.85rem; color:var(--primary); display:block; margin-bottom:10px;">
+                    Are service menu prices tax-inclusive or exclusive?
+                </label>
+                <div style="display:flex; gap:24px; flex-wrap:wrap;">
+                    <label style="font-weight:400; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.875rem;">
+                        <input type="radio" name="cfg_inclusive_toggle" id="cfg_inclusive_yes" value="inclusive" onchange="saveTaxInclusiveSetting(true)" style="width:15px; height:15px; accent-color:var(--manager);">
+                        <span><strong>Tax Inclusive</strong> <span style="color:#888;">— tax is already inside the listed price</span></span>
+                    </label>
+                    <label style="font-weight:400; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.875rem;">
+                        <input type="radio" name="cfg_inclusive_toggle" id="cfg_inclusive_no" value="exclusive" onchange="saveTaxInclusiveSetting(false)" style="width:15px; height:15px; accent-color:var(--manager);" checked>
+                        <span><strong>Tax Exclusive</strong> <span style="color:#888;">— tax is added on top of the listed price</span></span>
+                    </label>
+                </div>
+            </div>
             <div id="taxConfigList" style="margin-top:15px; border-top:1px dashed var(--border); padding-top:15px;">
                 <p class="text-muted">No taxes configured yet.</p>
             </div>
