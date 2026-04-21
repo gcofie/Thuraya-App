@@ -640,29 +640,55 @@ function fetchLiveMenu(hasEditAccess) {
         });
         if (bookingContainer) bookingContainer.innerHTML = bookingHtml;
 
-        // ── 2. READ-ONLY DISPLAY (Service Menu tab) ──────────────────────────
-        let readOnlyHtml = '';
+        // ── 2. INTERACTIVE MENU TAB (selectable cards with own breakdown) ────
+        let menuViewHtml = '';
         ['Hand', 'Foot'].forEach(dept => {
             const disp = dept === 'Hand' ? 'block' : 'none';
-            readOnlyHtml += `<div id="menu_view_dept_${dept}" style="display:${disp};">`;
+            menuViewHtml += `<div id="menu_view_dept_${dept}" style="display:${disp};">`;
             let col1 = '', col2 = '', toggleCol = true;
 
             sortedCatsFor(dept).forEach(cat => {
-                let sectionHtml = `<div class="menu-col"><div class="menu-section-title"><span>${cat}</span></div>`;
+                const firstType = dbData[dept][cat][0]?.inputType;
+                const hint = firstType === 'radio'
+                    ? "<span class='section-hint'>(Select one)</span>"
+                    : "<span class='section-hint'>(Select any)</span>";
+                let sectionHtml = `<div class="menu-col"><div class="menu-section-title"><span>${cat}</span>${hint}</div>`;
 
                 dbData[dept][cat].forEach(s => {
+                    const type     = s.inputType || "radio";
                     const safeName = s.name || "Unnamed";
                     const safeDur  = s.duration || 0;
                     const safePrc  = s.price || 0;
                     const descHtml = s.desc ? `<span class="service-desc">${s.desc}</span>` : '';
                     const tagHtml  = (s.tag && s.tag !== "None") ? `<span class="hl-tag">${s.tag}</span>` : '';
                     const priceTag = `<span class="service-price-tag">${safeDur > 0 ? safeDur + ' mins | ' : ''}${safePrc} GHC</span>`;
-                    sectionHtml += `
-                        <div class="service-card" style="cursor:default;">
-                            <label style="margin-left:0; cursor:default; pointer-events:none;">
-                                <strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}
-                            </label>
-                        </div>`;
+
+                    // Use menu_cb_* / menu_qty_* IDs and menu_base_* group names
+                    // so these don't collide with the booking form's sched_cb_* inputs
+                    if (type === 'counter') {
+                        sectionHtml += `
+                            <div class="service-card" style="align-items:center;">
+                                <label style="margin-left:0; cursor:default;">
+                                    <strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}
+                                </label>
+                                <div class="counter-box">
+                                    <button class="btn btn-secondary btn-sm btn-auto" onclick="updateMenuCounter('${s.id}',-1)">−</button>
+                                    <input type="number" id="menu_qty_${s.id}" class="menu-service-counter"
+                                        data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}" value="0" min="0" readonly>
+                                    <button class="btn btn-secondary btn-sm btn-auto" onclick="updateMenuCounter('${s.id}',1)">+</button>
+                                </div>
+                            </div>`;
+                    } else {
+                        const inputName = type === 'radio' ? `menu_base_${dept}` : `menu_cb_${s.id}`;
+                        const inputHtml = type === 'radio'
+                            ? `<input type="radio" name="${inputName}" class="menu-service-item" id="menu_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`
+                            : `<input type="checkbox" class="menu-service-item" id="menu_cb_${s.id}" data-name="${safeName}" data-duration="${safeDur}" data-price="${safePrc}">`;
+                        sectionHtml += `
+                            <div class="service-card" onclick="toggleMenuServiceCard(event,this,'${s.id}','${type}','${inputName}')">
+                                ${inputHtml}
+                                <label><strong>${safeName} ${tagHtml}</strong>${descHtml}${priceTag}</label>
+                            </div>`;
+                    }
                 });
 
                 sectionHtml += '</div>';
@@ -670,9 +696,9 @@ function fetchLiveMenu(hasEditAccess) {
                 toggleCol = !toggleCol;
             });
 
-            readOnlyHtml += `<div class="grid-2" style="align-items:start;">${col1}${col2}</div></div>`;
+            menuViewHtml += `<div class="grid-2" style="align-items:start;">${col1}${col2}</div></div>`;
         });
-        if (readOnlyContainer) readOnlyContainer.innerHTML = readOnlyHtml;
+        if (readOnlyContainer) readOnlyContainer.innerHTML = menuViewHtml;
 
         // ── 3. ADMIN EDIT CARDS (Menu Settings tab) ──────────────────────────
         let adminHtml = '';
@@ -813,6 +839,117 @@ window.clearAllSelections = function() {
     document.querySelectorAll('.service-card').forEach(card => card.classList.remove('selected'));
     calculateScheduleTotals();
 };
+
+// ============================================================
+//  SERVICE MENU TAB — selection & breakdown
+//  Uses menu_cb_* / menu_qty_* / menu_base_* to avoid
+//  colliding with the booking form's sched_* inputs.
+// ============================================================
+
+window.toggleMenuServiceCard = function(event, cardElement, id, type, groupName) {
+    event.preventDefault();
+    const input = document.getElementById('menu_cb_' + id);
+    if (!input) return;
+
+    if (type === 'radio') {
+        if (input.checked) {
+            input.checked = false;
+            cardElement.classList.remove('selected');
+        } else {
+            document.querySelectorAll(`input[name="${groupName}"]`).forEach(r => {
+                r.checked = false;
+                r.closest('.service-card')?.classList.remove('selected');
+            });
+            input.checked = true;
+            cardElement.classList.add('selected');
+        }
+    } else {
+        input.checked = !input.checked;
+        cardElement.classList.toggle('selected', input.checked);
+    }
+    calculateMenuTotals();
+};
+
+window.updateMenuCounter = function(id, val) {
+    const input = document.getElementById('menu_qty_' + id);
+    if (!input) return;
+    let current = parseInt(input.value) || 0;
+    current = Math.max(0, current + val);
+    input.value = current;
+    calculateMenuTotals();
+};
+
+window.clearMenuSelections = function() {
+    document.querySelectorAll('.menu-service-item').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.menu-service-counter').forEach(input => input.value = 0);
+    // Only clear cards inside the menu tab, not booking form cards
+    const menuContainer = document.getElementById('menuViewReadOnly');
+    if (menuContainer) menuContainer.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+    calculateMenuTotals();
+};
+
+function calculateMenuTotals() {
+    let totalMins = 0, subtotalCost = 0;
+    let breakdownHtml = '';
+
+    document.querySelectorAll('.menu-service-item:checked').forEach(input => {
+        const mins = parseInt(input.getAttribute('data-duration')) || 0;
+        const cost = parseFloat(input.getAttribute('data-price')) || 0;
+        const name = input.getAttribute('data-name');
+        totalMins += mins; subtotalCost += cost;
+        breakdownHtml += `<div class="breakdown-row"><span>${name}</span><span>${cost.toFixed(2)} GHC</span></div>`;
+    });
+
+    document.querySelectorAll('.menu-service-counter').forEach(input => {
+        const qty = parseInt(input.value) || 0;
+        if (qty > 0) {
+            const costPer   = parseFloat(input.getAttribute('data-price')) || 0;
+            const mins      = parseInt(input.getAttribute('data-duration')) || 0;
+            const name      = input.getAttribute('data-name');
+            const itemTotal = costPer * qty;
+            totalMins += mins; subtotalCost += itemTotal;
+            breakdownHtml += `<div class="breakdown-row"><span>${name} (x${qty})</span><span>${itemTotal.toFixed(2)} GHC</span></div>`;
+        }
+    });
+
+    // Apply live taxes
+    let totalTaxAmt = 0, taxBreakdownHtml = '';
+    if (subtotalCost > 0 && liveTaxes.length > 0) {
+        taxBreakdownHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:5px;font-weight:600;color:#555;"><span>Subtotal:</span><span>${subtotalCost.toFixed(2)} GHC</span></div>`;
+        liveTaxes.forEach(t => {
+            const tAmt = subtotalCost * (t.rate / 100);
+            totalTaxAmt += tAmt;
+            taxBreakdownHtml += `<div style="display:flex;justify-content:space-between;font-size:0.85rem;color:#888;margin-bottom:3px;"><span>+ ${t.name} (${t.rate}%)</span><span>${tAmt.toFixed(2)} GHC</span></div>`;
+        });
+    }
+
+    const grandTotal = subtotalCost + totalTaxAmt;
+
+    const taxEl  = document.getElementById('menu_taxBreakdown');
+    const brkDiv = document.getElementById('menu_breakdown');
+    const brkList= document.getElementById('menu_breakdownList');
+    const durEl  = document.getElementById('menu_totalDuration');
+    const costEl = document.getElementById('menu_totalCost');
+
+    if (!brkDiv) return; // menu tab not yet in DOM
+
+    if (subtotalCost > 0 || totalMins > 0) {
+        if (brkList) brkList.innerHTML = breakdownHtml;
+        if (taxEl) {
+            if (taxBreakdownHtml) { taxEl.innerHTML = taxBreakdownHtml; taxEl.style.display = 'block'; }
+            else taxEl.style.display = 'none';
+        }
+        if (durEl)  durEl.innerText  = totalMins;
+        if (costEl) costEl.innerText = grandTotal.toFixed(2);
+        brkDiv.style.display = 'block';
+    } else {
+        if (brkList) brkList.innerHTML = '';
+        if (taxEl)   taxEl.style.display = 'none';
+        if (durEl)   durEl.innerText  = '0';
+        if (costEl)  costEl.innerText = '0.00';
+        brkDiv.style.display = 'none';
+    }
+}
 
 // ============================================================
 //  BOOKING TOTALS & TIME SLOTS

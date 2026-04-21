@@ -404,11 +404,11 @@
         </div>
     </div>
 
-    <!-- SERVICE MENU VIEW — read-only, all roles -->
+    <!-- SERVICE MENU VIEW — interactive, all roles -->
     <div id="menuView" class="app-module">
         <div class="module-box primary-top">
             <h3>Service Menu</h3>
-            <p class="module-subtitle">Current Hand and Foot therapy offerings with pricing.</p>
+            <p class="module-subtitle">Select services to see a live cost and time breakdown.</p>
 
             <div class="dept-tabs">
                 <label><input type="radio" name="menu_view_dept_toggle" value="Hand" checked onchange="toggleMenuViewDept()"> Hand Therapy</label>
@@ -417,6 +417,24 @@
 
             <div id="menuViewReadOnly">
                 <p class="text-muted" style="text-align:center;">Loading service menu...</p>
+            </div>
+        </div>
+
+        <!-- Breakdown panel — mirrors the booking form's, scoped to this tab -->
+        <div id="menu_breakdown" class="module-box" style="display:none; border:2px dashed var(--accent);">
+            <h4 class="breakdown-heading">Selected Services</h4>
+            <div id="menu_breakdownList"></div>
+            <div id="menu_taxBreakdown" style="margin-top:10px; padding-top:10px; border-top:1px dashed #ddd; display:none;"></div>
+            <div class="breakdown-total-row" style="margin-top:12px;">
+                <span>Total</span>
+                <span>
+                    <span id="menu_totalDuration" class="text-accent">0</span> mins
+                    &nbsp;·&nbsp;
+                    <span id="menu_totalCost" class="text-success">0.00</span> GHC
+                </span>
+            </div>
+            <div style="text-align:right; margin-top:12px;">
+                <button class="btn btn-ghost btn-auto btn-sm" onclick="clearMenuSelections()">Clear</button>
             </div>
         </div>
     </div>
