@@ -557,10 +557,20 @@ function fetchLiveMenu(hasEditAccess) {
         // ── Build dept data structure ─────────────────────────────────────────
         // Normalise category strings (trim + collapse whitespace) so minor
         // storage inconsistencies don't create phantom duplicate sections.
+        //
+        // CATEGORY ALIASES — maps legacy / variant names to the canonical name.
+        // Services stored under an alias are merged into the canonical bucket
+        // at render time; Firestore documents are not modified.
+        const CATEGORY_ALIASES = {
+            'I. HAND THERAPIES': 'I. HAND THERAPY RITUALS',
+        };
+
         let dbData = { Hand: {}, Foot: {} };
         services.forEach(s => {
-            const rawCat = (s.category || "Uncategorized").trim().replace(/\s+/g, ' ');
-            const dept   = s.department || "Hand";
+            let rawCat = (s.category || "Uncategorized").trim().replace(/\s+/g, ' ');
+            // Apply alias: check both the exact string and an upper-cased version
+            rawCat = CATEGORY_ALIASES[rawCat] ?? CATEGORY_ALIASES[rawCat.toUpperCase()] ?? rawCat;
+            const dept = s.department || "Hand";
 
             const addTo = (d) => {
                 if (!dbData[d]) dbData[d] = {};
@@ -794,7 +804,7 @@ window.seedDefaultMenu = async function() {
     const ok = await confirm("This will inject dummy data. Proceed?");
     if (!ok) return;
     const menuItems = [
-        { dept:"Hand", cat:"I. HAND THERAPIES",        type:"radio",    name:"Youthful Touch (Hand Renewal)", dur:45, prc:220, desc:"", tag:"None" },
+        { dept:"Hand", cat:"I. HAND THERAPY RITUALS",   type:"radio",    name:"Youthful Touch (Hand Renewal)", dur:45, prc:220, desc:"", tag:"None" },
         { dept:"Hand", cat:"A. FINISHING INDULGENCES", type:"checkbox", name:"Lush Arm Sculpt",               dur:20, prc:50,  desc:"", tag:"None" }
     ];
     try {
