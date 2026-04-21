@@ -3012,6 +3012,15 @@ window.togglePromoValueLabel = function() {
         : 'Discount Amount (GHC) <span class="required-star">*</span>';
 };
 
+window.generatePromoCode = function() {
+    const chars  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const array  = new Uint8Array(6);
+    crypto.getRandomValues(array);
+    const code   = Array.from(array, b => chars[b % chars.length]).join('');
+    const input  = document.getElementById('promo_code');
+    if (input) { input.value = code; input.focus(); }
+};
+
 window.clearPromoForm = function() {
     ['promo_code','promo_desc','promo_value','promo_min_spend',
      'promo_max_uses','promo_expires'].forEach(id => {
