@@ -1604,6 +1604,7 @@ function startExpectedTodayListener() {
                             <button class="btn btn-sm btn-auto" onclick="checkInAppointment('${appt.id}', this)">Check-In</button>
                             <button class="btn btn-secondary btn-sm btn-auto" onclick="editAppointment('${appt.id}')">Edit</button>
                             <button class="btn btn-secondary btn-sm btn-auto" style="color:var(--error); border-color:var(--error);" onclick="cancelAppointment('${appt.id}')">Cancel</button>
+                            <button class="btn btn-secondary btn-sm btn-auto" style="color:#888; border-color:#ccc;" onclick="markNoShow('${appt.id}')">No Show</button>
                         </div>
                     </div>`;
             });
@@ -1613,6 +1614,19 @@ function startExpectedTodayListener() {
                 : html;
         });
 }
+
+window.markNoShow = async function(id) {
+    const ok = await confirm("Mark this appointment as a No Show?");
+    if (!ok) return;
+    try {
+        await db.collection('Appointments').doc(id).update({
+            status: 'No Show',
+            noShowAt: firebase.firestore.FieldValue.serverTimestamp(),
+            noShowBy: currentUserEmail
+        });
+        toast("Appointment marked as No Show.", 'info');
+    } catch (e) { toast("Error updating appointment: " + e.message, 'error'); }
+};
 
 window.checkInAppointment = async function(id, triggerEl) {
     // Accept the button element explicitly — global `event` is deprecated
