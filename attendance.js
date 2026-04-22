@@ -93,29 +93,20 @@ window.att_loadRoster = async function() {
     }
 
     try {
-        const techEmails = techs.map(t => t.email);
-
-        // Fetch schedules + leave in parallel
-        // Leave: single where only — filter dates client-side to avoid composite index
-        const chunks = att_chunk(techEmails, 30);
-        const [schedDocs, leaveDocs] = await Promise.all([
-            Promise.all(chunks.map(c =>
-                db.collection('Staff_Schedules')
-                    .where(firebase.firestore.FieldPath.documentId(), 'in', c)
-                    .get()
-            )),
-            db.collection('Staff_Leave')
-                .where('status', '==', 'Approved')
-                .get()
+        // Fetch ALL schedules and ALL approved leave — no composite index needed
+        // With max 8 techs this is a tiny collection fetch
+        const [schedSnap, leaveSnap] = await Promise.all([
+            db.collection('Staff_Schedules').get(),
+            db.collection('Staff_Leave').where('status', '==', 'Approved').get()
         ]);
 
-        // Build schedule map
+        // Build schedule map — filter to known techs client-side
         const schedMap = {};
-        schedDocs.forEach(snap => snap.forEach(d => { schedMap[d.id] = d.data(); }));
+        schedSnap.forEach(d => { schedMap[d.id] = d.data(); });
 
         // Build leave set — filter to records covering dateStr client-side
         const onLeave = {};
-        leaveDocs.forEach(d => {
+        leaveSnap.forEach(d => {
             const l = d.data();
             if (l.startDate <= dateStr && l.endDate >= dateStr && l.techEmail) {
                 onLeave[l.techEmail] = l.type || 'Leave';
