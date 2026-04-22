@@ -696,21 +696,35 @@
                 <!-- Create block form -->
                 <div class="module-box" style="border-top:4px solid var(--error);">
                     <h3 style="color:var(--error); border-bottom-color:var(--error);">Block Calendar</h3>
-                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Prevent bookings for a full day, a time window, or a specific technician.</p>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Prevent bookings for a full day, a date range, a time window, or a specific technician.</p>
 
                     <div class="grid-2" style="margin-bottom:0;">
                         <div class="form-group">
                             <label>Block Type <span class="required-star">*</span></label>
                             <select id="att_blockType" onchange="att_onBlockTypeChange()">
                                 <option value="">Select type…</option>
-                                <option value="full_day">🔴 Full Day — no bookings at all</option>
-                                <option value="time_range">🟡 Time Range — block specific hours</option>
+                                <option value="full_day">🔴 Full Day — single date, no bookings</option>
+                                <option value="date_range">🟣 Date Range — block multiple days</option>
+                                <option value="time_range">🟡 Time Range — block specific hours on one day</option>
                                 <option value="tech_specific">🟠 Tech Specific — block one tech all day</option>
                             </select>
                         </div>
-                        <div class="form-group">
+                        <!-- Single date — shown for full_day, time_range, tech_specific -->
+                        <div class="form-group" id="att_blockSingleDateField">
                             <label>Date <span class="required-star">*</span></label>
                             <input type="date" id="att_blockDate">
+                        </div>
+                    </div>
+
+                    <!-- Date range fields — shown only for date_range -->
+                    <div id="att_blockDateRangeFields" class="grid-2" style="display:none; margin-bottom:0;">
+                        <div class="form-group">
+                            <label>Start Date <span class="required-star">*</span></label>
+                            <input type="date" id="att_blockRangeStart">
+                        </div>
+                        <div class="form-group">
+                            <label>End Date <span class="required-star">*</span></label>
+                            <input type="date" id="att_blockRangeEnd">
                         </div>
                     </div>
 
@@ -736,7 +750,7 @@
 
                     <div class="form-group">
                         <label>Reason <span style="font-weight:400; color:#999;">(internal — not shown to clients)</span></label>
-                        <input type="text" id="att_blockReason" placeholder="e.g. Training day, Equipment maintenance…">
+                        <input type="text" id="att_blockReason" placeholder="e.g. Public holiday, Training week, Equipment maintenance…">
                     </div>
 
                     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">

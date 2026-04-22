@@ -881,41 +881,59 @@ function att_initBlocks() {
 }
 
 window.att_saveBlock = async function() {
-    const type      = document.getElementById('att_blockType')?.value;
-    const dateStr   = document.getElementById('att_blockDate')?.value;
-    const startTime = document.getElementById('att_blockStart')?.value;
-    const endTime   = document.getElementById('att_blockEnd')?.value;
-    const techEmail = document.getElementById('att_blockTech')?.value || '';
-    const reason    = document.getElementById('att_blockReason')?.value?.trim() || '';
-    const btn       = document.getElementById('btnSaveBlock');
-    const msgEl     = document.getElementById('att_blockMsg');
+    const type       = document.getElementById('att_blockType')?.value;
+    const dateStr    = document.getElementById('att_blockDate')?.value;
+    const rangeStart = document.getElementById('att_blockRangeStart')?.value;
+    const rangeEnd   = document.getElementById('att_blockRangeEnd')?.value;
+    const startTime  = document.getElementById('att_blockStart')?.value;
+    const endTime    = document.getElementById('att_blockEnd')?.value;
+    const techEmail  = document.getElementById('att_blockTech')?.value || '';
+    const reason     = document.getElementById('att_blockReason')?.value?.trim() || '';
+    const btn        = document.getElementById('btnSaveBlock');
+    const msgEl      = document.getElementById('att_blockMsg');
 
     const setMsg = (msg, ok) => { if(msgEl){ msgEl.textContent=msg; msgEl.style.color=ok?'var(--success)':'var(--error)'; } };
 
-    if (!type)    { setMsg('Select a block type.', false); return; }
-    if (!dateStr) { setMsg('Select a date.', false); return; }
-    if (type === 'time_range' && (!startTime || !endTime)) { setMsg('Select start and end times for a time range block.', false); return; }
-    if (type === 'time_range' && endTime <= startTime) { setMsg('End time must be after start time.', false); return; }
+    if (!type) { setMsg('Select a block type.', false); return; }
+
+    if (type === 'date_range') {
+        if (!rangeStart || !rangeEnd) { setMsg('Select start and end dates for the date range.', false); return; }
+        if (rangeEnd < rangeStart)    { setMsg('End date must be after start date.', false); return; }
+    } else {
+        if (!dateStr) { setMsg('Select a date.', false); return; }
+    }
+    if (type === 'time_range' && (!startTime || !endTime)) { setMsg('Select start and end times.', false); return; }
+    if (type === 'time_range' && endTime <= startTime)      { setMsg('End time must be after start time.', false); return; }
 
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
         await db.collection('Calendar_Blocks').add({
-            type, dateString: dateStr,
-            startTime: type === 'time_range' ? startTime : '',
-            endTime:   type === 'time_range' ? endTime   : '',
+            type,
+            // Single date fields
+            dateString:  (type !== 'date_range') ? dateStr : '',
+            // Date range fields
+            rangeStart:  type === 'date_range' ? rangeStart : '',
+            rangeEnd:    type === 'date_range' ? rangeEnd   : '',
+            // Time fields
+            startTime:   type === 'time_range' ? startTime : '',
+            endTime:     type === 'time_range' ? endTime   : '',
             techEmail,
             reason,
             createdBy: typeof currentUserEmail !== 'undefined' ? currentUserEmail : '',
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+
         setMsg('✓ Block saved.', true);
+
         // Reset form
-        ['att_blockDate','att_blockStart','att_blockEnd','att_blockReason'].forEach(id => {
+        ['att_blockDate','att_blockRangeStart','att_blockRangeEnd',
+         'att_blockStart','att_blockEnd','att_blockReason'].forEach(id => {
             const el = document.getElementById(id); if(el) el.value = '';
         });
         const typeEl = document.getElementById('att_blockType');
-        if (typeEl) typeEl.value = '';
+        if (typeEl) { typeEl.value = ''; att_onBlockTypeChange(); }
         att_loadBlocks();
+
     } catch(e) {
         setMsg('Error: ' + e.message, false);
     } finally {
@@ -928,28 +946,55 @@ window.att_loadBlocks = async function() {
     if (!listEl) return;
     listEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:16px 0;">Loading…</p>';
     try {
-        const snap = await db.collection('Calendar_Blocks')
-            .where('dateString', '>=', att_todayStr())
-            .get();
+        const today = att_todayStr();
+        const snap  = await db.collection('Calendar_Blocks').get();
 
         if (snap.empty) {
             listEl.innerHTML = '<p style="color:#999;text-align:center;padding:16px 0;">No upcoming blocks.</p>';
             return;
         }
 
-        const docs = [];
+        // Filter to upcoming only — for date_range use rangeEnd, else dateString
+        let docs = [];
         snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
-        docs.sort((a, b) => (a.dateString||'').localeCompare(b.dateString||'') || (a.startTime||'').localeCompare(b.startTime||''));
+        docs = docs.filter(d => {
+            if (d.type === 'date_range') return (d.rangeEnd || '') >= today;
+            return (d.dateString || '') >= today;
+        });
 
-        const typeLabels = { full_day: '🔴 Full Day', time_range: '🟡 Time Range', tech_specific: '🟠 Tech Specific' };
+        if (!docs.length) {
+            listEl.innerHTML = '<p style="color:#999;text-align:center;padding:16px 0;">No upcoming blocks.</p>';
+            return;
+        }
+
+        // Sort by start date
+        docs.sort((a, b) => {
+            const aDate = a.type === 'date_range' ? (a.rangeStart||'') : (a.dateString||'');
+            const bDate = b.type === 'date_range' ? (b.rangeStart||'') : (b.dateString||'');
+            return aDate.localeCompare(bDate);
+        });
+
+        const typeLabels = {
+            full_day:     '🔴 Full Day',
+            date_range:   '🟣 Date Range',
+            time_range:   '🟡 Time Range',
+            tech_specific:'🟠 Tech Specific'
+        };
 
         listEl.innerHTML = docs.map(d => {
             const label = typeLabels[d.type] || d.type;
+            let dateDisplay = '';
+            if (d.type === 'date_range') {
+                dateDisplay = `${att_fmtDate(d.rangeStart)} – ${att_fmtDate(d.rangeEnd)}`;
+            } else {
+                dateDisplay = att_fmtDate(d.dateString);
+            }
             const times = d.type === 'time_range' ? ` · ${att_fmt12(d.startTime)} – ${att_fmt12(d.endTime)}` : '';
-            const tech  = d.techEmail ? ` · ${d.techEmail}` : ' · All techs';
+            const tech  = d.techEmail ? ` · ${d.techEmail}` : (d.type === 'tech_specific' || d.type === 'time_range' ? ' · All techs' : '');
+
             return `<div style="border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:8px;background:white;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                 <div>
-                    <span style="font-weight:700;color:var(--primary);font-size:0.88rem;">${att_fmtDate(d.dateString)}</span>
+                    <span style="font-weight:700;color:var(--primary);font-size:0.88rem;">${dateDisplay}</span>
                     <span style="margin-left:8px;font-size:0.8rem;color:#666;">${label}${times}${tech}</span>
                     ${d.reason ? `<p style="margin:4px 0 0;font-size:0.78rem;color:#999;font-style:italic;">${d.reason}</p>` : ''}
                 </div>
@@ -970,13 +1015,22 @@ window.att_deleteBlock = async function(id) {
     catch(e) { alert('Error: ' + e.message); }
 };
 
-// Toggle time range fields based on block type
+// Toggle fields based on block type
 window.att_onBlockTypeChange = function() {
-    const type = document.getElementById('att_blockType')?.value;
-    const timeFields = document.getElementById('att_blockTimeFields');
-    const techField  = document.getElementById('att_blockTechField');
-    if (timeFields) timeFields.style.display = type === 'time_range' ? 'grid' : 'none';
-    if (techField)  techField.style.display  = (type === 'time_range' || type === 'tech_specific') ? 'block' : 'none';
+    const type            = document.getElementById('att_blockType')?.value;
+    const singleDateField = document.getElementById('att_blockSingleDateField');
+    const dateRangeFields = document.getElementById('att_blockDateRangeFields');
+    const timeFields      = document.getElementById('att_blockTimeFields');
+    const techField       = document.getElementById('att_blockTechField');
+
+    // Single date shown for everything except date_range
+    if (singleDateField) singleDateField.style.display = type === 'date_range' ? 'none' : 'block';
+    // Date range shown only for date_range
+    if (dateRangeFields) dateRangeFields.style.display = type === 'date_range' ? 'grid' : 'none';
+    // Time fields shown only for time_range
+    if (timeFields)      timeFields.style.display      = type === 'time_range'  ? 'grid' : 'none';
+    // Tech field shown for time_range and tech_specific
+    if (techField)       techField.style.display       = (type === 'time_range' || type === 'tech_specific') ? 'block' : 'none';
 };
 
 console.log('Thuraya Calendar Blocks module loaded.');
