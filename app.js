@@ -143,6 +143,7 @@ auth.onAuthStateChanged(async (user) => {
                     document.getElementById('tabMenuSettings').style.display = 'flex';
                 }
                 if(isAdmin || isManager) { document.getElementById('tabHR').style.display = 'flex'; }
+                if(isAdmin || isManager) { document.getElementById('tabAttendance').style.display = 'flex'; }
                 if(isAdmin || isManager || isSupply) { document.getElementById('tabSupply').style.display = 'flex'; }
                 
                 if(isAdmin) { 

@@ -64,6 +64,10 @@
                 <input type="radio" name="main_nav" id="nav_hr" value="hrView" onchange="switchModule(this.value)">
                 <label for="nav_hr">👥 HR & Finance</label>
             </div>
+            <div class="nav-tab" id="tabAttendance">
+                <input type="radio" name="main_nav" id="nav_attendance" value="attendanceView" onchange="switchModule(this.value)">
+                <label for="nav_attendance">🗓 Attendance</label>
+            </div>
             <div class="nav-tab" id="tabSupply">
                 <input type="radio" name="main_nav" id="nav_supply" value="supplyView" onchange="switchModule(this.value)">
                 <label for="nav_supply">📦 Supply Chain</label>
@@ -527,6 +531,162 @@
             </div>
         </div>
 
+        <!-- ── ATTENDANCE MODULE ──────────────────────────────── -->
+        <div id="attendanceView" class="app-module">
+
+            <div class="category-tabs" style="margin-bottom:20px;">
+                <label><input type="radio" name="att_sub" value="att_roster"   checked onchange="att_switchSub(this.value)"> 📅 Daily Roster</label>
+                <label><input type="radio" name="att_sub" value="att_schedule"        onchange="att_switchSub(this.value)"> ⏰ Working Hours</label>
+                <label><input type="radio" name="att_sub" value="att_leave"           onchange="att_switchSub(this.value)"> 🌿 Leave Management</label>
+                <label><input type="radio" name="att_sub" value="att_balances"        onchange="att_switchSub(this.value)"> 📊 Leave Balances</label>
+            </div>
+
+            <!-- Daily Roster -->
+            <div id="att_roster" class="att-sub">
+                <div class="module-box" style="border-top:4px solid var(--manager);">
+                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Daily Roster</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">See who is scheduled, on leave, or absent for any date.</p>
+                    <div class="grid-2" style="align-items:end; margin-bottom:20px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Date</label>
+                            <input type="date" id="att_rosterDate" onchange="att_loadRoster()">
+                        </div>
+                        <button class="btn" style="background:var(--manager); margin-bottom:0;" onclick="att_loadRoster()">View Roster</button>
+                    </div>
+                    <div id="att_rosterList">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px 0;">Select a date to view roster.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Working Hours -->
+            <div id="att_schedule" class="att-sub" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--manager);">
+                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Working Hours</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Set working days and hours per staff member. Changes take effect from the effective date.</p>
+                    <div class="grid-2" style="align-items:end; margin-bottom:20px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Staff Member</label>
+                            <select id="att_schedTech" onchange="att_loadSchedule()">
+                                <option value="">Select staff member…</option>
+                            </select>
+                        </div>
+                        <div id="att_schedCurrentBadge" style="padding:10px; background:#eef5f9; border:1px solid #b8cddb; border-radius:4px; font-size:0.85rem; color:var(--primary); display:none;">
+                            Current: <strong id="att_schedCurrentText">—</strong>
+                        </div>
+                    </div>
+                    <div id="att_schedForm" style="display:none;">
+                        <div class="grid-3" style="margin-bottom:20px;">
+                            <div class="form-group"><label>Start Time</label><input type="time" id="att_schedStart" value="08:00"></div>
+                            <div class="form-group"><label>End Time</label><input type="time" id="att_schedEnd" value="20:00"></div>
+                            <div class="form-group"><label>Effective From</label><input type="date" id="att_schedEffective"></div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:20px;">
+                            <label>Working Days</label>
+                            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px;">
+                                <label class="att-day-label"><input type="checkbox" value="Mon" class="att-day-cb"> Mon</label>
+                                <label class="att-day-label"><input type="checkbox" value="Tue" class="att-day-cb"> Tue</label>
+                                <label class="att-day-label"><input type="checkbox" value="Wed" class="att-day-cb"> Wed</label>
+                                <label class="att-day-label"><input type="checkbox" value="Thu" class="att-day-cb"> Thu</label>
+                                <label class="att-day-label"><input type="checkbox" value="Fri" class="att-day-cb"> Fri</label>
+                                <label class="att-day-label"><input type="checkbox" value="Sat" class="att-day-cb"> Sat</label>
+                                <label class="att-day-label"><input type="checkbox" value="Sun" class="att-day-cb"> Sun</label>
+                            </div>
+                        </div>
+                        <button class="btn" id="btnSaveSchedule" style="background:var(--manager); width:auto; padding:10px 25px;" onclick="att_saveSchedule()">Save Working Hours</button>
+                    </div>
+                </div>
+                <div class="module-box" id="att_schedHistoryBox" style="display:none;">
+                    <h3 style="color:var(--primary);">Schedule History</h3>
+                    <div id="att_schedHistory" style="margin-top:10px;"></div>
+                </div>
+            </div>
+
+            <!-- Leave Management -->
+            <div id="att_leave" class="att-sub" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--manager);">
+                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Submit Leave Request</h3>
+                    <div class="grid-2" style="margin-bottom:0;">
+                        <div class="form-group">
+                            <label>Staff Member <span class="required-star">*</span></label>
+                            <select id="att_leaveTech"><option value="">Select staff member…</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Leave Type <span class="required-star">*</span></label>
+                            <select id="att_leaveType">
+                                <option value="">Select type…</option>
+                                <option value="Annual Leave">Annual Leave</option>
+                                <option value="Day Off">Day Off</option>
+                                <option value="Wellness Day">Wellness Day</option>
+                                <option value="Sick Leave">Sick Leave</option>
+                                <option value="Leave Without Pay">Leave Without Pay</option>
+                                <option value="Public Holiday">Public Holiday</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Start Date <span class="required-star">*</span></label>
+                            <input type="date" id="att_leaveStart">
+                        </div>
+                        <div class="form-group">
+                            <label>End Date <span class="required-star">*</span></label>
+                            <input type="date" id="att_leaveEnd">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Note (optional)</label>
+                        <textarea id="att_leaveNote" rows="2" placeholder="Any additional context…"></textarea>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <button class="btn" id="btnSubmitLeave" style="background:var(--manager); width:auto; padding:10px 25px;" onclick="att_submitLeave()">Submit Leave Request</button>
+                        <span id="att_leaveMsg" style="font-size:0.85rem; font-weight:bold;"></span>
+                    </div>
+                </div>
+                <div class="module-box" style="border-top:4px solid var(--primary);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                        <h3 style="margin:0; border:none; padding:0; color:var(--primary);">Leave Requests</h3>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <select id="att_leaveFilter" onchange="att_loadLeaveRequests()" style="width:auto; padding:7px 10px; font-size:0.85rem;">
+                                <option value="all">All Requests</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                            <select id="att_leaveTechFilter" onchange="att_loadLeaveRequests()" style="width:auto; padding:7px 10px; font-size:0.85rem;">
+                                <option value="all">All Staff</option>
+                            </select>
+                            <button class="btn btn-secondary" style="width:auto; padding:7px 15px; font-size:0.82rem;" onclick="att_loadLeaveRequests()">Refresh</button>
+                        </div>
+                    </div>
+                    <div id="att_leaveList">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px 0;">Loading leave requests…</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leave Balances -->
+            <div id="att_balances" class="att-sub" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--manager);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                        <h3 style="margin:0; border:none; padding:0; color:var(--manager);">Leave Balances</h3>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <select id="att_balYear" onchange="att_loadBalances()" style="width:auto; padding:7px 10px; font-size:0.85rem;"></select>
+                            <button class="btn btn-secondary" style="width:auto; padding:7px 15px; font-size:0.82rem;" onclick="att_loadBalances()">Refresh</button>
+                        </div>
+                    </div>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Approved leave days consumed per staff member for the selected year.</p>
+                    <div id="att_balancesList">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px 0;">Loading balances…</p>
+                    </div>
+                </div>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Annual Entitlements</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Set the number of paid leave days each staff member is entitled to per year.</p>
+                    <div id="att_entitlementsList"></div>
+                </div>
+            </div>
+
+        </div><!-- /#attendanceView -->
+
     </div>
 
     <div id="consultationModal" class="consult-overlay">
@@ -606,5 +766,6 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
 <script src="app.js"></script>
+<script src="attendance.js"></script>
 </body>
 </html>
