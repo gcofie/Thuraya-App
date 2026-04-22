@@ -916,8 +916,17 @@ window.editMenuService = async function(id) {
         set('adv_duration',    s.duration    || '');
         set('adv_price',       s.price       || '');
         set('adv_desc',        s.desc        || s.description || '');
-        set('adv_section',     s.section     || s.category    || '');
-        set('adv_category',    s.category    || 'Hand Therapy');
+        // adv_section = the category header (e.g. "D. EMBELLISHMENTS DRAWERS")
+        set('adv_section',     s.section || s.category || '');
+
+        // adv_category = the type dropdown (Hand Therapy / Foot Therapy / Add-On)
+        // Derive from department/appliesTo since category holds the display header
+        const dept = s.department || s.appliesTo || 'Hand';
+        const catDropdown = dept === 'Foot' ? 'Foot Therapy'
+                          : dept === 'Both' ? 'Hand Therapy'
+                          : s.type === 'Add-On' ? 'Add-On'
+                          : 'Hand Therapy';
+        set('adv_category', catDropdown);
         set('adv_status',      s.status      || 'Active');
         set('adv_applies_to',  s.appliesTo   || s.department  || 'Hand');
         set('adv_tag',         s.tag         || 'None');
@@ -962,8 +971,11 @@ window.editMenuService = async function(id) {
 };
 
 window.addNewMenuServiceAdv = async function() {
+    const sectionHeader = document.getElementById('adv_section')?.value.trim() || '';
     const payload = {
-        category:    document.getElementById('adv_category')?.value    || '',
+        // `category` is the display header used by the menu engine to group services
+        // It must come from adv_section (the typed header), NOT adv_category (the dropdown)
+        category:    sectionHeader || document.getElementById('adv_category')?.value || '',
         type:        document.getElementById('adv_type')?.value        || '',
         name:        document.getElementById('adv_name')?.value.trim() || '',
         duration:    parseInt(document.getElementById('adv_duration')?.value  || '0', 10),
@@ -974,12 +986,12 @@ window.addNewMenuServiceAdv = async function() {
         desc:        document.getElementById('adv_desc')?.value.trim() || '',
         appliesTo:   document.getElementById('adv_applies_to')?.value  || 'Hand',
         selection:   document.getElementById('adv_selection')?.value   || 'Single',
-        section:     document.getElementById('adv_section')?.value.trim() || '',
+        section:     sectionHeader,
         tag:         document.getElementById('adv_tag')?.value         || 'None',
         updatedAt:   firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    // Derive inputType from selection so the booking form renders correctly
+    // Derive inputType and department from selection/appliesTo
     payload.inputType  = payload.selection === 'Single' ? 'radio' : 'checkbox';
     payload.department = payload.appliesTo;
 
