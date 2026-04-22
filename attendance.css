@@ -1,0 +1,59 @@
+/* ============================================================
+   THURAYA — Attendance Module  styles.css additions
+   Paste at the very bottom of your staff app styles.css
+   ============================================================ */
+
+/* ── Attendance badges ──────────────────────────────────────── */
+.att-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 10px;
+    border-radius: 12px;
+}
+.att-badge--working {
+    background: rgba(39,174,96,0.12);
+    color: var(--success);
+    border: 1px solid rgba(39,174,96,0.3);
+}
+.att-badge--leave {
+    background: rgba(41,128,185,0.12);
+    color: var(--manager);
+    border: 1px solid rgba(41,128,185,0.3);
+}
+.att-badge--off {
+    background: rgba(122,122,122,0.1);
+    color: #888;
+    border: 1px solid rgba(122,122,122,0.2);
+}
+
+/* ── Working days checkboxes ────────────────────────────────── */
+.att-day-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: white;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--primary);
+    transition: all 0.15s;
+    user-select: none;
+}
+.att-day-label:hover { border-color: var(--accent); }
+.att-day-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--manager);
+    cursor: pointer;
+}
+.att-day-label:has(input:checked) {
+    background: rgba(41,128,185,0.08);
+    border-color: var(--manager);
+    color: var(--manager);
+}
