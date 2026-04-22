@@ -543,6 +543,7 @@
                 <label><input type="radio" name="att_sub" value="att_schedule"        onchange="att_switchSub(this.value)"> ⏰ Working Hours</label>
                 <label><input type="radio" name="att_sub" value="att_leave"           onchange="att_switchSub(this.value)"> 🌿 Leave Management</label>
                 <label><input type="radio" name="att_sub" value="att_balances"        onchange="att_switchSub(this.value)"> 📊 Leave Balances</label>
+                <label><input type="radio" name="att_sub" value="att_blocks"          onchange="att_switchSub(this.value)"> 🚫 Calendar Blocks</label>
             </div>
 
             <!-- Daily Roster -->
@@ -688,6 +689,76 @@
                     <div id="att_entitlementsList"></div>
                 </div>
             </div>
+
+            <!-- ── CALENDAR BLOCKS ───────────────────────────────── -->
+            <div id="att_blocks" class="att-sub" style="display:none;">
+
+                <!-- Create block form -->
+                <div class="module-box" style="border-top:4px solid var(--error);">
+                    <h3 style="color:var(--error); border-bottom-color:var(--error);">Block Calendar</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Prevent bookings for a full day, a time window, or a specific technician.</p>
+
+                    <div class="grid-2" style="margin-bottom:0;">
+                        <div class="form-group">
+                            <label>Block Type <span class="required-star">*</span></label>
+                            <select id="att_blockType" onchange="att_onBlockTypeChange()">
+                                <option value="">Select type…</option>
+                                <option value="full_day">🔴 Full Day — no bookings at all</option>
+                                <option value="time_range">🟡 Time Range — block specific hours</option>
+                                <option value="tech_specific">🟠 Tech Specific — block one tech all day</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date <span class="required-star">*</span></label>
+                            <input type="date" id="att_blockDate">
+                        </div>
+                    </div>
+
+                    <!-- Time range fields — shown only for time_range -->
+                    <div id="att_blockTimeFields" class="grid-2" style="display:none; margin-bottom:0;">
+                        <div class="form-group">
+                            <label>Start Time</label>
+                            <input type="time" id="att_blockStart">
+                        </div>
+                        <div class="form-group">
+                            <label>End Time</label>
+                            <input type="time" id="att_blockEnd">
+                        </div>
+                    </div>
+
+                    <!-- Tech field — shown for time_range and tech_specific -->
+                    <div id="att_blockTechField" class="form-group" style="display:none;">
+                        <label>Technician <span style="font-weight:400; color:#999;">(leave blank to apply to all)</span></label>
+                        <select id="att_blockTech">
+                            <option value="">All technicians</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Reason <span style="font-weight:400; color:#999;">(internal — not shown to clients)</span></label>
+                        <input type="text" id="att_blockReason" placeholder="e.g. Training day, Equipment maintenance…">
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <button class="btn" id="btnSaveBlock" style="background:var(--error); width:auto; padding:10px 25px;" onclick="att_saveBlock()">
+                            Save Block
+                        </button>
+                        <span id="att_blockMsg" style="font-size:0.85rem; font-weight:bold;"></span>
+                    </div>
+                </div>
+
+                <!-- Upcoming blocks list -->
+                <div class="module-box" style="border-top:4px solid var(--primary);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                        <h3 style="margin:0; border:none; padding:0; color:var(--primary);">Upcoming Blocks</h3>
+                        <button class="btn btn-secondary" style="width:auto; padding:7px 15px; font-size:0.82rem;" onclick="att_loadBlocks()">Refresh</button>
+                    </div>
+                    <div id="att_blocksList">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:16px 0;">Loading blocks…</p>
+                    </div>
+                </div>
+
+            </div><!-- /#att_blocks -->
 
         </div><!-- /#attendanceView -->
 

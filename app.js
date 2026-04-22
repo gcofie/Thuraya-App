@@ -236,14 +236,21 @@ async function fetchAllTechs() {
             const isTestTech = safeR.some(role => role.includes('test tech'));
 
             if(isNormalTech || isTestTech) { 
-                allTechs.push({ email: doc.id, name: data.name || "Unknown", isTest: isTestTech }); 
+                allTechs.push({ 
+                    email: doc.id, 
+                    name: data.name || "Unknown", 
+                    isTest: isTestTech,
+                    // visibleToClients defaults to true if not set
+                    visibleToClients: data.visibleToClients !== false
+                }); 
             }
         });
         
         const select = document.getElementById('sched_techSelect');
         if(select) {
             select.innerHTML = '<option value="" disabled selected>Select Technician...</option>';
-            allTechs.forEach(t => { select.innerHTML += `<option value="${t.email}">${t.name}</option>`; });
+            // Staff see ALL techs regardless of visibleToClients
+            allTechs.forEach(t => { select.innerHTML += `<option value="${t.email}">${t.name}${t.visibleToClients ? '' : ' 🔒'}</option>`; });
         }
         const reassignSelect = document.getElementById('consultReassignTech');
         const consultReassign = document.getElementById('consultReassign');
@@ -1149,157 +1156,53 @@ window.bookAppointment = async function() {
     } catch(e) { alert("Error booking: " + e.message); }
 }
 
-// ── Group colour palette — 10 distinct colours for groupId colouring ──
-const GROUP_COLOURS = [
-    '#2980b9','#8e44ad','#16a085','#d35400','#c0392b',
-    '#27ae60','#f39c12','#2c3e50','#1abc9c','#e74c3c'
-];
-const _groupColourMap = {};
-let   _groupColourIdx = 0;
-function getGroupColour(groupId) {
-    if (!groupId) return 'var(--manager)';
-    if (!_groupColourMap[groupId]) {
-        _groupColourMap[groupId] = GROUP_COLOURS[_groupColourIdx % GROUP_COLOURS.length];
-        _groupColourIdx++;
-    }
-    return _groupColourMap[groupId];
-}
-
-function fmt12(timeString) {
-    const parts = (timeString || '00:00').split(':');
-    const hr = parseInt(parts[0]) || 0;
-    const min = parts[1] || '00';
-    const ampm = hr >= 12 ? 'PM' : 'AM';
-    const hr12 = hr % 12 || 12;
-    return `${hr12}:${min} ${ampm}`;
-}
-
 function startScheduleListener() {
     const listDiv = document.getElementById('upcomingScheduleList');
     try {
-        scheduleListener = db.collection('Appointments')
-            .where('status', 'in', ['Scheduled', 'Action Required'])
-            .onSnapshot(snap => {
-                if (snap.empty) {
-                    listDiv.innerHTML = '<p style="color:#999; font-style:italic;">No upcoming appointments scheduled.</p>';
-                    return;
-                }
-
-                // ── Collect & filter ──────────────────────────────
-                let allAppts = [];
-                snap.forEach(doc => {
-                    const a = doc.data();
-                    if (a.dateString >= todayDateStr || a.status === 'Action Required') {
-                        allAppts.push({ id: doc.id, ...a });
-                    }
-                });
-
-                if (!allAppts.length) {
-                    listDiv.innerHTML = '<p style="color:#999; font-style:italic;">No upcoming appointments scheduled.</p>';
-                    return;
-                }
-
-                // ── Sort by date then time ────────────────────────
-                allAppts.sort((a, b) => {
-                    const dk = (a.dateString || '').localeCompare(b.dateString || '');
-                    return dk !== 0 ? dk : (a.timeString || '').localeCompare(b.timeString || '');
-                });
-
-                // ── Separate solos and groups ─────────────────────
-                const solos  = allAppts.filter(a => !a.isGroupBooking || !a.groupId);
-                const grouped = {};
-                allAppts.filter(a => a.isGroupBooking && a.groupId).forEach(a => {
-                    if (!grouped[a.groupId]) grouped[a.groupId] = [];
-                    grouped[a.groupId].push(a);
-                });
-
-                // ── Build render list: interleave groups and solos by date/time ──
-                // Each entry is either { type:'solo', appt } or { type:'group', groupId, members[] }
-                const renderList = [];
-                solos.forEach(a => renderList.push({ type: 'solo', appt: a, sortKey: (a.dateString||'') + (a.timeString||'') }));
-                Object.entries(grouped).forEach(([groupId, members]) => {
-                    const earliest = members.reduce((a, b) => ((a.dateString||'')+(a.timeString||'')) < ((b.dateString||'')+(b.timeString||'')) ? a : b);
-                    renderList.push({ type: 'group', groupId, members, sortKey: (earliest.dateString||'') + (earliest.timeString||'') });
-                });
-                renderList.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-
-                // ── Render ────────────────────────────────────────
-                let html = '';
-
-                renderList.forEach(entry => {
-                    if (entry.type === 'solo') {
-                        const a = entry.appt;
-                        const isToday   = a.dateString === todayDateStr ? '<span class="ticket-badge" style="background:#e74c3c;">TODAY</span>' : '';
-                        const actionReq = a.status === 'Action Required' ? '<span class="ticket-badge" style="background:var(--error);margin-left:5px;">RESCHEDULE REQUESTED</span>' : '';
-                        const amt       = parseFloat(a.grandTotal || a.bookedPrice || 0).toFixed(2);
-                        html += `
-                        <div class="ticket" style="border-color:var(--manager); padding:10px;">
-                            <div style="flex-grow:1;">
-                                <h4 style="margin:0;font-size:1rem;color:var(--manager);">${a.clientName || 'Unknown'} ${isToday}${actionReq}</h4>
-                                <p style="margin:0;font-size:0.8rem;color:var(--primary);font-weight:bold;">💅 ${a.bookedService} (${a.bookedDuration} mins | ${amt} GHC)</p>
-                                <p style="margin:0;font-size:0.8rem;">📅 ${a.dateString} at ⏰ ${fmt12(a.timeString)} | Tech: ${a.assignedTechName || 'Unknown'}</p>
-                            </div>
-                            <div style="display:flex;flex-direction:column;gap:5px;">
-                                <button class="btn btn-secondary" style="width:100%;padding:5px 10px;font-size:0.75rem;" onclick="editAppointment('${a.id}')">Edit</button>
-                                <button class="btn btn-secondary" style="width:100%;padding:5px 10px;font-size:0.75rem;color:var(--error);border-color:var(--error);" onclick="cancelAppointment('${a.id}')">Cancel</button>
-                            </div>
-                        </div>`;
-
-                    } else {
-                        // ── GROUP BLOCK ───────────────────────────
-                        const { groupId, members } = entry;
-                        const colour    = getGroupColour(groupId);
-                        const refShort  = groupId.slice(0, 8).toUpperCase();
-                        const lead      = members.find(m => m.isLeadBooker) || members[0];
-                        const isToday   = lead.dateString === todayDateStr ? '<span class="ticket-badge" style="background:#e74c3c;">TODAY</span>' : '';
-                        const hasAction = members.some(m => m.status === 'Action Required');
-                        const actionReq = hasAction ? '<span class="ticket-badge" style="background:var(--error);margin-left:5px;">RESCHEDULE REQUESTED</span>' : '';
-                        const groupTotal= members.reduce((s, m) => s + parseFloat(m.grandTotal || m.bookedPrice || 0), 0).toFixed(2);
-                        const maxDur    = Math.max(...members.map(m => parseInt(m.bookedDuration) || 0));
-
-                        // Member rows
-                        const memberRows = members.map((m, i) => `
-                            <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:${colour}11;border-radius:5px;margin-bottom:4px;border-left:3px solid ${colour};">
-                                <span style="font-size:0.78rem;font-weight:700;color:${colour};min-width:16px;">${i+1}</span>
-                                <div style="flex:1;">
-                                    <span style="font-size:0.85rem;font-weight:600;color:var(--primary);">${m.clientName || 'Guest ' + (i+1)}</span>
-                                    ${m.isLeadBooker ? '<span style="font-size:0.65rem;background:'+colour+';color:white;padding:1px 6px;border-radius:10px;margin-left:6px;font-weight:700;">LEAD</span>' : ''}
-                                    <p style="margin:0;font-size:0.75rem;color:#666;">💅 ${m.bookedService} · ${m.bookedDuration} mins · ${parseFloat(m.grandTotal||m.bookedPrice||0).toFixed(2)} GHC</p>
-                                    <p style="margin:0;font-size:0.75rem;color:#666;">👩‍🔧 ${m.assignedTechName || 'To be assigned'}</p>
-                                </div>
-                                <div style="display:flex;flex-direction:column;gap:3px;">
-                                    <button class="btn btn-secondary" style="padding:3px 8px;font-size:0.7rem;width:auto;" onclick="editAppointment('${m.id}')">Edit</button>
-                                    <button class="btn btn-secondary" style="padding:3px 8px;font-size:0.7rem;width:auto;color:var(--error);border-color:var(--error);" onclick="cancelAppointment('${m.id}')">Cancel</button>
-                                </div>
-                            </div>`).join('');
-
-                        html += `
-                        <div style="border:2px solid ${colour};border-radius:8px;overflow:hidden;margin-bottom:15px;box-shadow:0 3px 10px ${colour}22;">
-                            <!-- Group header -->
-                            <div style="background:${colour};padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <span style="font-size:1.1rem;">👥</span>
-                                    <div>
-                                        <span style="font-weight:700;color:white;font-size:0.95rem;">Group of ${members.length}</span>
-                                        ${isToday}${actionReq}
-                                        <span style="font-size:0.72rem;color:${colour}22;background:rgba(255,255,255,0.25);padding:2px 8px;border-radius:10px;margin-left:6px;">REF: ${refShort}</span>
-                                    </div>
-                                </div>
-                                <div style="text-align:right;">
-                                    <p style="margin:0;color:white;font-size:0.82rem;font-weight:600;">📅 ${lead.dateString} at ⏰ ${fmt12(lead.timeString)}</p>
-                                    <p style="margin:0;color:rgba(255,255,255,0.85);font-size:0.75rem;">Session: ${maxDur} mins · Total: ${groupTotal} GHC</p>
-                                </div>
-                            </div>
-                            <!-- Member rows -->
-                            <div style="padding:10px 12px;background:white;">
-                                ${memberRows}
-                            </div>
-                        </div>`;
-                    }
-                });
-
-                listDiv.innerHTML = html;
+        scheduleListener = db.collection('Appointments').where('status', 'in', ['Scheduled', 'Action Required']).onSnapshot(snap => {
+            if(snap.empty) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No upcoming appointments scheduled.</p>'; return; }
+            
+            let allAppts = [];
+            snap.forEach(doc => {
+                let appt = doc.data();
+                if(appt.dateString >= todayDateStr || appt.status === 'Action Required') { allAppts.push({id: doc.id, ...appt}); }
             });
+
+            allAppts.sort((a, b) => {
+                let dateA = a.dateString || ""; let dateB = b.dateString || "";
+                let timeA = a.timeString || ""; let timeB = b.timeString || "";
+                if (dateA === dateB) return timeA.localeCompare(timeB);
+                return dateA.localeCompare(dateB);
+            });
+
+            if(allAppts.length === 0) { listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No upcoming appointments scheduled.</p>'; return; }
+
+            let html = '';
+            allAppts.forEach(appt => {
+                const isToday = appt.dateString === todayDateStr ? '<span class="ticket-badge" style="background:#e74c3c;">TODAY</span>' : '';
+                let actionReq = appt.status === 'Action Required' ? '<span class="ticket-badge" style="background:var(--error); margin-left:5px;">RESCHEDULE REQUESTED</span>' : '';
+                
+                let timeParts = (appt.timeString || "00:00").split(':');
+                let hr = parseInt(timeParts[0]) || 0; let min = timeParts[1] || "00";
+                let ampm = hr >= 12 ? 'PM' : 'AM'; let hr12 = hr % 12; if(hr12 === 0) hr12 = 12;
+                let displayAmt = parseFloat(appt.grandTotal || appt.bookedPrice || 0).toFixed(2);
+
+                html += `
+                    <div class="ticket" style="border-color: ${appt.status === 'Action Required' ? 'var(--error)' : 'var(--manager)'}; padding: 10px;">
+                        <div style="flex-grow:1;">
+                            <h4 style="margin:0; font-size:1rem; color:var(--manager);">${appt.clientName || 'Unknown'} ${isToday} ${actionReq}${appt.isGroupBooking ? `<span class="group-badge">👥 GROUP · ${appt.groupSize}</span>` : ''}</h4>
+                            <p style="margin:0; font-size:0.8rem; color: var(--primary); font-weight: bold;">💅 ${appt.bookedService} (${appt.bookedDuration} mins | ${displayAmt} GHC)</p>
+                            <p style="margin:0; font-size:0.8rem;">📅 ${appt.dateString} at ⏰ ${hr12}:${min} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'}</p>
+                            ${appt.isGroupBooking ? `<div class="group-member-list"><p>🔑 Group ID: <strong>${appt.groupId}</strong></p></div>` : ''}
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:5px;">
+                            <button class="btn btn-secondary" style="width:100%; padding:5px 10px; font-size:0.75rem;" onclick="editAppointment('${appt.id}')">Edit</button>
+                            <button class="btn btn-secondary" style="width:100%; padding:5px 10px; font-size:0.75rem; color:var(--error); border-color:var(--error);" onclick="cancelAppointment('${appt.id}')">Cancel</button>
+                        </div>
+                    </div>`;
+            });
+            listDiv.innerHTML = html;
+        });
     } catch(e) { console.error(e); }
 }
 
@@ -2111,7 +2014,7 @@ window.loadStaffDirectory = function() {
         const table = document.createElement('table');
         table.className = 'breakdown-table'; table.style.marginTop = '0';
         const thead = document.createElement('thead');
-        thead.innerHTML = '<tr><th>Name</th><th>Google Email</th><th>Departments</th><th style="text-align:center;">Action</th></tr>';
+        thead.innerHTML = '<tr><th>Name</th><th>Google Email</th><th>Departments</th><th style="text-align:center;">Client Visible</th><th style="text-align:center;">Action</th></tr>';
         table.appendChild(thead);
         const tbody = document.createElement('tbody');
 
@@ -2142,6 +2045,22 @@ window.loadStaffDirectory = function() {
                 let tdAction = document.createElement('td');
                 tdAction.style.textAlign = 'center'; tdAction.style.display = 'flex'; tdAction.style.gap = '5px'; tdAction.style.justifyContent = 'center';
 
+                // visibleToClients toggle — only relevant for techs
+                const isTechRow = validRoles.some(r => r.toLowerCase().includes('tech'));
+                const isVisible = data.visibleToClients !== false;
+                let tdVisible = document.createElement('td');
+                tdVisible.style.textAlign = 'center';
+                tdVisible.style.verticalAlign = 'middle';
+                if (isTechRow) {
+                    tdVisible.innerHTML = `<button onclick="window.toggleClientVisible('${email}', ${isVisible})"
+                        style="border:none; background:${isVisible ? 'var(--success)' : '#ccc'}; color:white;
+                        padding:4px 12px; border-radius:12px; cursor:pointer; font-size:0.75rem; font-weight:700;">
+                        ${isVisible ? '✓ Visible' : '✕ Hidden'}
+                    </button>`;
+                } else {
+                    tdVisible.innerHTML = '<span style="color:#ccc; font-size:0.75rem;">N/A</span>';
+                }
+
                 let btnEdit = document.createElement('button');
                 btnEdit.className = 'btn'; btnEdit.style.cssText = 'padding:5px 10px; width:auto; font-size:0.75rem; background:var(--primary);';
                 btnEdit.innerText = 'Edit'; btnEdit.onclick = function() { window.editStaff(email, name, rolesStr); };
@@ -2151,7 +2070,7 @@ window.loadStaffDirectory = function() {
                 btnRevoke.innerText = 'Del'; btnRevoke.onclick = function() { window.removeStaffAccount(email); };
 
                 tdAction.appendChild(btnEdit); tdAction.appendChild(btnRevoke);
-                tr.appendChild(tdName); tr.appendChild(tdEmail); tr.appendChild(tdRoles); tr.appendChild(tdAction);
+                tr.appendChild(tdName); tr.appendChild(tdEmail); tr.appendChild(tdRoles); tr.appendChild(tdVisible); tr.appendChild(tdAction);
                 tbody.appendChild(tr);
 
             } catch(innerErr) { console.log("Skipped corrupted user:", doc.id); }
@@ -2205,6 +2124,16 @@ window.removeStaffAccount = async function(email) {
         try { await db.collection('Users').doc(email).delete(); alert("Access revoked."); fetchAllTechs(); } 
         catch(e) { alert("Error revoking access: " + e.message); }
     }
+}
+
+window.toggleClientVisible = async function(email, currentlyVisible) {
+    const newVal = !currentlyVisible;
+    const label  = newVal ? 'visible to clients' : 'hidden from clients';
+    if (!confirm(`Set ${email} as ${label}?`)) return;
+    try {
+        await db.collection('Users').doc(email).update({ visibleToClients: newVal });
+        fetchAllTechs();
+    } catch(e) { alert('Error updating visibility: ' + e.message); }
 }
 
 // --- DYNAMIC CONSULTATION BUILDER (Form Engine) ---

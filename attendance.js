@@ -43,15 +43,18 @@ function att_populateTechDropdowns() {
     // allTechs is populated by fetchAllTechs() in app.js
     const techs = (typeof allTechs !== 'undefined' ? allTechs : []);
 
-    const selectors = ['att_schedTech', 'att_leaveTech', 'att_leaveTechFilter'];
+    const selectors = ['att_schedTech', 'att_leaveTech', 'att_leaveTechFilter', 'att_blockTech'];
     selectors.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
-        const isFilter = id === 'att_leaveTechFilter';
+        const isFilter  = id === 'att_leaveTechFilter';
+        const isOptional = id === 'att_blockTech';
         const current = el.value;
         el.innerHTML = isFilter
             ? '<option value="all">All Staff</option>'
-            : '<option value="">Select staff member…</option>';
+            : isOptional
+                ? '<option value="">All technicians</option>'
+                : '<option value="">Select staff member…</option>';
         techs.forEach(t => {
             const opt = document.createElement('option');
             opt.value = t.email;
@@ -857,3 +860,123 @@ window.myatt_showTab = function() {
 };
 
 console.log('Thuraya My Attendance module loaded.');
+
+
+// ============================================================
+//  CALENDAR BLOCKS — 5b-ii
+//  Manager blocks dates/times to prevent bookings
+// ============================================================
+
+// Add "Calendar Blocks" sub-tab to att_switchSub
+const _att_origSwitchSub = window.att_switchSub;
+window.att_switchSub = function(subId) {
+    _att_origSwitchSub(subId);
+    if (subId === 'att_blocks') att_initBlocks();
+};
+
+function att_initBlocks() {
+    const dateEl = document.getElementById('att_blockDate');
+    if (dateEl && !dateEl.value) dateEl.value = att_todayStr();
+    att_loadBlocks();
+}
+
+window.att_saveBlock = async function() {
+    const type      = document.getElementById('att_blockType')?.value;
+    const dateStr   = document.getElementById('att_blockDate')?.value;
+    const startTime = document.getElementById('att_blockStart')?.value;
+    const endTime   = document.getElementById('att_blockEnd')?.value;
+    const techEmail = document.getElementById('att_blockTech')?.value || '';
+    const reason    = document.getElementById('att_blockReason')?.value?.trim() || '';
+    const btn       = document.getElementById('btnSaveBlock');
+    const msgEl     = document.getElementById('att_blockMsg');
+
+    const setMsg = (msg, ok) => { if(msgEl){ msgEl.textContent=msg; msgEl.style.color=ok?'var(--success)':'var(--error)'; } };
+
+    if (!type)    { setMsg('Select a block type.', false); return; }
+    if (!dateStr) { setMsg('Select a date.', false); return; }
+    if (type === 'time_range' && (!startTime || !endTime)) { setMsg('Select start and end times for a time range block.', false); return; }
+    if (type === 'time_range' && endTime <= startTime) { setMsg('End time must be after start time.', false); return; }
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        await db.collection('Calendar_Blocks').add({
+            type, dateString: dateStr,
+            startTime: type === 'time_range' ? startTime : '',
+            endTime:   type === 'time_range' ? endTime   : '',
+            techEmail,
+            reason,
+            createdBy: typeof currentUserEmail !== 'undefined' ? currentUserEmail : '',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        setMsg('✓ Block saved.', true);
+        // Reset form
+        ['att_blockDate','att_blockStart','att_blockEnd','att_blockReason'].forEach(id => {
+            const el = document.getElementById(id); if(el) el.value = '';
+        });
+        const typeEl = document.getElementById('att_blockType');
+        if (typeEl) typeEl.value = '';
+        att_loadBlocks();
+    } catch(e) {
+        setMsg('Error: ' + e.message, false);
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save Block';
+    }
+};
+
+window.att_loadBlocks = async function() {
+    const listEl = document.getElementById('att_blocksList');
+    if (!listEl) return;
+    listEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:16px 0;">Loading…</p>';
+    try {
+        const snap = await db.collection('Calendar_Blocks')
+            .where('dateString', '>=', att_todayStr())
+            .get();
+
+        if (snap.empty) {
+            listEl.innerHTML = '<p style="color:#999;text-align:center;padding:16px 0;">No upcoming blocks.</p>';
+            return;
+        }
+
+        const docs = [];
+        snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => (a.dateString||'').localeCompare(b.dateString||'') || (a.startTime||'').localeCompare(b.startTime||''));
+
+        const typeLabels = { full_day: '🔴 Full Day', time_range: '🟡 Time Range', tech_specific: '🟠 Tech Specific' };
+
+        listEl.innerHTML = docs.map(d => {
+            const label = typeLabels[d.type] || d.type;
+            const times = d.type === 'time_range' ? ` · ${att_fmt12(d.startTime)} – ${att_fmt12(d.endTime)}` : '';
+            const tech  = d.techEmail ? ` · ${d.techEmail}` : ' · All techs';
+            return `<div style="border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:8px;background:white;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div>
+                    <span style="font-weight:700;color:var(--primary);font-size:0.88rem;">${att_fmtDate(d.dateString)}</span>
+                    <span style="margin-left:8px;font-size:0.8rem;color:#666;">${label}${times}${tech}</span>
+                    ${d.reason ? `<p style="margin:4px 0 0;font-size:0.78rem;color:#999;font-style:italic;">${d.reason}</p>` : ''}
+                </div>
+                <button onclick="att_deleteBlock('${d.id}')"
+                    style="background:transparent;border:1px solid var(--error);color:var(--error);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:0.78rem;flex-shrink:0;">
+                    Remove
+                </button>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        listEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:16px 0;">Error: ${e.message}</p>`;
+    }
+};
+
+window.att_deleteBlock = async function(id) {
+    if (!confirm('Remove this calendar block?')) return;
+    try { await db.collection('Calendar_Blocks').doc(id).delete(); att_loadBlocks(); }
+    catch(e) { alert('Error: ' + e.message); }
+};
+
+// Toggle time range fields based on block type
+window.att_onBlockTypeChange = function() {
+    const type = document.getElementById('att_blockType')?.value;
+    const timeFields = document.getElementById('att_blockTimeFields');
+    const techField  = document.getElementById('att_blockTechField');
+    if (timeFields) timeFields.style.display = type === 'time_range' ? 'grid' : 'none';
+    if (techField)  techField.style.display  = (type === 'time_range' || type === 'tech_specific') ? 'block' : 'none';
+};
+
+console.log('Thuraya Calendar Blocks module loaded.');
