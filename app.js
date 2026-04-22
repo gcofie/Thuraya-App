@@ -1224,6 +1224,8 @@ window.selectClientForSchedule = function(clientData) {
     document.getElementById('sched_search').value = '';
     document.getElementById('sched_searchResults').style.display = 'none';
     document.getElementById('sched_selectedClientDisplay').style.display = 'block';
+    // Open Client Intelligence Panel
+    cip_open(clientData);
 }
 
 window.selectClientForFOH = function(clientData) {
@@ -1241,6 +1243,8 @@ window.selectClientForFOH = function(clientData) {
     const msg = document.getElementById('fohSearchMsg');
     msg.innerText = "Client Loaded. You can update their details and save.";
     msg.style.color = "var(--success)";
+    // Open Client Intelligence Panel
+    cip_open(clientData);
 }
 
 window.liveClientSearchFOH = async function() {
@@ -2169,3 +2173,347 @@ function renderFormBuilderUI() {
     if(!el) return;
     el.innerHTML = consultTemplate.length ? consultTemplate.map(q => `<div style="display:flex;justify-content:space-between;padding:10px;border:1px solid #ccc;margin-bottom:5px;border-radius:4px;background:white;"><div><strong style="color:var(--primary);">${q.label}</strong> <span style="font-size:0.75rem;background:#eee;padding:2px 5px;border-radius:4px;margin-left:5px;">${q.type.toUpperCase()}</span>${q.type !== 'text' ? '<br><small style="color:#666;">Options: ' + q.options.join(', ') + '</small>' : ''}</div><button class="btn" style="background:var(--error);padding:5px 10px;width:auto;font-size:0.75rem;" onclick="deleteConsultQuestion('${q.id}')">Remove</button></div>`).join('') : '<p style="color:#999;font-style:italic;">No custom questions.</p>';
 }
+
+
+// ============================================================
+//  CLIENT INTELLIGENCE PANEL
+// ============================================================
+
+let _cip_clientData    = null;
+let _cip_allVisits     = [];
+let _cip_activeTab     = 'visits';
+
+// ── Open panel ────────────────────────────────────────────────
+window.cip_open = async function(clientData) {
+    _cip_clientData = clientData;
+    _cip_allVisits  = [];
+    _cip_activeTab  = 'visits';
+
+    const phone    = clientData.Tel_Number || '';
+    const fullName = `${clientData.Forename || ''} ${clientData.Surname || ''}`.trim() || 'Unknown Client';
+
+    // Set header
+    document.getElementById('cip_name').textContent = fullName;
+    document.getElementById('cip_sub').textContent  = `📞 ${phone}${clientData.Email ? '  ·  ✉ ' + clientData.Email : ''}`;
+
+    // Reset tabs
+    document.querySelectorAll('.cip-tab').forEach(t => t.classList.remove('cip-tab--active'));
+    document.querySelector('.cip-tab').classList.add('cip-tab--active');
+    document.querySelectorAll('[id^="cip_tab_"]').forEach(t => t.style.display = 'none');
+    document.getElementById('cip_tab_visits').style.display = 'block';
+
+    // Reset badges
+    ['cip_vipBadge','cip_lapsedBadge','cip_birthdayBadge'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+    });
+
+    // Show panel
+    document.getElementById('clientIntelPanel').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+
+    // Load data
+    await cip_loadData(phone, clientData);
+};
+
+window.cip_close = function() {
+    document.getElementById('clientIntelPanel').style.display = 'none';
+    document.body.style.overflow = '';
+};
+
+// ── Load all data ─────────────────────────────────────────────
+async function cip_loadData(phone, clientData) {
+    try {
+        // Fetch appointments + staff notes in parallel
+        const [apptSnap, notesDoc] = await Promise.all([
+            db.collection('Appointments')
+                .where('clientPhone', '==', phone)
+                .get(),
+            db.collection('Client_Notes').doc(phone).get()
+        ]);
+
+        // Build visits array — closed jobs only
+        _cip_allVisits = [];
+        apptSnap.forEach(d => {
+            const a = d.data();
+            if (['Closed','Completed'].includes(a.status)) {
+                _cip_allVisits.push({ id: d.id, ...a });
+            }
+        });
+        _cip_allVisits.sort((a, b) => (b.dateString||'').localeCompare(a.dateString||''));
+
+        // ── Compute metrics ───────────────────────────────────
+        const totalVisits = _cip_allVisits.length;
+        const totalSpend  = _cip_allVisits.reduce((s, a) => s + parseFloat(a.grandTotal || 0), 0);
+        const avgSpend    = totalVisits > 0 ? totalSpend / totalVisits : 0;
+        const thisYear    = new Date().getFullYear().toString();
+        const thisYearSpend = _cip_allVisits
+            .filter(a => (a.dateString||'').startsWith(thisYear))
+            .reduce((s, a) => s + parseFloat(a.grandTotal || 0), 0);
+        const lastVisit   = _cip_allVisits[0]?.dateString || null;
+
+        // Favourite service
+        const svcCount = {};
+        _cip_allVisits.forEach(a => {
+            const s = (a.bookedService || '').split(',')[0].trim();
+            if (s) svcCount[s] = (svcCount[s] || 0) + 1;
+        });
+        const favService = Object.entries(svcCount).sort((a,b) => b[1]-a[1])[0]?.[0] || '—';
+
+        // Favourite technician
+        const techCount = {};
+        _cip_allVisits.forEach(a => {
+            const t = a.assignedTechName || '';
+            if (t && t !== 'To be assigned') techCount[t] = (techCount[t] || 0) + 1;
+        });
+        const favTech = Object.entries(techCount).sort((a,b) => b[1]-a[1])[0]?.[0] || '—';
+
+        // Visit frequency (avg days between visits)
+        let frequency = '—';
+        if (_cip_allVisits.length >= 2) {
+            const dates = _cip_allVisits.map(a => new Date(a.dateString + 'T12:00:00')).filter(d => !isNaN(d));
+            if (dates.length >= 2) {
+                let totalGap = 0;
+                for (let i = 0; i < dates.length - 1; i++) {
+                    totalGap += Math.abs(dates[i] - dates[i+1]) / 86400000;
+                }
+                const avgDays = Math.round(totalGap / (dates.length - 1));
+                frequency = avgDays < 30 ? `${avgDays}d` : `${Math.round(avgDays/30)}mo`;
+            }
+        }
+
+        // ── Update metrics UI ─────────────────────────────────
+        document.getElementById('cip_totalVisits').textContent = totalVisits;
+        document.getElementById('cip_totalSpend').textContent  = totalSpend.toFixed(0) + ' GHC';
+        document.getElementById('cip_avgSpend').textContent    = avgSpend.toFixed(0) + ' GHC';
+        document.getElementById('cip_thisYear').textContent    = thisYearSpend.toFixed(0) + ' GHC';
+        document.getElementById('cip_lastVisit').textContent   = lastVisit ? cip_fmtDate(lastVisit) : '—';
+        document.getElementById('cip_favService').textContent  = favService.length > 12 ? favService.slice(0,12)+'…' : favService;
+        document.getElementById('cip_favTech').textContent     = favTech.split(' ')[0] || '—';
+        document.getElementById('cip_frequency').textContent   = frequency;
+
+        // ── Badges / flags ────────────────────────────────────
+        // VIP: 10+ visits or 2000+ GHC total
+        if (totalVisits >= 10 || totalSpend >= 2000) {
+            document.getElementById('cip_vipBadge').style.display = 'inline-block';
+        }
+
+        // Lapsed: no visit in 60+ days
+        if (lastVisit) {
+            const daysSince = Math.floor((new Date() - new Date(lastVisit + 'T12:00:00')) / 86400000);
+            if (daysSince >= 60) {
+                document.getElementById('cip_lapsedBadge').style.display = 'inline-block';
+            }
+        }
+
+        // Birthday: DOB on file and within 7 days
+        if (clientData.DOB) {
+            try {
+                const dob  = new Date(clientData.DOB);
+                const now  = new Date();
+                const bday = new Date(now.getFullYear(), dob.getMonth(), dob.getDate());
+                const diff = Math.ceil((bday - now) / 86400000);
+                if (diff >= 0 && diff <= 7) {
+                    document.getElementById('cip_birthdayBadge').style.display = 'inline-block';
+                }
+            } catch(e) {}
+        }
+
+        // ── Year filter ───────────────────────────────────────
+        const years = [...new Set(_cip_allVisits.map(a => (a.dateString||'').slice(0,4)).filter(Boolean))];
+        const yearSel = document.getElementById('cip_yearFilter');
+        yearSel.innerHTML = '<option value="all">All Years</option>';
+        years.forEach(y => { yearSel.innerHTML += `<option value="${y}">${y}</option>`; });
+
+        // ── Render visits ─────────────────────────────────────
+        cip_filterVisits();
+
+        // ── Staff notes ───────────────────────────────────────
+        const notes = notesDoc.exists ? (notesDoc.data().notes || '') : '';
+        document.getElementById('cip_notesInput').value = notes;
+        document.getElementById('cip_notesSaved').textContent = '';
+
+        // ── Last consultation ─────────────────────────────────
+        await cip_loadLastConsultation(phone);
+
+        // ── Alerts ────────────────────────────────────────────
+        cip_renderAlerts(clientData, totalVisits, totalSpend, lastVisit);
+
+    } catch(e) {
+        console.error('CIP error:', e);
+    }
+}
+
+// ── Visit list ────────────────────────────────────────────────
+window.cip_filterVisits = function() {
+    const year  = document.getElementById('cip_yearFilter')?.value || 'all';
+    const list  = document.getElementById('cip_visitList');
+    const visits = year === 'all'
+        ? _cip_allVisits
+        : _cip_allVisits.filter(a => (a.dateString||'').startsWith(year));
+
+    if (!visits.length) {
+        list.innerHTML = '<p style="color:#999; text-align:center; padding:20px; font-style:italic;">No visits found.</p>';
+        return;
+    }
+
+    list.innerHTML = visits.map(a => {
+        const amt  = parseFloat(a.grandTotal || 0).toFixed(2);
+        const tech = a.assignedTechName || 'Unknown';
+        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f1f1; flex-wrap:wrap; gap:6px;">
+            <div>
+                <strong style="font-size:0.88rem; color:var(--primary);">${cip_fmtDate(a.dateString)}</strong>
+                <p style="margin:2px 0; font-size:0.8rem; color:#555;">💅 ${a.bookedService || 'N/A'}</p>
+                <p style="margin:0; font-size:0.78rem; color:#999;">👩‍🔧 ${tech} · ${a.bookedDuration || 0} mins</p>
+            </div>
+            <div style="text-align:right;">
+                <strong style="color:var(--success); font-size:0.9rem;">${amt} GHC</strong>
+                ${a.isGroupBooking ? '<br><span style="font-size:0.7rem; background:var(--manager); color:white; padding:2px 6px; border-radius:8px;">GROUP</span>' : ''}
+            </div>
+        </div>`;
+    }).join('');
+};
+
+// ── Last consultation ─────────────────────────────────────────
+async function cip_loadLastConsultation(phone) {
+    const el = document.getElementById('cip_consultDisplay');
+    try {
+        // Find the most recent closed appointment with consultation data
+        const snap = await db.collection('Appointments')
+            .where('clientPhone', '==', phone)
+            .where('status', '==', 'Closed')
+            .get();
+
+        let latest = null;
+        snap.forEach(d => {
+            const a = d.data();
+            if (a.consultation && (!latest || a.dateString > latest.dateString)) {
+                latest = a;
+            }
+        });
+
+        if (!latest || !latest.consultation) {
+            el.innerHTML = '<p style="color:#999; text-align:center; padding:20px; font-style:italic;">No consultation notes on record.</p>';
+            return;
+        }
+
+        const c = latest.consultation;
+        const flaggedDate = cip_fmtDate(latest.dateString);
+        const isOld = (() => {
+            try {
+                const days = Math.floor((new Date() - new Date(latest.dateString + 'T12:00:00')) / 86400000);
+                return days > 180;
+            } catch(e) { return false; }
+        })();
+
+        el.innerHTML = `
+            <div style="background:#fafafa; border:1px solid var(--border); border-radius:6px; padding:16px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                    <p style="font-weight:700; color:var(--primary); margin:0;">Last consultation: ${flaggedDate}</p>
+                    ${isOld ? '<span style="background:var(--error); color:white; font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:700;">⚠️ OUTDATED — over 6 months ago</span>' : ''}
+                </div>
+                <div class="grid-2" style="gap:10px;">
+                    ${c.callus ? `<div><label style="font-size:0.72rem; text-transform:uppercase; color:#999; letter-spacing:1px;">Callus Level</label><p style="font-weight:600; color:var(--primary); margin:2px 0;">${c.callus}</p></div>` : ''}
+                    ${c.skin   ? `<div><label style="font-size:0.72rem; text-transform:uppercase; color:#999; letter-spacing:1px;">Skin Condition</label><p style="font-weight:600; color:var(--primary); margin:2px 0;">${c.skin}</p></div>` : ''}
+                    ${c.medical?.length ? `<div><label style="font-size:0.72rem; text-transform:uppercase; color:#999; letter-spacing:1px;">Medical Flags</label><p style="font-weight:600; color:var(--error); margin:2px 0;">⚠️ ${c.medical.join(', ')}</p></div>` : ''}
+                    ${c.allergies ? `<div><label style="font-size:0.72rem; text-transform:uppercase; color:#999; letter-spacing:1px;">Allergies</label><p style="font-weight:600; color:var(--primary); margin:2px 0;">${c.allergies}</p></div>` : ''}
+                </div>
+                ${c.notes ? `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);"><label style="font-size:0.72rem; text-transform:uppercase; color:#999; letter-spacing:1px;">Visual Mapping Notes</label><p style="color:var(--primary); margin:4px 0; font-size:0.88rem;">${c.notes}</p></div>` : ''}
+            </div>`;
+    } catch(e) {
+        el.innerHTML = `<p style="color:var(--error); text-align:center; padding:20px;">Error loading consultation: ${e.message}</p>`;
+    }
+}
+
+// ── Alerts ────────────────────────────────────────────────────
+function cip_renderAlerts(clientData, totalVisits, totalSpend, lastVisit) {
+    const el     = document.getElementById('cip_alertsList');
+    const alerts = [];
+
+    // VIP
+    if (totalVisits >= 10 || totalSpend >= 2000) {
+        alerts.push({ icon:'⭐', color:'var(--accent)', title:'VIP Client', msg:`${totalVisits} visits · ${totalSpend.toFixed(0)} GHC lifetime spend. Give priority treatment.` });
+    }
+
+    // Lapsed
+    if (lastVisit) {
+        const days = Math.floor((new Date() - new Date(lastVisit + 'T12:00:00')) / 86400000);
+        if (days >= 60) {
+            alerts.push({ icon:'💤', color:'var(--error)', title:'Lapsed Client', msg:`Last visit was ${days} days ago. Consider a re-engagement offer.` });
+        }
+    }
+
+    // Birthday
+    if (clientData.DOB) {
+        try {
+            const dob  = new Date(clientData.DOB);
+            const now  = new Date();
+            const bday = new Date(now.getFullYear(), dob.getMonth(), dob.getDate());
+            const diff = Math.ceil((bday - now) / 86400000);
+            if (diff >= 0 && diff <= 7) {
+                alerts.push({ icon:'🎂', color:'#f39c12', title:'Birthday This Week!', msg:`${clientData.Forename || 'Client'}'s birthday is ${diff === 0 ? 'today' : `in ${diff} day${diff>1?'s':''}`}. Consider a complimentary treat.` });
+            }
+        } catch(e) {}
+    }
+
+    // Medical flags from Clients collection
+    if (clientData.Medical && clientData.Medical.length) {
+        alerts.push({ icon:'⚠️', color:'var(--error)', title:'Medical Conditions on File', msg: clientData.Medical.join(', ') });
+    }
+
+    // No visit yet
+    if (totalVisits === 0) {
+        alerts.push({ icon:'🆕', color:'var(--manager)', title:'First-Time Client', msg:'No completed visits on record. Welcome them warmly!' });
+    }
+
+    if (!alerts.length) {
+        el.innerHTML = '<p style="color:#999; text-align:center; padding:20px; font-style:italic;">No alerts for this client.</p>';
+        return;
+    }
+
+    el.innerHTML = alerts.map(a => `
+        <div style="display:flex; gap:12px; padding:14px; border-left:4px solid ${a.color}; background:${a.color}11; border-radius:0 6px 6px 0; margin-bottom:10px;">
+            <span style="font-size:1.4rem;">${a.icon}</span>
+            <div>
+                <strong style="color:${a.color}; font-size:0.88rem;">${a.title}</strong>
+                <p style="margin:4px 0 0; font-size:0.82rem; color:#555;">${a.msg}</p>
+            </div>
+        </div>`).join('');
+}
+
+// ── Staff notes save ──────────────────────────────────────────
+window.cip_saveNotes = async function() {
+    const phone = _cip_clientData?.Tel_Number || '';
+    const notes = document.getElementById('cip_notesInput')?.value?.trim() || '';
+    const msgEl = document.getElementById('cip_notesSaved');
+    if (!phone) return;
+    try {
+        await db.collection('Client_Notes').doc(phone).set({
+            notes,
+            updatedBy: typeof currentUserEmail !== 'undefined' ? currentUserEmail : '',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        msgEl.textContent = '✓ Saved';
+        msgEl.style.color = 'var(--success)';
+        setTimeout(() => { msgEl.textContent = ''; }, 2000);
+    } catch(e) {
+        msgEl.textContent = 'Error: ' + e.message;
+        msgEl.style.color = 'var(--error)';
+    }
+};
+
+// ── Tab switcher ──────────────────────────────────────────────
+window.cip_switchTab = function(tab, btn) {
+    document.querySelectorAll('.cip-tab').forEach(t => t.classList.remove('cip-tab--active'));
+    btn.classList.add('cip-tab--active');
+    document.querySelectorAll('[id^="cip_tab_"]').forEach(t => t.style.display = 'none');
+    document.getElementById('cip_tab_' + tab).style.display = 'block';
+};
+
+// ── Helpers ───────────────────────────────────────────────────
+function cip_fmtDate(dateStr) {
+    if (!dateStr) return '—';
+    try { return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }); }
+    catch(e) { return dateStr; }
+}
+
+console.log('Thuraya Client Intelligence Panel loaded.');

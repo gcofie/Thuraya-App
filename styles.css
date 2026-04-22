@@ -40,7 +40,7 @@ body { background-color: var(--bg); color: var(--text); line-height: 1.6; displa
 
 /* Dynamic Navigation Tabs */
 #topNavMenu { display: none; justify-content: flex-start; gap: 10px; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid var(--border); flex-wrap: wrap; }
-.nav-tab { display: none; } 
+.nav-tab { display: none; }
 .nav-tab label { background: #f1f1f1; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #555; transition: 0.3s; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.9rem;}
 .nav-tab input[type="radio"] { display: none; }
 .nav-tab input[type="radio"]:checked + label { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -132,7 +132,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .radio-group label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #444; }
 .radio-group input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); }
 
-/* ── GROUP BOOKING ─────────────────────────────────── */
+/* ── GROUP BOOKING ──────────────────────────────────── */
 .group-badge {
     background: var(--manager);
     color: white;
@@ -155,3 +155,101 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
     color: var(--primary);
 }
 .group-member-list p { margin: 3px 0; }
+
+/* ── ATTENDANCE MODULE ───────────────────────────────── */
+.att-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 10px;
+    border-radius: 12px;
+}
+.att-badge--working {
+    background: rgba(39,174,96,0.12);
+    color: var(--success);
+    border: 1px solid rgba(39,174,96,0.3);
+}
+.att-badge--leave {
+    background: rgba(41,128,185,0.12);
+    color: var(--manager);
+    border: 1px solid rgba(41,128,185,0.3);
+}
+.att-badge--off {
+    background: rgba(122,122,122,0.1);
+    color: #888;
+    border: 1px solid rgba(122,122,122,0.2);
+}
+.att-day-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: white;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--primary);
+    transition: all 0.15s;
+    user-select: none;
+}
+.att-day-label:hover { border-color: var(--accent); }
+.att-day-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--manager);
+    cursor: pointer;
+}
+.att-day-label:has(input:checked) {
+    background: rgba(41,128,185,0.08);
+    border-color: var(--manager);
+    color: var(--manager);
+}
+
+/* ── CLIENT INTELLIGENCE PANEL ───────────────────────── */
+.cip-metric {
+    flex: 1;
+    min-width: 90px;
+    background: #f9f7f4;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-align: center;
+}
+.cip-metric-val {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.2;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cip-metric-lbl {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #7a7060;
+}
+.cip-tab {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: #888;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+}
+.cip-tab:hover { color: var(--primary); }
+.cip-tab--active {
+    color: var(--primary);
+    border-bottom-color: var(--accent);
+}
