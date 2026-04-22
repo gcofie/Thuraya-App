@@ -81,6 +81,14 @@ window.toggleAdminDeptView = function() {
     if (foot) foot.style.display = (view === 'Foot') ? 'block' : 'none';
 }
 
+window.toggleMenuViewDept = function() {
+    const view = document.querySelector('input[name="menu_view_dept_toggle"]:checked')?.value;
+    ['Hand', 'Foot'].forEach(dept => {
+        const el = document.getElementById('menu_view_dept_' + dept);
+        if (el) el.style.display = (view === dept) ? 'block' : 'none';
+    });
+}
+
 auth.onAuthStateChanged(async (user) => {
     if (user) {
         const userEmail = user.email.toLowerCase();
@@ -131,6 +139,9 @@ auth.onAuthStateChanged(async (user) => {
                 }
 
                 if(isManager || isFOH || isTech || isAdmin) { document.getElementById('tabMenu').style.display = 'flex'; }
+                if(isAdmin || isManager) { 
+                    document.getElementById('tabMenuSettings').style.display = 'flex';
+                }
                 if(isAdmin || isManager) { document.getElementById('tabHR').style.display = 'flex'; }
                 if(isAdmin || isManager || isSupply) { document.getElementById('tabSupply').style.display = 'flex'; }
                 
@@ -376,19 +387,20 @@ window.calculatePreview = function() {
 // ==========================================
 function fetchLiveMenu(hasEditAccess) {
     if (hasEditAccess) {
-        let controls = document.getElementById('managerMenuControls');
-        if (controls) controls.style.display = 'block';
         let seedBtn = document.getElementById('seedMenuBtnContainer');
         if (seedBtn) seedBtn.style.display = 'block';
     }
 
     db.collection('Menu_Services').onSnapshot(snap => {
-        const menuContainer = document.getElementById('sched_serviceMenu');
-        const adminList = document.getElementById('menuManagerList');
+        const menuContainer   = document.getElementById('sched_serviceMenu');
+        const adminList       = document.getElementById('menuManagerList');
+        const readOnlyList    = document.getElementById('menuViewReadOnly');
 
         if(snap.empty) {
-            if(adminList) adminList.innerHTML = '<p style="text-align:center; color:#999;">Menu database is empty. Manager must initialize.</p>';
-            if(menuContainer) menuContainer.innerHTML = '<p style="color:#999; font-style:italic; text-align:center;">No services available.</p>';
+            const emptyMsg = '<p style="text-align:center; color:#999; font-style:italic;">No services configured yet.</p>';
+            if(adminList)    adminList.innerHTML    = '<p style="text-align:center; color:#999;">Menu is empty. Use the form above to add services.</p>';
+            if(menuContainer)menuContainer.innerHTML = emptyMsg;
+            if(readOnlyList) readOnlyList.innerHTML  = emptyMsg;
             return;
         }
 
@@ -540,11 +552,18 @@ function fetchLiveMenu(hasEditAccess) {
             });
             
             bookingHtml += `<div class="grid-2" style="align-items:start;">${col1}${col2}</div></div>`;
-            adminHtml += `</div>`;
+            adminHtml   += `</div>`;
         });
 
-        if(adminList) adminList.innerHTML = adminHtml;
+        if(adminList)     adminList.innerHTML     = adminHtml;
         if(menuContainer) menuContainer.innerHTML = bookingHtml;
+
+        // Render read-only view for Service Menu tab (all roles)
+        // Reuse bookingHtml but swap IDs so dept toggles don't conflict
+        const readOnlyHtml = bookingHtml
+            .replace(/id="menu_dept_/g,    'id="menu_view_dept_')
+            .replace(/name="sched_base_/g, 'name="view_base_');
+        if(readOnlyList) readOnlyList.innerHTML = readOnlyHtml;
 
     }, error => {
         console.error(error);
