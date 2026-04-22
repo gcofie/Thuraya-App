@@ -68,6 +68,10 @@
                 <input type="radio" name="main_nav" id="nav_attendance" value="attendanceView" onchange="switchModule(this.value)">
                 <label for="nav_attendance">🗓 Attendance</label>
             </div>
+            <div class="nav-tab" id="tabMyAttendance">
+                <input type="radio" name="main_nav" id="nav_my_attendance" value="myAttendanceView" onchange="switchModule(this.value)">
+                <label for="nav_my_attendance">🙋 My Attendance</label>
+            </div>
             <div class="nav-tab" id="tabSupply">
                 <input type="radio" name="main_nav" id="nav_supply" value="supplyView" onchange="switchModule(this.value)">
                 <label for="nav_supply">📦 Supply Chain</label>
@@ -686,6 +690,92 @@
             </div>
 
         </div><!-- /#attendanceView -->
+
+        <!-- ── MY ATTENDANCE MODULE (all staff) ──────────────── -->
+        <div id="myAttendanceView" class="app-module">
+
+            <div class="category-tabs" style="margin-bottom:20px;">
+                <label><input type="radio" name="myatt_sub" value="myatt_schedule" checked onchange="myatt_switchSub(this.value)"> ⏰ My Schedule</label>
+                <label><input type="radio" name="myatt_sub" value="myatt_request"        onchange="myatt_switchSub(this.value)"> 🌿 Request Leave</label>
+                <label><input type="radio" name="myatt_sub" value="myatt_history"        onchange="myatt_switchSub(this.value)"> 📋 My Leave History</label>
+            </div>
+
+            <!-- My Schedule -->
+            <div id="myatt_schedule" class="myatt-sub">
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">My Working Schedule</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Your current assigned working hours and days.</p>
+                    <div id="myatt_scheduleDisplay">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px 0;">Loading your schedule…</p>
+                    </div>
+                </div>
+
+                <div class="module-box" style="border-top:4px solid var(--primary);">
+                    <h3 style="color:var(--primary);">My Leave Balance</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Your approved leave days used this year.</p>
+                    <div id="myatt_balanceDisplay">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px 0;">Loading balance…</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Request Leave -->
+            <div id="myatt_request" class="myatt-sub" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Request Leave</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Submit a leave request. Your manager will be notified to approve or reject it.</p>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Leave Type <span class="required-star">*</span></label>
+                            <select id="myatt_leaveType">
+                                <option value="">Select type…</option>
+                                <option value="Annual Leave">Annual Leave</option>
+                                <option value="Day Off">Day Off</option>
+                                <option value="Wellness Day">Wellness Day</option>
+                                <option value="Sick Leave">Sick Leave</option>
+                                <option value="Leave Without Pay">Leave Without Pay</option>
+                            </select>
+                        </div>
+                        <div></div>
+                        <div class="form-group">
+                            <label>Start Date <span class="required-star">*</span></label>
+                            <input type="date" id="myatt_leaveStart">
+                        </div>
+                        <div class="form-group">
+                            <label>End Date <span class="required-star">*</span></label>
+                            <input type="date" id="myatt_leaveEnd">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Reason / Note <span class="required-star">*</span></label>
+                        <textarea id="myatt_leaveNote" rows="3" placeholder="Briefly describe the reason for your leave request…"></textarea>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <button class="btn" id="btnMyattSubmit" style="background:var(--accent); width:auto; padding:10px 25px;" onclick="myatt_submitRequest()">
+                            Submit Request
+                        </button>
+                        <span id="myatt_submitMsg" style="font-size:0.85rem; font-weight:bold;"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Leave History -->
+            <div id="myatt_history" class="myatt-sub" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--primary);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                        <h3 style="margin:0; border:none; padding:0; color:var(--primary);">My Leave History</h3>
+                        <button class="btn btn-secondary" style="width:auto; padding:7px 15px; font-size:0.82rem;" onclick="myatt_loadHistory()">Refresh</button>
+                    </div>
+                    <div id="myatt_historyList">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px 0;">Loading your requests…</p>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /#myAttendanceView -->
 
     </div>
 

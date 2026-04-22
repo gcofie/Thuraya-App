@@ -617,3 +617,243 @@ function att_chunk(arr, size) {
 }
 
 console.log('Thuraya Attendance Module 4c+4d loaded.');
+
+
+// ============================================================
+//  MY ATTENDANCE MODULE — all staff roles
+// ============================================================
+
+const _myatt_origSwitch = window.switchModule;
+window.switchModule = function(moduleId) {
+    _myatt_origSwitch(moduleId);
+    if (moduleId === 'myAttendanceView') myatt_onOpen();
+};
+
+function myatt_onOpen() {
+    const startEl = document.getElementById('myatt_leaveStart');
+    const endEl   = document.getElementById('myatt_leaveEnd');
+    const today   = att_todayStr();
+    if (startEl) startEl.min = today;
+    if (endEl)   endEl.min   = today;
+    myatt_loadSchedule();
+    myatt_loadBalance();
+}
+
+window.myatt_switchSub = function(subId) {
+    document.querySelectorAll('.myatt-sub').forEach(el => el.style.display = 'none');
+    const target = document.getElementById(subId);
+    if (target) target.style.display = 'block';
+    if (subId === 'myatt_schedule') { myatt_loadSchedule(); myatt_loadBalance(); }
+    if (subId === 'myatt_history')  myatt_loadHistory();
+};
+
+async function myatt_loadSchedule() {
+    const el = document.getElementById('myatt_scheduleDisplay');
+    if (!el) return;
+    const email = typeof currentUserEmail !== 'undefined' ? currentUserEmail : '';
+    if (!email) { el.innerHTML = '<p style="color:var(--error);">Not signed in.</p>'; return; }
+    try {
+        const doc = await db.collection('Staff_Schedules').doc(email).get();
+        if (!doc.exists) {
+            el.innerHTML = '<div style="padding:16px;background:#fafafa;border:1px solid var(--border);border-radius:6px;color:#666;font-size:0.9rem;">No schedule assigned yet. Please contact your manager.</div>';
+            return;
+        }
+        const s = doc.data();
+        const days = (s.workingDays || []).join('  ·  ');
+        el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:16px;">
+            <div style="flex:1;min-width:180px;background:#f0f7ff;border:1px solid #b8cddb;border-radius:8px;padding:16px 20px;text-align:center;">
+                <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--manager);margin-bottom:6px;">Working Days</p>
+                <p style="font-size:1rem;font-weight:700;color:var(--primary);">${days || '—'}</p>
+            </div>
+            <div style="flex:1;min-width:140px;background:#f0f7ff;border:1px solid #b8cddb;border-radius:8px;padding:16px 20px;text-align:center;">
+                <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--manager);margin-bottom:6px;">Start Time</p>
+                <p style="font-size:1.2rem;font-weight:700;color:var(--primary);">${att_fmt12(s.startTime)}</p>
+            </div>
+            <div style="flex:1;min-width:140px;background:#f0f7ff;border:1px solid #b8cddb;border-radius:8px;padding:16px 20px;text-align:center;">
+                <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--manager);margin-bottom:6px;">End Time</p>
+                <p style="font-size:1.2rem;font-weight:700;color:var(--primary);">${att_fmt12(s.endTime)}</p>
+            </div>
+        </div>`;
+    } catch(e) {
+        el.innerHTML = `<p style="color:var(--error);">Error: ${e.message}</p>`;
+    }
+}
+
+async function myatt_loadBalance() {
+    const el = document.getElementById('myatt_balanceDisplay');
+    if (!el) return;
+    const email = typeof currentUserEmail !== 'undefined' ? currentUserEmail : '';
+    if (!email) return;
+    const year = new Date().getFullYear();
+    const yearStart = `${year}-01-01`, yearEnd = `${year}-12-31`;
+    try {
+        const [leaveSnap, entDoc] = await Promise.all([
+            db.collection('Staff_Leave').where('techEmail','==',email).where('status','==','Approved').get(),
+            db.collection('Staff_Leave_Balances').doc(email).get()
+        ]);
+        const tally = {};
+        leaveSnap.forEach(d => {
+            const l = d.data();
+            if (l.startDate < yearStart || l.startDate > yearEnd) return;
+            const days = att_daysBetween(l.startDate, l.endDate);
+            tally[l.type] = (tally[l.type] || 0) + days;
+        });
+        const entData = entDoc.exists ? entDoc.data() : {};
+        const entitled = entData[year] || entData.annualLeave || 14;
+        const annualUsed = tally['Annual Leave'] || 0;
+        const remaining  = entitled - annualUsed;
+        const remColor   = remaining < 0 ? 'var(--error)' : remaining <= 3 ? 'var(--accent)' : 'var(--success)';
+        const leaveTypes = ['Annual Leave','Day Off','Wellness Day','Sick Leave','Leave Without Pay'];
+        el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+            <div style="background:#f0fff4;border:1px solid #a3d9b1;border-radius:8px;padding:14px 20px;text-align:center;flex:1;min-width:130px;">
+                <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--success);margin-bottom:4px;">Entitlement</p>
+                <p style="font-size:1.6rem;font-weight:700;color:var(--success);">${entitled}</p>
+                <p style="font-size:0.72rem;color:#666;">days / year</p>
+            </div>
+            <div style="background:#fff8f0;border:1px solid #f0c080;border-radius:8px;padding:14px 20px;text-align:center;flex:1;min-width:130px;">
+                <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:4px;">Annual Used</p>
+                <p style="font-size:1.6rem;font-weight:700;color:var(--accent);">${annualUsed}</p>
+                <p style="font-size:0.72rem;color:#666;">days in ${year}</p>
+            </div>
+            <div style="background:#f0f7ff;border:1px solid #b8cddb;border-radius:8px;padding:14px 20px;text-align:center;flex:1;min-width:130px;">
+                <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;color:${remColor};margin-bottom:4px;">Remaining</p>
+                <p style="font-size:1.6rem;font-weight:700;color:${remColor};">${remaining}</p>
+                <p style="font-size:0.72rem;color:#666;">days left</p>
+            </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+            <thead><tr style="background:#f1f1f1;">${leaveTypes.map(t => `<th style="padding:8px 10px;text-align:center;color:var(--primary);">${t}</th>`).join('')}</tr></thead>
+            <tbody><tr>${leaveTypes.map(t => `<td style="padding:8px 10px;text-align:center;color:#555;">${tally[t]||0} day${(tally[t]||0)!==1?'s':''}</td>`).join('')}</tr></tbody>
+        </table>`;
+    } catch(e) {
+        el.innerHTML = `<p style="color:var(--error);">Error: ${e.message}</p>`;
+    }
+}
+
+window.myatt_submitRequest = async function() {
+    const type      = document.getElementById('myatt_leaveType')?.value;
+    const startDate = document.getElementById('myatt_leaveStart')?.value;
+    const endDate   = document.getElementById('myatt_leaveEnd')?.value;
+    const note      = document.getElementById('myatt_leaveNote')?.value?.trim() || '';
+    const msgEl     = document.getElementById('myatt_submitMsg');
+    const btn       = document.getElementById('btnMyattSubmit');
+    const setMsg = (msg, ok) => { if(msgEl){ msgEl.textContent=msg; msgEl.style.color=ok?'var(--success)':'var(--error)'; } };
+
+    if (!type)      { setMsg('Please select a leave type.', false); return; }
+    if (!startDate) { setMsg('Please select a start date.', false); return; }
+    if (!endDate)   { setMsg('Please select an end date.', false); return; }
+    if (endDate < startDate) { setMsg('End date cannot be before start date.', false); return; }
+    if (!note)      { setMsg('Please add a reason for your request.', false); return; }
+
+    const email = typeof currentUserEmail !== 'undefined' ? currentUserEmail : '';
+    const name  = typeof currentUserName  !== 'undefined' ? currentUserName  : email;
+    if (!email) { setMsg('Not signed in.', false); return; }
+
+    btn.disabled = true; btn.textContent = 'Submitting…';
+    try {
+        await db.collection('Staff_Leave').add({
+            techEmail: email, techName: name, type, startDate, endDate, note,
+            status: 'Pending', approvedBy: '',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        setMsg('✓ Request submitted. Your manager will review it shortly.', true);
+        ['myatt_leaveType','myatt_leaveStart','myatt_leaveEnd'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+        const noteEl = document.getElementById('myatt_leaveNote');
+        if (noteEl) noteEl.value = '';
+    } catch(e) {
+        setMsg('Error: ' + e.message, false);
+    } finally {
+        btn.disabled = false; btn.textContent = 'Submit Request';
+    }
+};
+
+window.myatt_loadHistory = async function() {
+    const el = document.getElementById('myatt_historyList');
+    if (!el) return;
+    const email = typeof currentUserEmail !== 'undefined' ? currentUserEmail : '';
+    if (!email) { el.innerHTML = '<p style="color:var(--error);">Not signed in.</p>'; return; }
+    el.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:20px 0;">Loading…</p>';
+    try {
+        const snap = await db.collection('Staff_Leave').where('techEmail','==',email).get();
+        if (snap.empty) { el.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0;">No leave requests found.</p>'; return; }
+        const docs = [];
+        snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+        docs.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
+        const statusColors = { Approved:'var(--success)', Pending:'var(--accent)', Rejected:'var(--error)' };
+        const statusIcons  = { Approved:'✓', Pending:'⏳', Rejected:'✕' };
+        el.innerHTML = docs.map(d => {
+            const days  = att_daysBetween(d.startDate, d.endDate);
+            const color = statusColors[d.status] || '#999';
+            const icon  = statusIcons[d.status]  || '?';
+            return `<div style="border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:10px;background:white;border-left:4px solid ${color};">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+                    <div>
+                        <span style="background:${color}22;color:${color};border:1px solid ${color}44;font-size:0.72rem;font-weight:700;padding:2px 9px;border-radius:10px;text-transform:uppercase;">${icon} ${d.status}</span>
+                        <span style="margin-left:8px;background:#f1f1f1;color:#555;font-size:0.72rem;padding:2px 8px;border-radius:10px;">${d.type}</span>
+                    </div>
+                    <div style="font-size:0.82rem;color:#666;text-align:right;">${att_fmtDate(d.startDate)} – ${att_fmtDate(d.endDate)} <span style="margin-left:6px;font-weight:700;color:var(--primary);">(${days} day${days!==1?'s':''})</span></div>
+                </div>
+                ${d.note ? `<p style="margin-top:8px;font-size:0.82rem;color:#666;font-style:italic;">"${d.note}"</p>` : ''}
+                ${d.status==='Rejected'&&d.rejectionNote ? `<p style="margin-top:4px;font-size:0.8rem;color:var(--error);">Manager note: ${d.rejectionNote}</p>` : ''}
+                ${d.approvedBy ? `<p style="margin-top:4px;font-size:0.75rem;color:#999;">${d.status==='Approved'?'Approved':'Actioned'} by ${d.approvedBy}</p>` : ''}
+                ${d.status==='Pending' ? `<button onclick="myatt_cancelRequest('${d.id}')" style="margin-top:8px;background:transparent;border:1px solid var(--error);color:var(--error);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:0.78rem;">Withdraw Request</button>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) {
+        el.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px 0;">Error: ${e.message}</p>`;
+    }
+};
+
+window.myatt_cancelRequest = async function(id) {
+    if (!confirm('Withdraw this leave request?')) return;
+    try { await db.collection('Staff_Leave').doc(id).delete(); myatt_loadHistory(); }
+    catch(e) { alert('Error: ' + e.message); }
+};
+
+// Manager: rejection note prompt
+const _orig_updateStatus = window.att_updateLeaveStatus;
+window.att_updateLeaveStatus = async function(id, status) {
+    if (status === 'Rejected') {
+        const note = prompt('Optional: Add a note explaining the rejection (shown to staff):') || '';
+        try {
+            await db.collection('Staff_Leave').doc(id).update({
+                status, rejectionNote: note,
+                approvedBy: typeof currentUserEmail !== 'undefined' ? currentUserEmail : '',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            att_loadLeaveRequests();
+        } catch(e) { alert('Error: ' + e.message); }
+    } else {
+        _orig_updateStatus(id, status);
+    }
+};
+
+// Manager Attendance: pending count badge
+const _att_origOpen = window.att_onModuleOpen;
+window.att_onModuleOpen = async function() {
+    _att_origOpen();
+    try {
+        const snap = await db.collection('Staff_Leave').where('status','==','Pending').get();
+        if (snap.size > 0) {
+            const leaveRadio = document.querySelector('input[value="att_leave"]');
+            if (leaveRadio) {
+                const lbl = leaveRadio.closest('label');
+                if (lbl && !lbl.querySelector('.pending-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'pending-badge';
+                    badge.textContent = snap.size;
+                    badge.style.cssText = 'background:var(--error);color:white;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;margin-left:6px;';
+                    lbl.appendChild(badge);
+                }
+            }
+        }
+    } catch(e) { /* silent */ }
+};
+
+// Expose tab show for app.js to call
+window.myatt_showTab = function() {
+    const tab = document.getElementById('tabMyAttendance');
+    if (tab) tab.style.display = 'flex';
+};
+
+console.log('Thuraya My Attendance module loaded.');
