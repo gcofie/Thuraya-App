@@ -1022,6 +1022,7 @@ window.att_onBlockTypeChange = function() {
     const dateRangeFields = document.getElementById('att_blockDateRangeFields');
     const timeFields      = document.getElementById('att_blockTimeFields');
     const techField       = document.getElementById('att_blockTechField');
+    const techLabel       = document.getElementById('att_blockTechLabel');
 
     // Single date shown for everything except date_range
     if (singleDateField) singleDateField.style.display = type === 'date_range' ? 'none' : 'block';
@@ -1029,8 +1030,14 @@ window.att_onBlockTypeChange = function() {
     if (dateRangeFields) dateRangeFields.style.display = type === 'date_range' ? 'grid' : 'none';
     // Time fields shown only for time_range
     if (timeFields)      timeFields.style.display      = type === 'time_range'  ? 'grid' : 'none';
-    // Tech field shown for time_range and tech_specific
-    if (techField)       techField.style.display       = (type === 'time_range' || type === 'tech_specific') ? 'block' : 'none';
+    // Tech field shown for time_range, tech_specific AND date_range
+    if (techField)       techField.style.display       = (type === 'time_range' || type === 'tech_specific' || type === 'date_range') ? 'block' : 'none';
+    // Update label hint for date_range — tech is required, not optional
+    if (techLabel) {
+        techLabel.textContent = type === 'date_range'
+            ? 'Technician (leave blank to block all techs)'
+            : 'Technician (leave blank to apply to all)';
+    }
 };
 
 console.log('Thuraya Calendar Blocks module loaded.');
