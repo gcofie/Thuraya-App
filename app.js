@@ -956,7 +956,7 @@ window.editMenuService = async function(id) {
 
         // Scroll to the form
         document.getElementById('managerMenuControls')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        toast(`Editing: "${s.name}" — make your changes above and click Update Service.`, 'info', 6000);
+        alert(`Editing: "${s.name}" — make your changes above and click Update Service.`);
 
     } catch (e) { alert('Error loading service: ' + e.message); }
 };
