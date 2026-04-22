@@ -96,6 +96,7 @@ window.att_loadRoster = async function() {
         const techEmails = techs.map(t => t.email);
 
         // Fetch schedules + leave in parallel
+        // Leave: single where only — filter dates client-side to avoid composite index
         const chunks = att_chunk(techEmails, 30);
         const [schedDocs, leaveDocs] = await Promise.all([
             Promise.all(chunks.map(c =>
@@ -105,7 +106,6 @@ window.att_loadRoster = async function() {
             )),
             db.collection('Staff_Leave')
                 .where('status', '==', 'Approved')
-                .where('startDate', '<=', dateStr)
                 .get()
         ]);
 
@@ -113,11 +113,11 @@ window.att_loadRoster = async function() {
         const schedMap = {};
         schedDocs.forEach(snap => snap.forEach(d => { schedMap[d.id] = d.data(); }));
 
-        // Build leave set
+        // Build leave set — filter to records covering dateStr client-side
         const onLeave = {};
         leaveDocs.forEach(d => {
             const l = d.data();
-            if (l.endDate >= dateStr && l.techEmail) {
+            if (l.startDate <= dateStr && l.endDate >= dateStr && l.techEmail) {
                 onLeave[l.techEmail] = l.type || 'Leave';
             }
         });
