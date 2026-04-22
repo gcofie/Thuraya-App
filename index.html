@@ -941,35 +941,35 @@
     <div style="background:white; max-width:860px; margin:20px auto; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,0.25); overflow:hidden;">
 
         <!-- Header -->
-        <div style="background:var(--primary); padding:20px 24px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="background:var(--primary); padding:20px 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <div>
                 <h2 id="cip_name" style="color:white; margin:0; font-size:1.3rem; letter-spacing:1px;">CLIENT HISTORY</h2>
                 <p id="cip_sub" style="color:rgba(255,255,255,0.7); margin:4px 0 0; font-size:0.85rem;"></p>
             </div>
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span id="cip_vipBadge" style="display:none; background:var(--accent); color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">⭐ VIP</span>
-                <span id="cip_lapsedBadge" style="display:none; background:var(--error); color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">💤 LAPSED</span>
-                <span id="cip_birthdayBadge" style="display:none; background:#f39c12; color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">🎂 BIRTHDAY</span>
-                <button onclick="cip_close()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center;">×</button>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span id="cip_vipBadge"      style="display:none; background:var(--accent); color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">⭐ VIP</span>
+                <span id="cip_lapsedBadge"   style="display:none; background:var(--error);  color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">💤 LAPSED</span>
+                <span id="cip_birthdayBadge" style="display:none; background:#f39c12;        color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">🎂 BIRTHDAY</span>
+                <button onclick="cip_close()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1.2rem; line-height:1; flex-shrink:0;">×</button>
             </div>
         </div>
 
         <div style="padding:24px;">
 
             <!-- Summary metrics -->
-            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:24px;" id="cip_metrics">
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:24px;">
                 <div class="cip-metric"><div class="cip-metric-val" id="cip_totalVisits">—</div><div class="cip-metric-lbl">Total Visits</div></div>
                 <div class="cip-metric"><div class="cip-metric-val" id="cip_totalSpend">—</div><div class="cip-metric-lbl">Total Spend</div></div>
                 <div class="cip-metric"><div class="cip-metric-val" id="cip_avgSpend">—</div><div class="cip-metric-lbl">Avg per Visit</div></div>
                 <div class="cip-metric"><div class="cip-metric-val" id="cip_thisYear">—</div><div class="cip-metric-lbl">This Year</div></div>
                 <div class="cip-metric"><div class="cip-metric-val" id="cip_lastVisit">—</div><div class="cip-metric-lbl">Last Visit</div></div>
                 <div class="cip-metric"><div class="cip-metric-val" id="cip_favService">—</div><div class="cip-metric-lbl">Fav Service</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_favTech">—</div><div class="cip-metric-lbl">Fav Technician</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_frequency">—</div><div class="cip-metric-lbl">Visit Frequency</div></div>
+                <div class="cip-metric"><div class="cip-metric-val" id="cip_favTech">—</div><div class="cip-metric-lbl">Fav Tech</div></div>
+                <div class="cip-metric"><div class="cip-metric-val" id="cip_frequency">—</div><div class="cip-metric-lbl">Frequency</div></div>
             </div>
 
             <!-- Tabs -->
-            <div style="display:flex; gap:6px; border-bottom:2px solid var(--border); margin-bottom:20px; flex-wrap:wrap;">
+            <div style="display:flex; gap:4px; border-bottom:2px solid var(--border); margin-bottom:20px; flex-wrap:wrap;">
                 <button class="cip-tab cip-tab--active" onclick="cip_switchTab('visits', this)">📋 Visit History</button>
                 <button class="cip-tab" onclick="cip_switchTab('consult', this)">🩺 Consultation</button>
                 <button class="cip-tab" onclick="cip_switchTab('notes', this)">📝 Staff Notes</button>
@@ -979,7 +979,7 @@
             <!-- Visit History -->
             <div id="cip_tab_visits">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-                    <p style="font-size:0.85rem; color:#666; margin:0;">All past appointments sorted newest first.</p>
+                    <p style="font-size:0.85rem; color:#666; margin:0;">All past appointments, newest first.</p>
                     <select id="cip_yearFilter" onchange="cip_filterVisits()" style="width:auto; padding:6px 10px; font-size:0.82rem; border:1px solid var(--border); border-radius:4px;">
                         <option value="all">All Years</option>
                     </select>
