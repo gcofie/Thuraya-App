@@ -877,6 +877,10 @@ window.att_switchSub = function(subId) {
 function att_initBlocks() {
     const dateEl = document.getElementById('att_blockDate');
     if (dateEl && !dateEl.value) dateEl.value = att_todayStr();
+    // Re-populate tech dropdown in case allTechs wasn't ready on module open
+    att_populateTechDropdowns();
+    // Re-trigger field visibility in case type was already selected
+    att_onBlockTypeChange();
     att_loadBlocks();
 }
 
