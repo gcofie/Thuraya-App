@@ -482,17 +482,19 @@ window.att_loadBalances = async function() {
     const yearEnd   = `${year}-12-31`;
 
     try {
-        // Get all approved leave for the year
+        // Single where clause only — filter year client-side to avoid composite index
         const snap = await db.collection('Staff_Leave')
             .where('status', '==', 'Approved')
-            .where('startDate', '>=', yearStart)
-            .where('startDate', '<=', yearEnd)
             .get();
+
+        let docs = [];
+        snap.forEach(d => docs.push(d.data()));
+        // Filter to selected year client-side
+        docs = docs.filter(d => d.startDate >= yearStart && d.startDate <= yearEnd);
 
         // Tally days per tech per type
         const tally = {};
-        snap.forEach(d => {
-            const l = d.data();
+        docs.forEach(l => {
             if (!tally[l.techEmail]) tally[l.techEmail] = {};
             const days = att_daysBetween(l.startDate, l.endDate);
             tally[l.techEmail][l.type] = (tally[l.techEmail][l.type] || 0) + days;
