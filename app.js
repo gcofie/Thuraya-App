@@ -144,6 +144,9 @@ auth.onAuthStateChanged(async (user) => {
                 }
                 if(isAdmin || isManager) { document.getElementById('tabHR').style.display = 'flex'; }
                 if(isAdmin || isManager) { document.getElementById('tabAttendance').style.display = 'flex'; }
+                if(isAdmin || isManager || isFOH || isTech || isSupply) {
+                    if(typeof myatt_showTab === 'function') myatt_showTab();
+                }
                 if(isAdmin || isManager || isSupply) { document.getElementById('tabSupply').style.display = 'flex'; }
                 
                 if(isAdmin) { 
