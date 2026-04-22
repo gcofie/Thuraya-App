@@ -143,6 +143,7 @@ auth.onAuthStateChanged(async (user) => {
                     document.getElementById('tabMenuSettings').style.display = 'flex';
                 }
                 if(isAdmin || isManager) { document.getElementById('tabHR').style.display = 'flex'; }
+                if(isAdmin || isManager) { document.getElementById('tabClientIntel').style.display = 'flex'; }
                 if(isAdmin || isManager) { document.getElementById('tabAttendance').style.display = 'flex'; }
                 if(isAdmin || isManager || isFOH || isTech || isSupply) {
                     if(typeof myatt_showTab === 'function') myatt_showTab();
@@ -2184,40 +2185,85 @@ let _cip_allVisits     = [];
 let _cip_activeTab     = 'visits';
 
 // ── Open panel ────────────────────────────────────────────────
+// ── Live search for Client Intel tab ─────────────────────────
+window.cip_liveSearch = async function() {
+    clearTimeout(window._cip_searchTimeout);
+    window._cip_searchTimeout = setTimeout(async () => {
+        const val    = document.getElementById('cip_searchInput')?.value?.toLowerCase().trim() || '';
+        const resDiv = document.getElementById('cip_searchResults');
+        if (val.length < 2) { resDiv.style.display = 'none'; return; }
+
+        // Use cached clients if available
+        if (allClientsCache.length === 0) {
+            const snap = await db.collection('Clients').get();
+            allClientsCache = [];
+            snap.forEach(d => allClientsCache.push({ id: d.id, ...d.data() }));
+        }
+
+        const matches = allClientsCache.filter(c => {
+            const name  = `${c.Forename||''} ${c.Surname||''}`.toLowerCase();
+            const phone = (c.Tel_Number||'').toLowerCase();
+            return name.includes(val) || phone.includes(val);
+        }).slice(0, 8);
+
+        if (!matches.length) { resDiv.style.display = 'none'; return; }
+
+        resDiv.innerHTML = matches.map(m => {
+            const name = `${m.Forename||''} ${m.Surname||''}`.trim() || 'Unknown';
+            return `<button class="search-result-item" onclick="cip_open(${JSON.stringify(m).replace(/"/g, '&quot;')})">
+                <strong>${name}</strong> &nbsp;·&nbsp; <span style="color:#666;">${m.Tel_Number||''}</span>
+            </button>`;
+        }).join('');
+        resDiv.style.display = 'block';
+    }, 250);
+};
+
+// ── Open panel (now works as tab section) ─────────────────────
 window.cip_open = async function(clientData) {
     _cip_clientData = clientData;
     _cip_allVisits  = [];
-    _cip_activeTab  = 'visits';
+
+    // Hide search results
+    const resDiv = document.getElementById('cip_searchResults');
+    if (resDiv) resDiv.style.display = 'none';
+    const searchInput = document.getElementById('cip_searchInput');
+    if (searchInput) {
+        const name = `${clientData.Forename||''} ${clientData.Surname||''}`.trim();
+        searchInput.value = name;
+    }
+
+    // Show panel
+    const panel = document.getElementById('cip_panel');
+    if (panel) panel.style.display = 'block';
 
     const phone    = clientData.Tel_Number || '';
     const fullName = `${clientData.Forename || ''} ${clientData.Surname || ''}`.trim() || 'Unknown Client';
 
     // Set header
-    document.getElementById('cip_name').textContent = fullName;
-    document.getElementById('cip_sub').textContent  = `📞 ${phone}${clientData.Email ? '  ·  ✉ ' + clientData.Email : ''}`;
+    const nameEl = document.getElementById('cip_name');
+    const subEl  = document.getElementById('cip_sub');
+    if (nameEl) nameEl.textContent = fullName;
+    if (subEl)  subEl.textContent  = `📞 ${phone}${clientData.Email ? '  ·  ✉ ' + clientData.Email : ''}`;
 
     // Reset tabs
     document.querySelectorAll('.cip-tab').forEach(t => t.classList.remove('cip-tab--active'));
-    document.querySelector('.cip-tab').classList.add('cip-tab--active');
+    const firstTab = document.querySelector('.cip-tab');
+    if (firstTab) firstTab.classList.add('cip-tab--active');
     document.querySelectorAll('[id^="cip_tab_"]').forEach(t => t.style.display = 'none');
-    document.getElementById('cip_tab_visits').style.display = 'block';
+    const visitsTab = document.getElementById('cip_tab_visits');
+    if (visitsTab) visitsTab.style.display = 'block';
 
     // Reset badges
     ['cip_vipBadge','cip_lapsedBadge','cip_birthdayBadge'].forEach(id => {
-        document.getElementById(id).style.display = 'none';
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
     });
 
-    // Show panel
-    document.getElementById('clientIntelPanel').style.display = 'block';
-    document.body.style.overflow = 'hidden';
+    // Scroll panel into view
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     // Load data
     await cip_loadData(phone, clientData);
-};
-
-window.cip_close = function() {
-    document.getElementById('clientIntelPanel').style.display = 'none';
-    document.body.style.overflow = '';
 };
 
 // ── Load all data ─────────────────────────────────────────────
@@ -2506,7 +2552,8 @@ window.cip_switchTab = function(tab, btn) {
     document.querySelectorAll('.cip-tab').forEach(t => t.classList.remove('cip-tab--active'));
     btn.classList.add('cip-tab--active');
     document.querySelectorAll('[id^="cip_tab_"]').forEach(t => t.style.display = 'none');
-    document.getElementById('cip_tab_' + tab).style.display = 'block';
+    const target = document.getElementById('cip_tab_' + tab);
+    if (target) target.style.display = 'block';
 };
 
 // ── Helpers ───────────────────────────────────────────────────

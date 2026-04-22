@@ -64,6 +64,10 @@
                 <input type="radio" name="main_nav" id="nav_hr" value="hrView" onchange="switchModule(this.value)">
                 <label for="nav_hr">👥 HR & Finance</label>
             </div>
+            <div class="nav-tab" id="tabClientIntel">
+                <input type="radio" name="main_nav" id="nav_client_intel" value="clientIntelView" onchange="switchModule(this.value)">
+                <label for="nav_client_intel">🔍 Client Intel</label>
+            </div>
             <div class="nav-tab" id="tabAttendance">
                 <input type="radio" name="main_nav" id="nav_attendance" value="attendanceView" onchange="switchModule(this.value)">
                 <label for="nav_attendance">🗓 Attendance</label>
@@ -862,6 +866,98 @@
 
         </div><!-- /#myAttendanceView -->
 
+        <!-- ── CLIENT INTELLIGENCE MODULE ───────────────────── -->
+        <div id="clientIntelView" class="app-module">
+
+            <!-- Search bar -->
+            <div class="module-box" style="border-top:4px solid var(--accent);">
+                <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Client Intelligence</h3>
+                <p style="font-size:0.85rem; color:#666; margin-bottom:16px;">Search for any client to view their full history, consultation notes, spend insights and alerts.</p>
+                <div class="search-box" style="max-width:500px;">
+                    <input type="text" id="cip_searchInput" placeholder="Search by name or phone number…" autocomplete="off" onkeyup="cip_liveSearch()">
+                    <button class="btn" style="width:auto;" onclick="cip_liveSearch()">Search</button>
+                    <div id="cip_searchResults" class="dropdown-results"></div>
+                </div>
+            </div>
+
+            <!-- Panel — hidden until client selected -->
+            <div id="cip_panel" style="display:none;">
+
+                <!-- Client header -->
+                <div style="background:var(--primary); border-radius:8px; padding:20px 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+                    <div>
+                        <h2 id="cip_name" style="color:white; margin:0; font-size:1.3rem; letter-spacing:1px;">—</h2>
+                        <p id="cip_sub" style="color:rgba(255,255,255,0.7); margin:4px 0 0; font-size:0.85rem;"></p>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span id="cip_vipBadge"      style="display:none; background:var(--accent); color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">⭐ VIP</span>
+                        <span id="cip_lapsedBadge"   style="display:none; background:var(--error);  color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">💤 LAPSED</span>
+                        <span id="cip_birthdayBadge" style="display:none; background:#f39c12;        color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">🎂 BIRTHDAY</span>
+                    </div>
+                </div>
+
+                <!-- Summary metrics -->
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
+                    <div class="cip-metric"><div class="cip-metric-val" id="cip_totalVisits">—</div><div class="cip-metric-lbl">Total Visits</div></div>
+                    <div class="cip-metric"><div class="cip-metric-val" id="cip_totalSpend">—</div><div class="cip-metric-lbl">Total Spend</div></div>
+                    <div class="cip-metric"><div class="cip-metric-val" id="cip_avgSpend">—</div><div class="cip-metric-lbl">Avg per Visit</div></div>
+                    <div class="cip-metric"><div class="cip-metric-val" id="cip_thisYear">—</div><div class="cip-metric-lbl">This Year</div></div>
+                    <div class="cip-metric"><div class="cip-metric-val" id="cip_lastVisit">—</div><div class="cip-metric-lbl">Last Visit</div></div>
+                    <div class="cip-metric"><div class="cip-metric-val" id="cip_favService">—</div><div class="cip-metric-lbl">Fav Service</div></div>
+                    <div class="cip-metric"><div class="cip-metric-val" id="cip_favTech">—</div><div class="cip-metric-lbl">Fav Tech</div></div>
+                    <div class="cip-metric"><div class="cip-metric-val" id="cip_frequency">—</div><div class="cip-metric-lbl">Frequency</div></div>
+                </div>
+
+                <!-- Tabs -->
+                <div style="display:flex; gap:4px; border-bottom:2px solid var(--border); margin-bottom:20px; flex-wrap:wrap;">
+                    <button class="cip-tab cip-tab--active" onclick="cip_switchTab('visits', this)">📋 Visit History</button>
+                    <button class="cip-tab" onclick="cip_switchTab('consult', this)">🩺 Consultation</button>
+                    <button class="cip-tab" onclick="cip_switchTab('notes', this)">📝 Staff Notes</button>
+                    <button class="cip-tab" onclick="cip_switchTab('alerts', this)">⚠️ Alerts</button>
+                </div>
+
+                <!-- Visit History -->
+                <div id="cip_tab_visits" class="module-box">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <p style="font-size:0.85rem; color:#666; margin:0;">All past appointments, newest first.</p>
+                        <select id="cip_yearFilter" onchange="cip_filterVisits()" style="width:auto; padding:6px 10px; font-size:0.82rem; border:1px solid var(--border); border-radius:4px;">
+                            <option value="all">All Years</option>
+                        </select>
+                    </div>
+                    <div id="cip_visitList" style="max-height:400px; overflow-y:auto;">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px;">Loading visits…</p>
+                    </div>
+                </div>
+
+                <!-- Consultation Notes -->
+                <div id="cip_tab_consult" class="module-box" style="display:none;">
+                    <div id="cip_consultDisplay">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px;">Loading consultation notes…</p>
+                    </div>
+                </div>
+
+                <!-- Staff Notes -->
+                <div id="cip_tab_notes" class="module-box" style="display:none;">
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:12px;">Internal notes visible to all staff. Not shown to the client.</p>
+                    <textarea id="cip_notesInput" rows="5" placeholder="Add notes about this client's preferences, special requirements, etc…"
+                        style="width:100%; padding:12px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; flex-wrap:wrap; gap:8px;">
+                        <span id="cip_notesSaved" style="font-size:0.82rem; font-weight:bold;"></span>
+                        <button class="btn" onclick="cip_saveNotes()" style="width:auto; padding:8px 20px; background:var(--primary);">Save Notes</button>
+                    </div>
+                </div>
+
+                <!-- Alerts -->
+                <div id="cip_tab_alerts" class="module-box" style="display:none;">
+                    <div id="cip_alertsList">
+                        <p style="color:#999; font-style:italic; text-align:center; padding:20px;">Loading alerts…</p>
+                    </div>
+                </div>
+
+            </div><!-- /#cip_panel -->
+
+        </div><!-- /#clientIntelView -->
+
     </div>
 
     <div id="consultationModal" class="consult-overlay">
@@ -935,88 +1031,6 @@
             </div>
         </div>
     </div>
-
-<!-- ── CLIENT INTELLIGENCE PANEL ─────────────────────────── -->
-<div id="clientIntelPanel" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200000; overflow-y:auto; padding:20px;">
-    <div style="background:white; max-width:860px; margin:20px auto; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,0.25); overflow:hidden;">
-
-        <!-- Header -->
-        <div style="background:var(--primary); padding:20px 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div>
-                <h2 id="cip_name" style="color:white; margin:0; font-size:1.3rem; letter-spacing:1px;">CLIENT HISTORY</h2>
-                <p id="cip_sub" style="color:rgba(255,255,255,0.7); margin:4px 0 0; font-size:0.85rem;"></p>
-            </div>
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span id="cip_vipBadge"      style="display:none; background:var(--accent); color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">⭐ VIP</span>
-                <span id="cip_lapsedBadge"   style="display:none; background:var(--error);  color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">💤 LAPSED</span>
-                <span id="cip_birthdayBadge" style="display:none; background:#f39c12;        color:white; padding:4px 12px; border-radius:12px; font-size:0.75rem; font-weight:700;">🎂 BIRTHDAY</span>
-                <button onclick="cip_close()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1.2rem; line-height:1; flex-shrink:0;">×</button>
-            </div>
-        </div>
-
-        <div style="padding:24px;">
-
-            <!-- Summary metrics -->
-            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:24px;">
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_totalVisits">—</div><div class="cip-metric-lbl">Total Visits</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_totalSpend">—</div><div class="cip-metric-lbl">Total Spend</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_avgSpend">—</div><div class="cip-metric-lbl">Avg per Visit</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_thisYear">—</div><div class="cip-metric-lbl">This Year</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_lastVisit">—</div><div class="cip-metric-lbl">Last Visit</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_favService">—</div><div class="cip-metric-lbl">Fav Service</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_favTech">—</div><div class="cip-metric-lbl">Fav Tech</div></div>
-                <div class="cip-metric"><div class="cip-metric-val" id="cip_frequency">—</div><div class="cip-metric-lbl">Frequency</div></div>
-            </div>
-
-            <!-- Tabs -->
-            <div style="display:flex; gap:4px; border-bottom:2px solid var(--border); margin-bottom:20px; flex-wrap:wrap;">
-                <button class="cip-tab cip-tab--active" onclick="cip_switchTab('visits', this)">📋 Visit History</button>
-                <button class="cip-tab" onclick="cip_switchTab('consult', this)">🩺 Consultation</button>
-                <button class="cip-tab" onclick="cip_switchTab('notes', this)">📝 Staff Notes</button>
-                <button class="cip-tab" onclick="cip_switchTab('alerts', this)">⚠️ Alerts</button>
-            </div>
-
-            <!-- Visit History -->
-            <div id="cip_tab_visits">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-                    <p style="font-size:0.85rem; color:#666; margin:0;">All past appointments, newest first.</p>
-                    <select id="cip_yearFilter" onchange="cip_filterVisits()" style="width:auto; padding:6px 10px; font-size:0.82rem; border:1px solid var(--border); border-radius:4px;">
-                        <option value="all">All Years</option>
-                    </select>
-                </div>
-                <div id="cip_visitList" style="max-height:320px; overflow-y:auto;">
-                    <p style="color:#999; font-style:italic; text-align:center; padding:20px;">Loading visits…</p>
-                </div>
-            </div>
-
-            <!-- Consultation Notes -->
-            <div id="cip_tab_consult" style="display:none;">
-                <div id="cip_consultDisplay">
-                    <p style="color:#999; font-style:italic; text-align:center; padding:20px;">Loading consultation notes…</p>
-                </div>
-            </div>
-
-            <!-- Staff Notes -->
-            <div id="cip_tab_notes" style="display:none;">
-                <p style="font-size:0.85rem; color:#666; margin-bottom:12px;">Internal notes visible to all staff. Not shown to the client.</p>
-                <textarea id="cip_notesInput" rows="5" placeholder="Add notes about this client's preferences, special requirements, etc…"
-                    style="width:100%; padding:12px; border:1px solid var(--border); border-radius:6px; font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; flex-wrap:wrap; gap:8px;">
-                    <span id="cip_notesSaved" style="font-size:0.82rem; font-weight:bold;"></span>
-                    <button class="btn" onclick="cip_saveNotes()" style="width:auto; padding:8px 20px; background:var(--primary);">Save Notes</button>
-                </div>
-            </div>
-
-            <!-- Alerts -->
-            <div id="cip_tab_alerts" style="display:none;">
-                <div id="cip_alertsList">
-                    <p style="color:#999; font-style:italic; text-align:center; padding:20px;">Loading alerts…</p>
-                </div>
-            </div>
-
-        </div>
-    </div>
-</div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
