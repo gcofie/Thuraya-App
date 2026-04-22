@@ -1002,6 +1002,9 @@ window.addNewMenuServiceAdv = async function() {
     try {
         if (_editingServiceId) {
             // UPDATE existing document
+            // Debug: show exactly what we're writing
+            const debugMsg = `Saving to Firestore:\ncategory: "${payload.category}"\ndepartment: "${payload.department}"\nname: "${payload.name}"`;
+            alert(debugMsg);
             await db.collection('Menu_Services').doc(_editingServiceId).update(payload);
             alert(`"${payload.name}" updated successfully.`);
         } else {
