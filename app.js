@@ -718,11 +718,12 @@ window.selectTimeSlot = function(timeStr, btnElement) {
 }
 
 async function generateTimeSlots() {
-    let date = document.getElementById('sched_date').value;
-    let duration = parseInt(document.getElementById('sched_totalDuration').innerText) || 0;
+    let date      = document.getElementById('sched_date').value;
+    let duration  = parseInt(document.getElementById('sched_totalDuration').innerText) || 0;
     let techEmail = document.getElementById('sched_techSelect').value;
+    let groupSize = parseInt(document.getElementById('sched_groupSize')?.value) || 1;
     let slotsContainer = document.getElementById('sched_timeSlots');
-    
+
     if (date && date < todayDateStr) {
         slotsContainer.innerHTML = '<p style="color:var(--error); font-weight:bold; margin:0;">You cannot book appointments in the past.</p>';
         return;
@@ -730,64 +731,85 @@ async function generateTimeSlots() {
 
     document.getElementById('sched_time').value = '';
 
-    if(!date || !techEmail || duration === 0) {
-        slotsContainer.innerHTML = '<p style="color:#999; font-size:0.85rem; margin:0; font-style: italic;">⚠️ Please select at least one Service, a Date, and a Technician to generate available times.</p>';
+    if (!date || !techEmail || duration === 0) {
+        slotsContainer.innerHTML = '<p style="color:#999; font-size:0.85rem; margin:0; font-style:italic;">⚠️ Please select at least one Service, a Date, and a Technician to generate available times.</p>';
         return;
     }
 
     slotsContainer.innerHTML = '<p style="color:#666; font-size:0.85rem; margin:0;">Calculating slots...</p>';
-    
+
     try {
         let snap = await db.collection('Appointments').where('dateString', '==', date).get();
 
-        let busyBlocks = []; 
+        // Build busy blocks per technician
+        let busyByTech = {};
         snap.forEach(doc => {
-            if(editingApptId && doc.id === editingApptId) return;
-
+            if (editingApptId && doc.id === editingApptId) return;
             let appt = doc.data();
-            if(appt.assignedTechEmail === techEmail && (appt.status === 'Scheduled' || appt.status === 'Arrived')) {
-                let aStart = timeToMins(appt.timeString);
-                let aEnd = aStart + parseInt(appt.bookedDuration || 0);
-                busyBlocks.push({start: aStart, end: aEnd});
+            if (appt.status === 'Scheduled' || appt.status === 'Arrived') {
+                if (!busyByTech[appt.assignedTechEmail]) busyByTech[appt.assignedTechEmail] = [];
+                busyByTech[appt.assignedTechEmail].push({
+                    start: timeToMins(appt.timeString),
+                    end:   timeToMins(appt.timeString) + parseInt(appt.bookedDuration || 0)
+                });
             }
         });
 
-        let openTime = 8 * 60; let closeTime = 20 * 60; let interval = 30; 
-        let html = '<div style="display:flex; flex-wrap:wrap; gap:10px;">';
-        let slotsFound = false;
-
+        let openTime = 8 * 60, closeTime = 20 * 60, interval = 30;
         let now = new Date();
         let currentMins = now.getHours() * 60 + now.getMinutes();
         let isToday = (date === todayDateStr);
 
-        for(let t = openTime; t + duration <= closeTime; t += interval) {
-            if (isToday && t <= currentMins) {
-                continue;
+        let html = '<div style="display:flex; flex-wrap:wrap; gap:10px;">';
+        let slotsFound = false;
+
+        for (let t = openTime; t + duration <= closeTime; t += interval) {
+            if (isToday && t <= currentMins) continue;
+
+            let slotEnd = t + duration;
+
+            if (groupSize <= 1) {
+                // INDIVIDUAL: check only the selected tech
+                let busy = busyByTech[techEmail] || [];
+                let available = busy.every(b => slotEnd <= b.start || t >= b.end);
+                if (!available) continue;
+            } else {
+                // GROUP: find how many techs (including selected) are free at this slot
+                // The selected tech must be free, plus (groupSize-1) additional techs
+                let selectedTechBusy = busyByTech[techEmail] || [];
+                let selectedFree = selectedTechBusy.every(b => slotEnd <= b.start || t >= b.end);
+                if (!selectedFree) continue; // selected tech must always be free
+
+                // Count other free techs
+                let otherFreeTechs = allTechs.filter(tech => {
+                    if (tech.email === techEmail) return false; // already counted
+                    let blocks = busyByTech[tech.email] || [];
+                    return blocks.every(b => slotEnd <= b.start || t >= b.end);
+                });
+
+                // Need (groupSize - 1) additional free techs
+                if (otherFreeTechs.length < groupSize - 1) continue;
             }
 
-            let slotStart = t; let slotEnd = t + duration; let isAvailable = true;
-
-            for(let i=0; i<busyBlocks.length; i++) {
-                let b = busyBlocks[i];
-                if(slotStart < b.end && slotEnd > b.start) { isAvailable = false; break; }
-            }
-
-            if(isAvailable) {
-                slotsFound = true;
-                let hrs = Math.floor(t / 60); let mins = t % 60; let ampm = hrs >= 12 ? 'PM' : 'AM';
-                let displayHrs = hrs % 12; if(displayHrs === 0) displayHrs = 12;
-                let displayMins = mins < 10 ? '0'+mins : mins;
-                
-                let timeString24 = `${hrs < 10 ? '0'+hrs : hrs}:${displayMins}`;
-                let timeString12 = `${displayHrs}:${displayMins} ${ampm}`;
-
-                html += `<button type="button" class="time-slot-btn" data-time="${timeString24}" onclick="selectTimeSlot('${timeString24}', this)">${timeString12}</button>`;
-            }
+            slotsFound = true;
+            let hrs = Math.floor(t / 60), mins = t % 60;
+            let ampm = hrs >= 12 ? 'PM' : 'AM';
+            let displayHrs = hrs % 12 || 12;
+            let displayMins = mins < 10 ? '0' + mins : mins;
+            let timeString24 = `${hrs < 10 ? '0'+hrs : hrs}:${displayMins}`;
+            let timeString12 = `${displayHrs}:${displayMins} ${ampm}`;
+            html += `<button type="button" class="time-slot-btn" data-time="${timeString24}" onclick="selectTimeSlot('${timeString24}', this)">${timeString12}</button>`;
         }
         html += '</div>';
 
-        if(!slotsFound) { slotsContainer.innerHTML = '<p style="color:var(--error); font-weight:bold; margin:0;">No time slots available for this duration.</p>'; } 
-        else { slotsContainer.innerHTML = html; }
+        if (!slotsFound) {
+            const msg = groupSize > 1
+                ? `<p style="color:var(--error); font-weight:bold; margin:0;">No slots available where ${groupSize} technicians are free simultaneously. Try a different date or reduce group size.</p>`
+                : '<p style="color:var(--error); font-weight:bold; margin:0;">No time slots available for this duration.</p>';
+            slotsContainer.innerHTML = msg;
+        } else {
+            slotsContainer.innerHTML = html;
+        }
 
     } catch(e) { console.error("Availability Error:", e); }
 }
@@ -1015,6 +1037,13 @@ window.cancelEditMode = function() {
     editingApptId = null;
     document.getElementById('btnConfirmBooking').innerText = "Confirm & Book Appointment";
     document.getElementById('btnCancelEdit').style.display = 'none';
+    // Reset group booking fields
+    const groupSizeEl = document.getElementById('sched_groupSize');
+    if (groupSizeEl) groupSizeEl.value = '1';
+    const groupNote = document.getElementById('groupSizeNote');
+    if (groupNote) groupNote.style.display = 'none';
+    const groupIdEl = document.getElementById('sched_groupId');
+    if (groupIdEl) groupIdEl.value = '';
     window.clearScheduleClient();
     document.getElementById('sched_date').value = '';
     document.getElementById('sched_time').value = '';
@@ -1022,41 +1051,76 @@ window.cancelEditMode = function() {
     clearAllSelections();
 }
 
+// ==========================================
+// PHASE 1 — GROUP BOOKING ENGINE
+// ==========================================
+
+/** Generate a short unique group ID: "GRP-" + 6 alphanumeric chars */
+function generateGroupId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const arr = new Uint8Array(6);
+    crypto.getRandomValues(arr);
+    return 'GRP-' + Array.from(arr, b => chars[b % chars.length]).join('');
+}
+
+/** Called when FOH changes the group size selector */
+window.onGroupSizeChange = function() {
+    const size = parseInt(document.getElementById('sched_groupSize').value) || 1;
+    const note = document.getElementById('groupSizeNote');
+    const noteCount = document.getElementById('groupSizeNoteCount');
+    if (size > 1) {
+        if (note) { note.style.display = 'block'; }
+        if (noteCount) noteCount.textContent = size;
+        // Generate a groupId if not already set
+        const groupIdEl = document.getElementById('sched_groupId');
+        if (groupIdEl && !groupIdEl.value) groupIdEl.value = generateGroupId();
+        // Re-generate slots since slot logic depends on group size
+        generateTimeSlots();
+    } else {
+        if (note) note.style.display = 'none';
+        const groupIdEl = document.getElementById('sched_groupId');
+        if (groupIdEl) groupIdEl.value = '';
+        generateTimeSlots();
+    }
+};
+
 window.bookAppointment = async function() {
-    const phone = document.getElementById('sched_phone').value;
-    const name = document.getElementById('sched_name').value;
-    const date = document.getElementById('sched_date').value;
-    const time = document.getElementById('sched_time').value;
+    const phone    = document.getElementById('sched_phone').value;
+    const name     = document.getElementById('sched_name').value;
+    const date     = document.getElementById('sched_date').value;
+    const time     = document.getElementById('sched_time').value;
     const duration = document.getElementById('sched_totalDuration').innerText;
-    
     const subtotal = document.getElementById('sched_subtotalVal').value;
-    const taxData = document.getElementById('sched_taxData').value;
+    const taxData  = document.getElementById('sched_taxData').value;
     const grandTotal = document.getElementById('sched_grandTotalVal').value;
-    
-    const techEmail = document.getElementById('sched_techSelect').value;
-    const techName = document.getElementById('sched_techSelect').options[document.getElementById('sched_techSelect').selectedIndex]?.text;
-    
+    const techEmail  = document.getElementById('sched_techSelect').value;
+    const techName   = document.getElementById('sched_techSelect').options[document.getElementById('sched_techSelect').selectedIndex]?.text;
+    const groupSize  = parseInt(document.getElementById('sched_groupSize').value) || 1;
+    const groupId    = document.getElementById('sched_groupId').value || '';
+
     let services = [];
-    
     document.querySelectorAll('.sched-service-item:checked').forEach(cb => { services.push(cb.getAttribute('data-name')); });
     document.querySelectorAll('.sched-service-counter').forEach(input => {
         let qty = parseInt(input.value) || 0;
-        if(qty > 0) { services.push(`${input.getAttribute('data-name')} (x${qty})`); }
+        if (qty > 0) services.push(`${input.getAttribute('data-name')} (x${qty})`);
     });
 
-    const serviceString = services.join(', ');
-
-    if(!phone || !name || !date || !time || !techEmail || services.length === 0) {
-        alert("Please complete the form: Select a client, at least one service, date, a technician, and an AVAILABLE TIME SLOT."); return;
+    if (!phone || !name || !date || !time || !techEmail || services.length === 0) {
+        alert("Please complete the form: Select a client, at least one service, date, a technician, and an available time slot."); return;
     }
 
     try {
         let payload = {
             clientPhone: phone, clientName: name, dateString: date, timeString: time,
             assignedTechEmail: techEmail, assignedTechName: techName,
-            bookedService: serviceString, bookedDuration: duration, 
-            bookedPrice: subtotal, taxBreakdown: taxData, grandTotal: grandTotal, 
+            bookedService: services.join(', '), bookedDuration: duration,
+            bookedPrice: subtotal, taxBreakdown: taxData, grandTotal: grandTotal,
             status: 'Scheduled', bookedBy: currentUserEmail,
+            // Group fields — present on all bookings, size=1 means individual
+            groupSize:      groupSize,
+            isGroupBooking: groupSize > 1,
+            groupId:        groupSize > 1 ? groupId : '',
+            groupRole:      groupSize > 1 ? 'lead'  : '',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -1066,11 +1130,18 @@ window.bookAppointment = async function() {
         } else {
             payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             await db.collection('Appointments').add(payload);
-            alert("Appointment successfully secured!");
+            if (groupSize > 1) {
+                alert(`Lead booking confirmed for ${name}.\n\nGroup ID: ${groupId}\n\nNow book each additional group member separately using the same Group ID: ${groupId}\nEach member's appointment will be automatically linked.`);
+                // Reset group size to 1 but keep the groupId for subsequent member bookings
+                document.getElementById('sched_groupSize').value = '1';
+                document.getElementById('groupSizeNote').style.display = 'none';
+                // Pre-fill groupId field so next booking in the group links automatically
+                // FOH can book member 2, 3 etc. without re-entering the ID
+            } else {
+                alert("Appointment successfully secured!");
+            }
         }
-        
-        cancelEditMode(); 
-        
+        cancelEditMode();
     } catch(e) { alert("Error booking: " + e.message); }
 }
 
@@ -1108,9 +1179,10 @@ function startScheduleListener() {
                 html += `
                     <div class="ticket" style="border-color: ${appt.status === 'Action Required' ? 'var(--error)' : 'var(--manager)'}; padding: 10px;">
                         <div style="flex-grow:1;">
-                            <h4 style="margin:0; font-size:1rem; color:var(--manager);">${appt.clientName || 'Unknown'} ${isToday} ${actionReq}</h4>
+                            <h4 style="margin:0; font-size:1rem; color:var(--manager);">${appt.clientName || 'Unknown'} ${isToday} ${actionReq}${appt.isGroupBooking ? `<span class="group-badge">👥 GROUP · ${appt.groupSize}</span>` : ''}</h4>
                             <p style="margin:0; font-size:0.8rem; color: var(--primary); font-weight: bold;">💅 ${appt.bookedService} (${appt.bookedDuration} mins | ${displayAmt} GHC)</p>
                             <p style="margin:0; font-size:0.8rem;">📅 ${appt.dateString} at ⏰ ${hr12}:${min} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'}</p>
+                            ${appt.isGroupBooking ? `<div class="group-member-list"><p>🔑 Group ID: <strong>${appt.groupId}</strong></p></div>` : ''}
                         </div>
                         <div style="display:flex; flex-direction:column; gap:5px;">
                             <button class="btn btn-secondary" style="width:100%; padding:5px 10px; font-size:0.75rem;" onclick="editAppointment('${appt.id}')">Edit</button>
@@ -1341,9 +1413,10 @@ function startExpectedTodayListener() {
                 html += `
                     <div class="ticket" style="border-color: var(--accent); padding: 10px; display:flex; justify-content:space-between; align-items:center;">
                         <div style="flex-grow:1;">
-                            <h4 style="margin:0; font-size:1rem;">${appt.clientName || 'Unknown'}</h4>
+                            <h4 style="margin:0; font-size:1rem;">${appt.clientName || 'Unknown'}${appt.isGroupBooking ? `<span class="group-badge">👥 GROUP · ${appt.groupSize}</span>` : ''}</h4>
                             <p style="margin:0; font-size:0.8rem; color: var(--primary);">💅 <strong>${appt.bookedService || 'N/A'}</strong></p>
                             <p style="margin:0; font-size:0.8rem;">⏰ ${hr12}:${displayMins} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'} | 📞 ${appt.clientPhone || 'N/A'}</p>
+                            ${appt.isGroupBooking ? `<div class="group-member-list"><p>🔑 Group ID: <strong>${appt.groupId}</strong></p></div>` : ''}
                         </div>
                         <div style="display:flex; flex-direction:column; gap:5px; width:80px;">
                             <button class="btn" style="width:100%; padding:5px; font-size:0.75rem;" onclick="checkInAppointment('${appt.id}')">Check-In</button>
@@ -1361,29 +1434,99 @@ function startExpectedTodayListener() {
 
 window.checkInAppointment = async function(id) {
     try {
-        const doc = await db.collection('Appointments').doc(id).get();
+        const doc  = await db.collection('Appointments').doc(id).get();
         const appt = doc.data();
-        await db.collection('Appointments').doc(id).update({ status: 'Arrived' });
 
-        const activeJobData = { 
-            clientPhone: appt.clientPhone, clientName: appt.clientName, 
-            assignedTechEmail: appt.assignedTechEmail, assignedTechName: appt.assignedTechName, 
-            bookedService: appt.bookedService || "N/A", bookedDuration: appt.bookedDuration || "0", 
-            bookedPrice: appt.bookedPrice || "0", grandTotal: appt.grandTotal || "0", taxBreakdown: appt.taxBreakdown || "[]",
-            status: "Waiting", fohCreator: currentUserEmail, 
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(), dateString: todayDateStr 
-        };
-        await db.collection("Active_Jobs").add(activeJobData);
-
-        if (GOOGLE_CHAT_WEBHOOK !== "") {
-            fetch(GOOGLE_CHAT_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: `🛎️ *Client Arrived*
-*Client:* ${appt.clientName}
-*Service:* ${appt.bookedService}
-*Assigned Tech:* ${appt.assignedTechName}
-_Please check your Dashboard._` }) }).catch(err => console.error(err));
+        // Check if this is part of a group — offer bulk check-in
+        if (appt.groupId && appt.isGroupBooking) {
+            const confirmBulk = confirm(
+                `${appt.clientName} is part of a group booking (${appt.groupId}, ${appt.groupSize} people).\n\n` +
+                `Check in ALL group members at once?\n\n` +
+                `OK = Check in entire group\nCancel = Check in this person only`
+            );
+            if (confirmBulk) {
+                await checkInGroupByGroupId(appt.groupId);
+                return;
+            }
         }
+
+        // Individual check-in
+        await _doCheckIn(id, appt);
         alert(`${appt.clientName} checked in and routed to ${appt.assignedTechName}!`);
     } catch(e) { alert("Error checking in: " + e.message); }
+}
+
+/** Check in all appointments sharing the same groupId */
+async function checkInGroupByGroupId(groupId) {
+    try {
+        const snap = await db.collection('Appointments')
+            .where('groupId', '==', groupId)
+            .where('status', '==', 'Scheduled')
+            .get();
+
+        if (snap.empty) { alert('No scheduled group members found.'); return; }
+
+        const batch = db.batch();
+        const jobPromises = [];
+
+        snap.forEach(doc => {
+            // Update appointment status
+            batch.update(doc.ref, { status: 'Arrived' });
+            // Create Active_Job for each member
+            const appt = doc.data();
+            jobPromises.push(db.collection('Active_Jobs').add({
+                clientPhone:       appt.clientPhone,
+                clientName:        appt.clientName,
+                assignedTechEmail: appt.assignedTechEmail,
+                assignedTechName:  appt.assignedTechName,
+                bookedService:     appt.bookedService  || 'N/A',
+                bookedDuration:    appt.bookedDuration || '0',
+                bookedPrice:       appt.bookedPrice    || '0',
+                grandTotal:        appt.grandTotal     || '0',
+                taxBreakdown:      appt.taxBreakdown   || '[]',
+                groupId:           appt.groupId        || '',
+                isGroupBooking:    true,
+                groupSize:         appt.groupSize      || 1,
+                status:            'Waiting',
+                fohCreator:        currentUserEmail,
+                createdAt:         firebase.firestore.FieldValue.serverTimestamp(),
+                dateString:        todayDateStr
+            }));
+        });
+
+        await batch.commit();
+        await Promise.all(jobPromises);
+        alert(`Group ${groupId} checked in — ${snap.size} member(s) routed to the floor.`);
+    } catch(e) { alert('Error checking in group: ' + e.message); }
+}
+
+/** Single appointment check-in helper */
+async function _doCheckIn(id, appt) {
+    await db.collection('Appointments').doc(id).update({ status: 'Arrived' });
+    await db.collection('Active_Jobs').add({
+        clientPhone:       appt.clientPhone,
+        clientName:        appt.clientName,
+        assignedTechEmail: appt.assignedTechEmail,
+        assignedTechName:  appt.assignedTechName,
+        bookedService:     appt.bookedService  || 'N/A',
+        bookedDuration:    appt.bookedDuration || '0',
+        bookedPrice:       appt.bookedPrice    || '0',
+        grandTotal:        appt.grandTotal     || '0',
+        taxBreakdown:      appt.taxBreakdown   || '[]',
+        groupId:           appt.groupId        || '',
+        isGroupBooking:    appt.isGroupBooking  || false,
+        groupSize:         appt.groupSize       || 1,
+        status:            'Waiting',
+        fohCreator:        currentUserEmail,
+        createdAt:         firebase.firestore.FieldValue.serverTimestamp(),
+        dateString:        todayDateStr
+    });
+    if (GOOGLE_CHAT_WEBHOOK !== "") {
+        fetch(GOOGLE_CHAT_WEBHOOK, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: `🛎️ *Client Arrived*\n*Client:* ${appt.clientName}\n*Service:* ${appt.bookedService}\n*Assigned Tech:* ${appt.assignedTechName}\n_Please check your Dashboard._` })
+        }).catch(err => console.error(err));
+    }
 }
 
 // ==========================================
