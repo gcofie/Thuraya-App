@@ -912,32 +912,29 @@ window.editMenuService = async function(id) {
 
         // Pre-fill every field in the Add New Service form
         const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val ?? ''; };
-        set('adv_name',        s.name        || '');
-        set('adv_duration',    s.duration    || '');
-        set('adv_price',       s.price       || '');
-        set('adv_desc',        s.desc        || s.description || '');
-        // adv_section = the category header (e.g. "D. EMBELLISHMENTS DRAWERS")
-        set('adv_section',     s.section || s.category || '');
+        set('adv_name',         s.name         || '');
+        set('adv_duration',     s.duration     || '');
+        set('adv_price',        s.price        || '');
+        set('adv_desc',         s.desc         || s.description || '');
+        // category in Firestore IS the section header — put it in adv_section
+        set('adv_section',      s.category     || s.section || '');
+        set('adv_status',       s.status       || 'Active');
+        set('adv_tag',          s.tag          || 'None');
+        set('adv_pricing_type', s.pricingType  || 'Fixed');
 
-        // adv_category = the type dropdown (Hand Therapy / Foot Therapy / Add-On)
-        // Derive from department/appliesTo since category holds the display header
+        // department → adv_applies_to (options: "Hand", "Foot", "Both")
         const dept = s.department || s.appliesTo || 'Hand';
-        const catDropdown = dept === 'Foot' ? 'Foot Therapy'
-                          : dept === 'Both' ? 'Hand Therapy'
-                          : s.type === 'Add-On' ? 'Add-On'
-                          : 'Hand Therapy';
+        set('adv_applies_to', dept);
+
+        // adv_category dropdown — derive from department
+        const catDropdown = dept === 'Foot' ? 'Foot Therapy' : dept === 'Both' ? 'Hand Therapy' : 'Hand Therapy';
         set('adv_category', catDropdown);
-        set('adv_status',      s.status      || 'Active');
-        set('adv_applies_to',  s.appliesTo   || s.department  || 'Hand');
-        set('adv_tag',         s.tag         || 'None');
-        set('adv_pricing_type',s.pricingType || 'Fixed');
 
-        // selection type: Single/Multi → adv_selection
+        // inputType → adv_selection (options: "Single", "Multi")
         const selEl = document.getElementById('adv_selection');
-        if (selEl) selEl.value = (s.selection || (s.inputType === 'radio' ? 'Single' : 'Multi'));
+        if (selEl) selEl.value = s.inputType === 'radio' ? 'Single' : 'Multi';
 
-        // type → adv_type
-        updateAdvForm(); // rebuild adv_type options first
+        updateAdvForm();
         const typeEl = document.getElementById('adv_type');
         if (typeEl && s.type) typeEl.value = s.type;
 
@@ -1001,10 +998,6 @@ window.addNewMenuServiceAdv = async function() {
 
     try {
         if (_editingServiceId) {
-            // UPDATE existing document
-            // Debug: show exactly what we're writing
-            const debugMsg = `Saving to Firestore:\ncategory: "${payload.category}"\ndepartment: "${payload.department}"\nname: "${payload.name}"`;
-            alert(debugMsg);
             await db.collection('Menu_Services').doc(_editingServiceId).update(payload);
             alert(`"${payload.name}" updated successfully.`);
         } else {
