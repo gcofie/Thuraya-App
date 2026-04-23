@@ -1827,59 +1827,153 @@ function startFohBillingListener() {
     try {
         fohBillingListener = db.collection('Active_Jobs')
             .where('status', '==', 'Ready for Payment')
-            .onSnapshot(snap => {
-                if(snap.empty) { 
-                    listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No pending checkouts.</p>'; 
+            .onSnapshot(async snap => {
+                if (snap.empty) {
+                    listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No pending checkouts.</p>';
                     document.getElementById('checkoutPanel').style.display = 'none';
-                    return; 
+                    return;
                 }
-                listDiv.innerHTML = '';
+
+                // Group jobs by groupId for group billing handling
+                const soloJobs  = [];
+                const groupMap  = {}; // groupId → { billingMode, jobs[] }
+
                 snap.forEach(doc => {
-                    let job = doc.data();
-                    
-                    let taxes = [];
-                    try { taxes = JSON.parse(job.taxBreakdown || '[]'); } catch(e){}
-                    let subtotal = parseFloat(job.bookedPrice || 0).toFixed(2);
-                    let grandTotal = parseFloat(job.grandTotal || job.bookedPrice || 0).toFixed(2);
+                    const job = { id: doc.id, ...doc.data() };
+                    if (job.isGroupBooking && job.groupId) {
+                        if (!groupMap[job.groupId]) {
+                            groupMap[job.groupId] = { billingMode: job.billingMode||'split', jobs: [] };
+                        }
+                        groupMap[job.groupId].jobs.push(job);
+                    } else {
+                        soloJobs.push(job);
+                    }
+                });
 
-                    let taxHtml = '';
-                    taxes.forEach(t => { taxHtml += `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#777;"><span>+ ${t.name}</span><span>${parseFloat(t.amount).toFixed(2)} GHC</span></div>`; });
+                listDiv.innerHTML = '';
 
-                    let div = document.createElement('div');
-                    div.className = 'ticket';
-                    div.style.borderColor = 'var(--success)';
-                    div.style.padding = '10px';
-                    
-                    let infoDiv = document.createElement('div');
-                    infoDiv.style.flexGrow = '1';
-                    infoDiv.innerHTML = `
-                        <h4 style="margin:0; font-size:1rem; color:var(--success);">${job.clientName}</h4>
-                        <p style="margin:0; font-size:0.8rem; margin-bottom:5px;">💅 ${job.bookedService}</p>
-                        <div style="background:#f1f1f1; padding:8px; border-radius:4px; max-width:250px;">
-                            <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span>Subtotal:</span><span>${subtotal} GHC</span></div>
-                            ${taxHtml}
-                            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:0.9rem; margin-top:3px; border-top:1px solid #ddd; padding-top:3px;"><span>Total:</span><span>${grandTotal} GHC</span></div>
-                        </div>
-                    `;
-                    
-                    let btn = document.createElement('button');
-                    btn.className = 'btn';
-                    btn.style.background = 'var(--success)';
-                    btn.style.width = 'auto';
-                    btn.style.padding = '5px 15px';
-                    btn.style.fontSize = '0.8rem';
-                    btn.innerText = 'Checkout';
-                    btn.onclick = function() {
-                        window.openCheckout(doc.id, job.clientName, job.bookedService, subtotal, taxHtml, grandTotal);
-                    };
-                    
-                    div.appendChild(infoDiv);
-                    div.appendChild(btn);
-                    listDiv.appendChild(div);
+                // ── Render solo jobs ──────────────────────────
+                soloJobs.forEach(job => {
+                    listDiv.appendChild(foh_buildJobCard(job));
+                });
+
+                // ── Render group jobs ─────────────────────────
+                Object.entries(groupMap).forEach(([groupId, group]) => {
+                    if (group.billingMode === 'single') {
+                        // Single bill — combine all jobs into one checkout
+                        listDiv.appendChild(foh_buildGroupSingleCard(groupId, group.jobs));
+                    } else {
+                        // Split bill — individual card per member
+                        group.jobs.forEach(job => {
+                            listDiv.appendChild(foh_buildJobCard(job, true));
+                        });
+                    }
                 });
             });
     } catch(e) { console.error(e); }
 }
+
+function foh_buildJobCard(job, isGroupMember=false) {
+    let taxes = [];
+    try { taxes = JSON.parse(job.taxBreakdown || '[]'); } catch(e){}
+    const subtotal   = parseFloat(job.bookedPrice || 0).toFixed(2);
+    const grandTotal = parseFloat(job.grandTotal || job.bookedPrice || 0).toFixed(2);
+
+    let taxHtml = '';
+    taxes.forEach(t => {
+        taxHtml += `<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#777;">
+            <span>+ ${t.name}</span><span>${parseFloat(t.amount).toFixed(2)} GHC</span>
+        </div>`;
+    });
+
+    const div = document.createElement('div');
+    div.className = 'ticket';
+    div.style.borderColor = 'var(--success)';
+    div.style.padding = '10px';
+
+    div.innerHTML = `
+        <div style="flex-grow:1;">
+            <h4 style="margin:0;font-size:1rem;color:var(--success);">
+                ${job.clientName || 'Unknown'}
+                ${isGroupMember ? `<span style="font-size:0.7rem;background:var(--manager);color:white;padding:1px 6px;border-radius:3px;margin-left:6px;">GROUP · Split</span>` : ''}
+            </h4>
+            <p style="margin:0;font-size:0.8rem;margin-bottom:5px;">💅 ${job.bookedService} · 👩‍🔧 ${job.assignedTechName||'—'}</p>
+            <div style="background:#f1f1f1;padding:8px;border-radius:4px;max-width:250px;">
+                <div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span>Subtotal:</span><span>${subtotal} GHC</span></div>
+                ${taxHtml}
+                <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:0.9rem;margin-top:3px;border-top:1px solid #ddd;padding-top:3px;">
+                    <span>Total:</span><span>${grandTotal} GHC</span>
+                </div>
+            </div>
+        </div>
+        <button class="btn" style="background:var(--success);width:auto;padding:5px 15px;font-size:0.8rem;"
+            onclick="window.openCheckout('${job.id}','${(job.clientName||'').replace(/'/g,"\\'")}','${(job.bookedService||'').replace(/'/g,"\\'")}','${subtotal}',\`${taxHtml.replace(/`/g,'\\`')}\`,'${grandTotal}')">
+            Checkout
+        </button>`;
+    return div;
+}
+
+function foh_buildGroupSingleCard(groupId, jobs) {
+    // Combined bill — sum all members
+    const leadJob    = jobs.find(j => j.isLeadBooker) || jobs[0];
+    const totalAmt   = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
+    const subtotalAmt= jobs.reduce((s,j) => s + parseFloat(j.bookedPrice||0), 0);
+    const taxAmt     = totalAmt - subtotalAmt;
+
+    const membersList = jobs.map(j =>
+        `<div style="font-size:0.78rem;color:#374151;padding:3px 0;border-bottom:1px solid #f1f1f1;">
+            <strong>${j.clientName||'Member'}</strong> — ${j.bookedService||'—'} · 👩‍🔧 ${j.assignedTechName||'—'}
+            <span style="float:right;font-weight:600;">${parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2)} GHC</span>
+        </div>`
+    ).join('');
+
+    const taxHtml = taxAmt > 0
+        ? `<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#777;"><span>+ Tax</span><span>${taxAmt.toFixed(2)} GHC</span></div>`
+        : '';
+
+    const div = document.createElement('div');
+    div.className = 'ticket';
+    div.style.borderColor = 'var(--manager)';
+    div.style.padding = '10px';
+
+    div.innerHTML = `
+        <div style="flex-grow:1;">
+            <h4 style="margin:0;font-size:1rem;color:var(--manager);">
+                ${leadJob.clientName||'Group'}
+                <span style="font-size:0.7rem;background:var(--manager);color:white;padding:1px 6px;border-radius:3px;margin-left:6px;">
+                    👥 GROUP · ${jobs.length} people · Single Bill
+                </span>
+            </h4>
+            <div style="margin:8px 0;padding:8px;background:#f9f7f4;border-radius:6px;max-width:320px;">
+                ${membersList}
+                <div style="margin-top:6px;padding-top:6px;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.8rem;"><span>Subtotal:</span><span>${subtotalAmt.toFixed(2)} GHC</span></div>
+                    ${taxHtml}
+                    <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:0.9rem;margin-top:3px;border-top:1px solid #ddd;padding-top:3px;">
+                        <span>Total:</span><span>${totalAmt.toFixed(2)} GHC</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="btn" style="background:var(--manager);width:auto;padding:5px 15px;font-size:0.8rem;"
+            onclick="window.openGroupCheckout('${groupId}', ${totalAmt.toFixed(2)}, \`${taxHtml.replace(/`/g,'\\`')}\`)">
+            Checkout All
+        </button>`;
+    return div;
+}
+
+window.openGroupCheckout = function(groupId, grandTotal, taxHtml) {
+    document.getElementById('checkoutJobId').value      = 'GROUP:' + groupId;
+    document.getElementById('checkoutClientName').innerText = 'Group Booking';
+    document.getElementById('checkoutServices').innerText   = 'Combined group services';
+    document.getElementById('checkoutSubtotal').innerText   = (grandTotal - 0).toFixed(2) + ' GHC';
+    document.getElementById('checkoutTaxList').innerHTML    = taxHtml;
+    document.getElementById('checkoutTotal').innerText      = grandTotal.toFixed(2) + ' GHC';
+    document.getElementById('checkoutGrandTotalVal').value  = grandTotal;
+    document.getElementById('checkoutPaymentMethod').value  = '';
+    document.getElementById('checkoutPanel').style.display  = 'block';
+    document.getElementById('checkoutPanel').scrollIntoView({ behavior: 'smooth' });
+};
 
 window.openCheckout = function(id, name, services, subtotal, taxHtml, grandTotal) {
     document.getElementById('checkoutJobId').value = id;
@@ -1895,24 +1989,53 @@ window.openCheckout = function(id, name, services, subtotal, taxHtml, grandTotal
 }
 
 window.confirmPayment = async function() {
-    const id = document.getElementById('checkoutJobId').value;
+    const id     = document.getElementById('checkoutJobId').value;
     const method = document.getElementById('checkoutPaymentMethod').value;
-    const price = parseFloat(document.getElementById('checkoutGrandTotalVal').value) || 0; 
-    
-    if(!method) { alert("Please select a Payment Method."); return; }
-    
+    const price  = parseFloat(document.getElementById('checkoutGrandTotalVal').value) || 0;
+
+    if (!method) { alert('Please select a Payment Method.'); return; }
+
     try {
-        await db.collection('Active_Jobs').doc(id).update({
-            status: 'Closed',
-            paymentMethod: method,
-            totalGHC: price,
-            closedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            closedBy: currentUserEmail
-        });
-        alert("Payment processed successfully!");
+        if (id.startsWith('GROUP:')) {
+            // Group single billing — close all jobs in the group
+            const groupId = id.replace('GROUP:', '');
+            const groupSnap = await db.collection('Active_Jobs')
+                .where('groupId', '==', groupId)
+                .where('status', '==', 'Ready for Payment')
+                .get();
+
+            const batch = db.batch();
+            let perJobAmt = price;
+            if (!groupSnap.empty) perJobAmt = price / groupSnap.size;
+
+            groupSnap.forEach(doc => {
+                batch.update(doc.ref, {
+                    status:        'Closed',
+                    paymentMethod: method,
+                    totalGHC:      perJobAmt,
+                    billedAs:      'group-single',
+                    closedAt:      firebase.firestore.FieldValue.serverTimestamp(),
+                    closedBy:      currentUserEmail
+                });
+            });
+            await batch.commit();
+            alert(`Group payment of ${price.toFixed(2)} GHC processed successfully!`);
+
+        } else {
+            // Solo or split group billing — close single job
+            await db.collection('Active_Jobs').doc(id).update({
+                status:        'Closed',
+                paymentMethod: method,
+                totalGHC:      price,
+                closedAt:      firebase.firestore.FieldValue.serverTimestamp(),
+                closedBy:      currentUserEmail
+            });
+            alert('Payment processed successfully!');
+        }
+
         document.getElementById('checkoutPanel').style.display = 'none';
-    } catch(e) { alert("Error processing payment: " + e.message); }
-}
+    } catch(e) { alert('Error processing payment: ' + e.message); }
+};
 
 window.generateReport = async function() {
     const start = document.getElementById('reportStart').value;
