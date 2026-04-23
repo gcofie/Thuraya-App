@@ -54,8 +54,9 @@ function timeToMins(timeStr) {
 window.switchModule = function(moduleId) {
     document.querySelectorAll('.app-module').forEach(mod => mod.style.display = 'none');
     document.getElementById(moduleId).style.display = 'block';
-    if (moduleId === 'adminView') { loadStaffDirectory(); }
+    if (moduleId === 'adminView')          { loadStaffDirectory(); }
     if (moduleId === 'activeAteliersView') { aa_load(); }
+    if (moduleId === 'reportsView')        { rpt_init(); }
 }
 
 window.toggleClientsSubView = function() {
@@ -153,6 +154,7 @@ auth.onAuthStateChanged(async (user) => {
                     if(typeof myatt_showTab === 'function') myatt_showTab();
                 }
                 if(isAdmin || isManager || isSupply) { document.getElementById('tabSupply').style.display = 'flex'; }
+                if(isAdmin || isManager) { document.getElementById('tabReports').style.display = 'flex'; }
                 
                 if(isAdmin) { 
                     document.getElementById('tabAdmin').style.display = 'flex'; 
@@ -2808,3 +2810,814 @@ window.aa_flag = async function(jobId) {
 };
 
 console.log('Thuraya Active Atelier(s) module loaded.');
+
+
+// ============================================================
+//  REPORTS MODULE — Full Build
+// ============================================================
+
+let _rpt_cache = { upcoming: [], daily: [], monthly: [], tech: [], clients: [], leave: [] };
+
+// ── Init ──────────────────────────────────────────────────────
+function rpt_init() {
+    const today = todayDateStr;
+
+    // Set default dates
+    ['rpt_dailyDate'].forEach(id => { const el = document.getElementById(id); if (el && !el.value) el.value = today; });
+    ['rpt_techMonth','rpt_monthlyMonth','rpt_clientMonth'].forEach(id => { const el = document.getElementById(id); if (el && !el.value) el.value = today.slice(0,7); });
+
+    const startEl = document.getElementById('rpt_startDate');
+    if (startEl && !startEl.value) startEl.value = today;
+    const endEl = document.getElementById('rpt_endDate');
+    if (endEl && !endEl.value) {
+        const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 6);
+        endEl.value = d.toISOString().slice(0,10);
+    }
+
+    // Populate year selector for leave report
+    const yearSel = document.getElementById('rpt_leaveYear');
+    if (yearSel && !yearSel.options.length) {
+        const yr = new Date().getFullYear();
+        for (let y = yr; y >= yr - 3; y--) {
+            const opt = document.createElement('option');
+            opt.value = y; opt.textContent = y;
+            yearSel.appendChild(opt);
+        }
+    }
+
+    // Populate tech filter
+    const techSel = document.getElementById('rpt_techFilter');
+    if (techSel && techSel.options.length <= 1) {
+        (typeof allTechs !== 'undefined' ? allTechs : []).forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.email; opt.textContent = t.name;
+            techSel.appendChild(opt);
+        });
+    }
+}
+
+// ── Sub-tab switcher ──────────────────────────────────────────
+window.rpt_switchSub = function(subId) {
+    ['rpt_upcoming','rpt_daily','rpt_monthly','rpt_tech','rpt_clients','rpt_leave'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = id === subId ? 'block' : 'none';
+    });
+};
+
+window.rpt_onRangeChange = function() {
+    const val = document.getElementById('rpt_dateRange')?.value;
+    const el  = document.getElementById('rpt_customRange');
+    if (el) el.style.display = val === 'custom' ? 'grid' : 'none';
+};
+
+function rpt_getDateRange() {
+    const val   = document.getElementById('rpt_dateRange')?.value || 'week';
+    const today = new Date(todayDateStr + 'T12:00:00');
+    if (val === 'today')    return { start: todayDateStr, end: todayDateStr };
+    if (val === 'tomorrow') {
+        const t = new Date(today); t.setDate(t.getDate() + 1);
+        const s = t.toISOString().slice(0,10); return { start: s, end: s };
+    }
+    if (val === 'week') {
+        const e = new Date(today); e.setDate(e.getDate() + 6);
+        return { start: todayDateStr, end: e.toISOString().slice(0,10) };
+    }
+    return {
+        start: document.getElementById('rpt_startDate')?.value || todayDateStr,
+        end:   document.getElementById('rpt_endDate')?.value   || todayDateStr
+    };
+}
+
+// ── Shared helpers ────────────────────────────────────────────
+function rpt_fmtDate(d) {
+    if (!d) return '—';
+    try { return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }); }
+    catch(e) { return d; }
+}
+function rpt_fmt12(t) {
+    if (!t) return '—';
+    const [h, m] = t.split(':').map(Number);
+    return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;
+}
+function rpt_metricCard(val, lbl, color='var(--primary)') {
+    return `<div class="cip-metric"><div class="cip-metric-val" style="color:${color};">${val}</div><div class="cip-metric-lbl">${lbl}</div></div>`;
+}
+function rpt_tableHead(...cols) {
+    return `<thead><tr style="background:#f1f1f1;">${cols.map(c => `<th style="padding:9px 8px; text-align:${c.align||'left'}; color:var(--primary); white-space:nowrap;">${c.label}</th>`).join('')}</tr></thead>`;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  1. UPCOMING BOOKINGS
+// ══════════════════════════════════════════════════════════════
+window.rpt_loadUpcoming = async function() {
+    const tableEl   = document.getElementById('rpt_upcomingTable');
+    const summaryEl = document.getElementById('rpt_upcomingSummary');
+    if (!tableEl) return;
+    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    summaryEl.style.display = 'none';
+
+    const { start, end } = rpt_getDateRange();
+    const techFilter   = document.getElementById('rpt_techFilter')?.value   || 'all';
+    const statusFilter = document.getElementById('rpt_statusFilter')?.value || 'all';
+
+    try {
+        const snap = await db.collection('Appointments')
+            .where('dateString', '>=', start)
+            .where('dateString', '<=', end)
+            .where('status', 'in', ['Scheduled','Arrived','In Progress','Action Required'])
+            .get();
+
+        let appts = [];
+        snap.forEach(d => appts.push({ id: d.id, ...d.data() }));
+        if (techFilter !== 'all')   appts = appts.filter(a => a.assignedTechEmail === techFilter);
+        if (statusFilter !== 'all') appts = appts.filter(a => a.status === statusFilter);
+        appts.sort((a,b) => (a.dateString+a.timeString).localeCompare(b.dateString+b.timeString));
+
+        _rpt_cache.upcoming = appts;
+
+        if (!appts.length) {
+            tableEl.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">No bookings found for this period.</p>';
+            return;
+        }
+
+        const totalRev = appts.reduce((s,a) => s + parseFloat(a.grandTotal||a.bookedPrice||0), 0);
+        const groups   = appts.filter(a => a.isGroupBooking).length;
+        const cancelled= 0; // cancelled excluded from query
+
+        summaryEl.style.display = 'flex';
+        summaryEl.innerHTML =
+            rpt_metricCard(appts.length, 'Total Bookings') +
+            rpt_metricCard(totalRev.toFixed(0)+' GHC', 'Expected Revenue', 'var(--success)') +
+            rpt_metricCard(groups, 'Group Bookings', 'var(--manager)') +
+            rpt_metricCard(start===end ? rpt_fmtDate(start) : rpt_fmtDate(start)+' → '+rpt_fmtDate(end), 'Period');
+
+        const statusColors = { 'Scheduled':'var(--primary)','Arrived':'var(--accent)','In Progress':'var(--success)','Action Required':'var(--error)' };
+
+        tableEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+            ${rpt_tableHead(
+                {label:'Date'},{label:'Time'},{label:'Client'},{label:'Service'},
+                {label:'Technician'},{label:'Mins',align:'center'},{label:'Amount',align:'right'},{label:'Status',align:'center'}
+            )}
+            <tbody>${appts.map((a,i) => {
+                const amt   = parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2);
+                const color = statusColors[a.status]||'#999';
+                const isToday = a.dateString === todayDateStr;
+                return `<tr style="background:${i%2===0?'white':'#fafafa'};border-bottom:1px solid #f1f1f1;">
+                    <td style="padding:9px 8px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':'inherit'};">
+                        ${rpt_fmtDate(a.dateString)}${isToday?` <span style="font-size:0.68rem;background:var(--error);color:white;padding:1px 5px;border-radius:3px;">TODAY</span>`:''}
+                    </td>
+                    <td style="padding:9px 8px;white-space:nowrap;">${rpt_fmt12(a.timeString)}</td>
+                    <td style="padding:9px 8px;">
+                        <strong>${a.clientName||'Unknown'}</strong>
+                        ${a.isGroupBooking?`<span style="font-size:0.68rem;background:var(--manager);color:white;padding:1px 5px;border-radius:3px;margin-left:4px;">GROUP</span>`:''}
+                        <br><span style="font-size:0.75rem;color:#999;">${a.clientPhone||''}</span>
+                    </td>
+                    <td style="padding:9px 8px;">${a.bookedService||'N/A'}</td>
+                    <td style="padding:9px 8px;">${a.assignedTechName||'—'}</td>
+                    <td style="padding:9px 8px;text-align:center;">${a.bookedDuration||0}</td>
+                    <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${amt} GHC</td>
+                    <td style="padding:9px 8px;text-align:center;">
+                        <span style="background:${color}22;color:${color};border:1px solid ${color}44;font-size:0.7rem;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;">${a.status}</span>
+                    </td>
+                </tr>`;
+            }).join('')}</tbody>
+            <tfoot><tr style="background:#f9f7f4;font-weight:700;border-top:2px solid var(--border);">
+                <td colspan="6" style="padding:9px 8px;color:var(--primary);">TOTAL (${appts.length} bookings)</td>
+                <td style="padding:9px 8px;text-align:right;color:var(--success);">${totalRev.toFixed(2)} GHC</td>
+                <td></td>
+            </tr></tfoot>
+        </table></div>`;
+    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+};
+
+
+// ══════════════════════════════════════════════════════════════
+//  2. DAILY OPERATIONS
+// ══════════════════════════════════════════════════════════════
+window.rpt_loadDaily = async function() {
+    const tableEl   = document.getElementById('rpt_dailyTable');
+    const metricsEl = document.getElementById('rpt_dailyMetrics');
+    if (!tableEl) return;
+    const date = document.getElementById('rpt_dailyDate')?.value || todayDateStr;
+    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    metricsEl.style.display = 'none';
+
+    try {
+        // Closed jobs = served clients
+        const [closedSnap, cancelSnap] = await Promise.all([
+            db.collection('Active_Jobs').where('dateString','==',date).where('status','==','Closed').get(),
+            db.collection('Appointments').where('dateString','==',date).where('status','==','Cancelled').get()
+        ]);
+
+        const jobs = []; closedSnap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
+        _rpt_cache.daily = jobs;
+        const cancelled = cancelSnap.size;
+
+        if (!jobs.length) {
+            tableEl.innerHTML = `<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">No closed jobs for ${rpt_fmtDate(date)}.</p>`;
+            return;
+        }
+
+        const totalRev  = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
+        const avgDur    = jobs.reduce((s,j) => s + parseInt(j.bookedDuration||0), 0) / jobs.length;
+        const techMap   = {}, svcMap = {}, payMap = {};
+
+        jobs.forEach(j => {
+            // By tech
+            const tn = j.assignedTechName || 'Unknown';
+            if (!techMap[tn]) techMap[tn] = { count:0, revenue:0, duration:0 };
+            techMap[tn].count++;
+            techMap[tn].revenue  += parseFloat(j.grandTotal||j.bookedPrice||0);
+            techMap[tn].duration += parseInt(j.bookedDuration||0);
+            // By service
+            const svc = (j.bookedService||'Unknown').split(',')[0].trim();
+            if (!svcMap[svc]) svcMap[svc] = { count:0, revenue:0 };
+            svcMap[svc].count++;
+            svcMap[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+            // By payment method
+            const pay = j.paymentMethod || 'Not recorded';
+            if (!payMap[pay]) payMap[pay] = { count:0, revenue:0 };
+            payMap[pay].count++;
+            payMap[pay].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+        });
+
+        metricsEl.style.display = 'flex';
+        metricsEl.innerHTML =
+            rpt_metricCard(jobs.length, 'Clients Served', 'var(--success)') +
+            rpt_metricCard(totalRev.toFixed(0)+' GHC', 'Total Revenue', 'var(--success)') +
+            rpt_metricCard((totalRev/jobs.length).toFixed(0)+' GHC', 'Avg per Client') +
+            rpt_metricCard(Math.round(avgDur)+' mins', 'Avg Duration') +
+            rpt_metricCard(Object.keys(techMap).length, 'Techs Active', 'var(--manager)') +
+            rpt_metricCard(cancelled, 'Cancellations', cancelled>0?'var(--error)':'#999');
+
+        // Build tables
+        const techRows = Object.entries(techMap).sort((a,b)=>b[1].revenue-a[1].revenue).map(([n,d],i) =>
+            `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;">👩‍🔧 ${n}</td>
+                <td style="padding:9px 8px;text-align:center;">${d.count}</td>
+                <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
+                <td style="padding:9px 8px;text-align:right;color:#666;">${(d.revenue/d.count).toFixed(2)} GHC</td>
+                <td style="padding:9px 8px;text-align:center;">${Math.round(d.duration/60)} hrs</td>
+            </tr>`).join('');
+
+        const svcRows = Object.entries(svcMap).sort((a,b)=>b[1].count-a[1].count).map(([n,d],i) =>
+            `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;">💅 ${n}</td>
+                <td style="padding:9px 8px;text-align:center;">${d.count}</td>
+                <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
+            </tr>`).join('');
+
+        const payRows = Object.entries(payMap).map(([n,d],i) =>
+            `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;">💳 ${n}</td>
+                <td style="padding:9px 8px;text-align:center;">${d.count}</td>
+                <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
+            </tr>`).join('');
+
+        tableEl.innerHTML = `
+            <div class="grid-2" style="gap:20px; margin-bottom:20px;">
+                <div>
+                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">By Technician</p>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                        ${rpt_tableHead({label:'Tech'},{label:'Clients',align:'center'},{label:'Revenue',align:'right'},{label:'Avg',align:'right'},{label:'Hours',align:'center'})}
+                        <tbody>${techRows}</tbody>
+                    </table>
+                </div>
+                <div>
+                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">By Service</p>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                        ${rpt_tableHead({label:'Service'},{label:'Count',align:'center'},{label:'Revenue',align:'right'})}
+                        <tbody>${svcRows}</tbody>
+                    </table>
+                </div>
+            </div>
+            <div style="max-width:420px;">
+                <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">By Payment Method</p>
+                <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                    ${rpt_tableHead({label:'Method'},{label:'Count',align:'center'},{label:'Revenue',align:'right'})}
+                    <tbody>${payRows}</tbody>
+                </table>
+            </div>`;
+    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+};
+
+
+// ══════════════════════════════════════════════════════════════
+//  3. WEEKLY / MONTHLY SUMMARY
+// ══════════════════════════════════════════════════════════════
+window.rpt_loadMonthly = async function() {
+    const tableEl   = document.getElementById('rpt_monthlyTable');
+    const metricsEl = document.getElementById('rpt_monthlyMetrics');
+    if (!tableEl) return;
+
+    const month = document.getElementById('rpt_monthlyMonth')?.value;
+    if (!month) return;
+    const [yr, mo] = month.split('-');
+    const start = `${yr}-${mo}-01`;
+    const daysInMonth = new Date(yr, mo, 0).getDate();
+    const end = `${yr}-${mo}-${String(daysInMonth).padStart(2,'0')}`;
+
+    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    metricsEl.style.display = 'none';
+
+    try {
+        const [jobsSnap, apptSnap, clientsSnap] = await Promise.all([
+            db.collection('Active_Jobs').where('dateString','>=',start).where('dateString','<=',end).where('status','==','Closed').get(),
+            db.collection('Appointments').where('dateString','>=',start).where('dateString','<=',end).get(),
+            db.collection('Clients').get()
+        ]);
+
+        const jobs = []; jobsSnap.forEach(d => jobs.push({ id:d.id, ...d.data() }));
+        _rpt_cache.monthly = jobs;
+
+        const totalRev     = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
+        const cancelled    = []; apptSnap.forEach(d => { if(d.data().status==='Cancelled') cancelled.push(d.data()); });
+
+        // Day map for busiest days
+        const dayMap = {}; const hourMap = {};
+        const clientSpend = {};
+        const svcRev = {};
+
+        jobs.forEach(j => {
+            // By day
+            const day = j.dateString || '';
+            if (!dayMap[day]) dayMap[day] = { count:0, revenue:0 };
+            dayMap[day].count++;
+            dayMap[day].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+            // By hour
+            const hr = (j.timeString||'00:00').split(':')[0];
+            if (!hourMap[hr]) hourMap[hr] = 0;
+            hourMap[hr]++;
+            // Client spend
+            const phone = j.clientPhone||'';
+            if (phone) {
+                if (!clientSpend[phone]) clientSpend[phone] = { name: j.clientName||'Unknown', spend:0, count:0 };
+                clientSpend[phone].spend  += parseFloat(j.grandTotal||j.bookedPrice||0);
+                clientSpend[phone].count++;
+            }
+            // Service revenue
+            const svc = (j.bookedService||'Unknown').split(',')[0].trim();
+            if (!svcRev[svc]) svcRev[svc] = { count:0, revenue:0 };
+            svcRev[svc].count++;
+            svcRev[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+        });
+
+        // New vs returning clients
+        const allClients = new Set();
+        clientsSnap.forEach(d => {
+            const data = d.data();
+            if ((data.createdAt||'') >= start) return; // skip — new this month handled separately
+            allClients.add(d.data().Tel_Number||d.id);
+        });
+        const jobPhones   = new Set(jobs.map(j => j.clientPhone).filter(Boolean));
+        const newClients  = [...jobPhones].filter(p => !allClients.has(p)).length;
+        const retClients  = [...jobPhones].filter(p => allClients.has(p)).length;
+
+        // Busiest day
+        const busiestDay  = Object.entries(dayMap).sort((a,b)=>b[1].count-a[1].count)[0];
+        const busiestHour = Object.entries(hourMap).sort((a,b)=>b[1]-a[1])[0];
+        const busiestHrFmt = busiestHour ? rpt_fmt12(busiestHour[0]+':00') : '—';
+
+        metricsEl.style.display = 'flex';
+        metricsEl.innerHTML =
+            rpt_metricCard(jobs.length, 'Clients Served') +
+            rpt_metricCard(totalRev.toFixed(0)+' GHC', 'Total Revenue', 'var(--success)') +
+            rpt_metricCard(newClients, 'New Clients', 'var(--manager)') +
+            rpt_metricCard(retClients, 'Returning Clients') +
+            rpt_metricCard(busiestDay ? rpt_fmtDate(busiestDay[0]) : '—', 'Busiest Day') +
+            rpt_metricCard(busiestHrFmt, 'Peak Hour') +
+            rpt_metricCard(cancelled.length, 'Cancellations', cancelled.length>0?'var(--error)':'#999');
+
+        // Top 10 clients
+        const top10 = Object.entries(clientSpend).sort((a,b)=>b[1].spend-a[1].spend).slice(0,10);
+        const top10Rows = top10.map(([phone,d],i) =>
+            `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;font-weight:700;">${i+1}. ${d.name}</td>
+                <td style="padding:9px 8px;color:#666;">${phone}</td>
+                <td style="padding:9px 8px;text-align:center;">${d.count}</td>
+                <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.spend.toFixed(2)} GHC</td>
+            </tr>`).join('');
+
+        // Top services
+        const topSvc = Object.entries(svcRev).sort((a,b)=>b[1].revenue-a[1].revenue).slice(0,10);
+        const topSvcRows = topSvc.map(([n,d],i) =>
+            `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;">${i+1}. ${n}</td>
+                <td style="padding:9px 8px;text-align:center;">${d.count}</td>
+                <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
+            </tr>`).join('');
+
+        // Daily revenue trend
+        const trendRows = Object.entries(dayMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([day,d]) =>
+            `<tr style="border-bottom:1px solid #f1f1f1;">
+                <td style="padding:7px 8px;">${rpt_fmtDate(day)}</td>
+                <td style="padding:7px 8px;text-align:center;">${d.count}</td>
+                <td style="padding:7px 8px;text-align:right;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
+                <td style="padding:7px 8px;">
+                    <div style="background:#f1f1f1;border-radius:4px;height:10px;width:100%;max-width:120px;">
+                        <div style="background:var(--success);height:100%;border-radius:4px;width:${Math.min(100,Math.round((d.revenue/Math.max(...Object.values(dayMap).map(x=>x.revenue)))*100))}%;"></div>
+                    </div>
+                </td>
+            </tr>`).join('');
+
+        tableEl.innerHTML = `
+            <div class="grid-2" style="gap:20px; margin-bottom:20px;">
+                <div>
+                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">Top 10 Clients by Spend</p>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                        ${rpt_tableHead({label:'Client'},{label:'Phone'},{label:'Visits',align:'center'},{label:'Total Spend',align:'right'})}
+                        <tbody>${top10Rows || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#999;">No data</td></tr>'}</tbody>
+                    </table>
+                </div>
+                <div>
+                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">Top Services by Revenue</p>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                        ${rpt_tableHead({label:'Service'},{label:'Count',align:'center'},{label:'Revenue',align:'right'})}
+                        <tbody>${topSvcRows || '<tr><td colspan="3" style="padding:12px;text-align:center;color:#999;">No data</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+            <div>
+                <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">Daily Revenue Trend</p>
+                <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                    ${rpt_tableHead({label:'Date'},{label:'Clients',align:'center'},{label:'Revenue',align:'right'},{label:''})}
+                    <tbody>${trendRows || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#999;">No data</td></tr>'}</tbody>
+                </table>
+            </div>`;
+    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+};
+
+
+// ══════════════════════════════════════════════════════════════
+//  4. TECHNICIAN PERFORMANCE
+// ══════════════════════════════════════════════════════════════
+window.rpt_loadTechPerf = async function() {
+    const tableEl = document.getElementById('rpt_techTable');
+    if (!tableEl) return;
+    const month = document.getElementById('rpt_techMonth')?.value;
+    if (!month) return;
+    const [yr, mo] = month.split('-');
+    const start = `${yr}-${mo}-01`;
+    const end   = `${yr}-${mo}-${new Date(yr, mo, 0).getDate()}`;
+    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+
+    try {
+        // Get working hours from schedules for utilisation
+        const [jobsSnap, schedSnap] = await Promise.all([
+            db.collection('Active_Jobs').where('dateString','>=',start).where('dateString','<=',end).where('status','==','Closed').get(),
+            db.collection('Staff_Schedules').get()
+        ]);
+
+        const techMap = {};
+        jobsSnap.forEach(d => {
+            const j = d.data();
+            const k = j.assignedTechEmail || 'unknown';
+            if (!techMap[k]) techMap[k] = { name: j.assignedTechName||'Unknown', count:0, revenue:0, duration:0 };
+            techMap[k].count++;
+            techMap[k].revenue  += parseFloat(j.grandTotal||j.bookedPrice||0);
+            techMap[k].duration += parseInt(j.bookedDuration||0);
+        });
+
+        // Schedule hours per tech — approx working days in month × daily hours
+        const daysInMonth = new Date(yr, mo, 0).getDate();
+        const schedMap = {};
+        schedSnap.forEach(d => {
+            const s = d.data();
+            const workDays = (s.workingDays||[]).length;
+            const startH   = parseInt((s.startTime||'08:00').split(':')[0]);
+            const endH     = parseInt((s.endTime||'20:00').split(':')[0]);
+            const hoursPerDay = endH - startH;
+            // Approx working days in this month
+            const approxDays = Math.round((workDays / 7) * daysInMonth);
+            schedMap[d.id] = approxDays * hoursPerDay * 60; // available minutes
+        });
+
+        _rpt_cache.tech = Object.entries(techMap).map(([email, d]) => ({ email, ...d }));
+
+        if (!Object.keys(techMap).length) {
+            tableEl.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">No closed jobs found for this month.</p>';
+            return;
+        }
+
+        const totalRev     = Object.values(techMap).reduce((s,t) => s+t.revenue, 0);
+        const totalClients = Object.values(techMap).reduce((s,t) => s+t.count, 0);
+
+        const rows = Object.entries(techMap).sort((a,b)=>b[1].revenue-a[1].revenue).map(([email,d],i) => {
+            const availMins   = schedMap[email] || 0;
+            const utilisPct   = availMins > 0 ? Math.min(100, Math.round((d.duration/availMins)*100)) : '—';
+            const utilisDisplay = availMins > 0 ? `${utilisPct}%` : '—';
+            return `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:10px 8px;font-weight:700;color:var(--primary);">${d.name}</td>
+                <td style="padding:10px 8px;text-align:center;">${d.count}</td>
+                <td style="padding:10px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
+                <td style="padding:10px 8px;text-align:right;">${(d.revenue/d.count).toFixed(2)} GHC</td>
+                <td style="padding:10px 8px;text-align:center;">${Math.round(d.duration/60)} hrs</td>
+                <td style="padding:10px 8px;text-align:center;">
+                    ${availMins > 0 ? `<div style="background:#f1f1f1;border-radius:4px;height:8px;margin-bottom:2px;"><div style="background:${utilisPct>=80?'var(--success)':utilisPct>=50?'var(--accent)':'var(--error)'};height:100%;border-radius:4px;width:${utilisPct}%;"></div></div>${utilisDisplay}` : '—'}
+                </td>
+                <td style="padding:10px 8px;text-align:center;color:#999;font-style:italic;">—</td>
+            </tr>`;
+        }).join('');
+
+        tableEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+            ${rpt_tableHead(
+                {label:'Technician'},{label:'Clients',align:'center'},{label:'Revenue',align:'right'},
+                {label:'Avg/Client',align:'right'},{label:'Hours',align:'center'},
+                {label:'Utilisation',align:'center'},{label:'Rating',align:'center'}
+            )}
+            <tbody>${rows}</tbody>
+            <tfoot><tr style="background:#f9f7f4;font-weight:700;border-top:2px solid var(--border);">
+                <td style="padding:9px 8px;">TOTAL</td>
+                <td style="padding:9px 8px;text-align:center;">${totalClients}</td>
+                <td style="padding:9px 8px;text-align:right;color:var(--success);">${totalRev.toFixed(2)} GHC</td>
+                <td style="padding:9px 8px;text-align:right;">${(totalRev/totalClients).toFixed(2)} GHC</td>
+                <td colspan="3"></td>
+            </tr></tfoot>
+        </table></div>`;
+    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+};
+
+
+// ══════════════════════════════════════════════════════════════
+//  5. CLIENT INTELLIGENCE REPORT
+// ══════════════════════════════════════════════════════════════
+window.rpt_loadClients = async function() {
+    const tableEl   = document.getElementById('rpt_clientTable');
+    const metricsEl = document.getElementById('rpt_clientMetrics');
+    if (!tableEl) return;
+
+    const month = document.getElementById('rpt_clientMonth')?.value || todayDateStr.slice(0,7);
+    const [yr, mo] = month.split('-');
+    const monthStart = `${yr}-${mo}-01`;
+    const monthEnd   = `${yr}-${mo}-${new Date(yr, mo, 0).getDate()}`;
+    const today      = todayDateStr;
+
+    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    metricsEl.style.display = 'none';
+
+    try {
+        const [clientsSnap, jobsSnap] = await Promise.all([
+            db.collection('Clients').get(),
+            db.collection('Active_Jobs').where('status','==','Closed').get()
+        ]);
+
+        // Build client spend map from all jobs
+        const spendMap = {};
+        jobsSnap.forEach(d => {
+            const j = d.data();
+            const phone = j.clientPhone || '';
+            if (!phone) return;
+            if (!spendMap[phone]) spendMap[phone] = { visits:0, spend:0, lastVisit:'', name: j.clientName||'' };
+            spendMap[phone].visits++;
+            spendMap[phone].spend += parseFloat(j.grandTotal||j.bookedPrice||0);
+            if (!spendMap[phone].lastVisit || j.dateString > spendMap[phone].lastVisit) {
+                spendMap[phone].lastVisit = j.dateString;
+            }
+        });
+
+        const clients = [];
+        clientsSnap.forEach(d => clients.push({ id: d.id, ...d.data() }));
+        _rpt_cache.clients = clients;
+
+        const now = new Date(today + 'T12:00:00');
+        let newCount = 0, lapsedList = [], vipList = [], birthdayList = [];
+
+        clients.forEach(c => {
+            const phone   = c.Tel_Number || c.id;
+            const spend   = spendMap[phone];
+            const created = c.createdAt?.toDate?.() || null;
+
+            // New this month
+            if (created && created >= new Date(monthStart + 'T00:00:00') && created <= new Date(monthEnd + 'T23:59:59')) newCount++;
+
+            // Lapsed — no visit in 60+ days
+            if (spend?.lastVisit) {
+                const days = Math.floor((now - new Date(spend.lastVisit + 'T12:00:00')) / 86400000);
+                if (days >= 60) lapsedList.push({ ...c, phone, days, lastVisit: spend.lastVisit });
+            }
+
+            // VIP
+            if (spend && (spend.visits >= 10 || spend.spend >= 2000)) {
+                vipList.push({ ...c, phone, ...spend });
+            }
+
+            // Birthday this month
+            if (c.DOB) {
+                try {
+                    const dob = new Date(c.DOB);
+                    if (dob.getMonth()+1 === parseInt(mo)) {
+                        birthdayList.push({ ...c, phone, dob: c.DOB });
+                    }
+                } catch(e) {}
+            }
+        });
+
+        metricsEl.style.display = 'flex';
+        metricsEl.innerHTML =
+            rpt_metricCard(clients.length, 'Total Clients') +
+            rpt_metricCard(newCount, 'New This Month', 'var(--manager)') +
+            rpt_metricCard(lapsedList.length, 'Lapsed (60+ days)', lapsedList.length>0?'var(--error)':'#999') +
+            rpt_metricCard(vipList.length, 'VIP Clients', 'var(--accent)') +
+            rpt_metricCard(birthdayList.length, 'Birthdays This Month', '#f39c12');
+
+        // VIP table
+        const vipRows = vipList.sort((a,b)=>b.spend-a.spend).map((c,i) =>
+            `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;"><strong>${c.Forename||''} ${c.Surname||''}</strong></td>
+                <td style="padding:9px 8px;color:#666;">${c.phone}</td>
+                <td style="padding:9px 8px;text-align:center;">${c.visits}</td>
+                <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${c.spend.toFixed(2)} GHC</td>
+                <td style="padding:9px 8px;text-align:center;">${rpt_fmtDate(c.lastVisit)}</td>
+            </tr>`).join('');
+
+        // Lapsed table
+        const lapsedRows = lapsedList.sort((a,b)=>b.days-a.days).slice(0,20).map((c,i) =>
+            `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;"><strong>${c.Forename||''} ${c.Surname||''}</strong></td>
+                <td style="padding:9px 8px;color:#666;">${c.phone}</td>
+                <td style="padding:9px 8px;text-align:center;color:var(--error);font-weight:700;">${c.days} days ago</td>
+                <td style="padding:9px 8px;text-align:center;">${rpt_fmtDate(c.lastVisit)}</td>
+            </tr>`).join('');
+
+        // Birthday table
+        const bdayRows = birthdayList.map((c,i) =>
+            `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;"><strong>${c.Forename||''} ${c.Surname||''}</strong></td>
+                <td style="padding:9px 8px;color:#666;">${c.phone}</td>
+                <td style="padding:9px 8px;">${rpt_fmtDate(c.dob)}</td>
+            </tr>`).join('');
+
+        tableEl.innerHTML = `
+            <div style="margin-bottom:24px;">
+                <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px;">⭐ VIP Clients</p>
+                ${vipList.length ? `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                    ${rpt_tableHead({label:'Client'},{label:'Phone'},{label:'Visits',align:'center'},{label:'Total Spend',align:'right'},{label:'Last Visit',align:'center'})}
+                    <tbody>${vipRows}</tbody>
+                </table>` : '<p style="color:#999;font-style:italic;">No VIP clients yet.</p>'}
+            </div>
+            <div class="grid-2" style="gap:20px;">
+                <div>
+                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--error);margin-bottom:8px;">💤 Lapsed Clients (top 20)</p>
+                    ${lapsedList.length ? `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                        ${rpt_tableHead({label:'Client'},{label:'Phone'},{label:'Last Seen',align:'center'},{label:'Date',align:'center'})}
+                        <tbody>${lapsedRows}</tbody>
+                    </table>` : '<p style="color:#999;font-style:italic;">No lapsed clients.</p>'}
+                </div>
+                <div>
+                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#f39c12;margin-bottom:8px;">🎂 Birthdays in ${new Date(monthStart+'T12:00:00').toLocaleDateString('en-GB',{month:'long'})}</p>
+                    ${birthdayList.length ? `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                        ${rpt_tableHead({label:'Client'},{label:'Phone'},{label:'Birthday'})}
+                        <tbody>${bdayRows}</tbody>
+                    </table>` : '<p style="color:#999;font-style:italic;">No birthdays this month.</p>'}
+                </div>
+            </div>`;
+    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+};
+
+
+// ══════════════════════════════════════════════════════════════
+//  6. LEAVE & ATTENDANCE REPORT
+// ══════════════════════════════════════════════════════════════
+window.rpt_loadLeave = async function() {
+    const tableEl = document.getElementById('rpt_leaveTable');
+    if (!tableEl) return;
+
+    const year = document.getElementById('rpt_leaveYear')?.value || new Date().getFullYear().toString();
+    const yearStart = `${year}-01-01`, yearEnd = `${year}-12-31`;
+
+    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+
+    try {
+        const [leaveSnap, balSnap, schedSnap] = await Promise.all([
+            db.collection('Staff_Leave').where('status','==','Approved').get(),
+            db.collection('Staff_Leave_Balances').get(),
+            db.collection('Staff_Schedules').get()
+        ]);
+
+        // Tally leave per tech per type
+        const techLeave = {};
+        leaveSnap.forEach(d => {
+            const l = d.data();
+            if (l.startDate < yearStart || l.startDate > yearEnd) return;
+            const email = l.techEmail || '';
+            if (!techLeave[email]) techLeave[email] = { name: l.techName||email, types:{}, total:0 };
+            const days = Math.max(1, Math.round((new Date(l.endDate+'T12:00:00') - new Date(l.startDate+'T12:00:00'))/86400000) + 1);
+            techLeave[email].types[l.type] = (techLeave[email].types[l.type]||0) + days;
+            techLeave[email].total += days;
+        });
+
+        const balMap = {};
+        balSnap.forEach(d => { balMap[d.id] = d.data()[year] || d.data().annualLeave || 14; });
+
+        _rpt_cache.leave = Object.entries(techLeave).map(([email,d]) => ({ email, ...d }));
+
+        const leaveTypes = ['Annual Leave','Day Off','Wellness Day','Sick Leave','Leave Without Pay','Public Holiday'];
+
+        if (!Object.keys(techLeave).length) {
+            tableEl.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">No approved leave records for this year.</p>';
+            return;
+        }
+
+        const rows = Object.entries(techLeave).sort((a,b)=>b[1].total-a[1].total).map(([email,d],i) => {
+            const entitled  = balMap[email] || 14;
+            const annualUsed = d.types['Annual Leave'] || 0;
+            const remaining  = entitled - annualUsed;
+            const remColor   = remaining < 0 ? 'var(--error)' : remaining <= 3 ? 'var(--accent)' : 'var(--success)';
+            return `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
+                <td style="padding:9px 8px;font-weight:700;color:var(--primary);">${d.name}</td>
+                ${leaveTypes.map(t => `<td style="padding:9px 8px;text-align:center;">${d.types[t]||0}</td>`).join('')}
+                <td style="padding:9px 8px;text-align:center;font-weight:700;">${d.total}</td>
+                <td style="padding:9px 8px;text-align:center;">${entitled}</td>
+                <td style="padding:9px 8px;text-align:center;font-weight:700;color:${remColor};">${remaining}</td>
+            </tr>`;
+        }).join('');
+
+        tableEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+            ${rpt_tableHead(
+                {label:'Staff Member'},
+                ...leaveTypes.map(t => ({label:t,align:'center'})),
+                {label:'Total Days',align:'center'},
+                {label:'Entitlement',align:'center'},
+                {label:'Remaining',align:'center'}
+            )}
+            <tbody>${rows}</tbody>
+        </table></div>`;
+    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+};
+
+
+// ══════════════════════════════════════════════════════════════
+//  CSV EXPORT
+// ══════════════════════════════════════════════════════════════
+window.rpt_exportCSV = function(type) {
+    let rows = [], filename = '';
+
+    if (type === 'upcoming') {
+        if (!_rpt_cache.upcoming.length) { alert('Load the report first.'); return; }
+        rows = [['Date','Time','Client','Phone','Service','Tech','Duration','Amount','Status','Group'],
+            ..._rpt_cache.upcoming.map(a => [
+                a.dateString, a.timeString, a.clientName||'', a.clientPhone||'',
+                a.bookedService||'', a.assignedTechName||'', a.bookedDuration||0,
+                parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2), a.status, a.isGroupBooking?'Yes':'No'
+            ])];
+        filename = `upcoming-bookings-${todayDateStr}.csv`;
+
+    } else if (type === 'daily') {
+        if (!_rpt_cache.daily.length) { alert('Load the report first.'); return; }
+        rows = [['Client','Phone','Service','Tech','Duration','Amount','Payment Method'],
+            ..._rpt_cache.daily.map(j => [
+                j.clientName||'', j.clientPhone||'', j.bookedService||'',
+                j.assignedTechName||'', j.bookedDuration||0,
+                parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2), j.paymentMethod||''
+            ])];
+        filename = `daily-ops-${document.getElementById('rpt_dailyDate')?.value||todayDateStr}.csv`;
+
+    } else if (type === 'monthly') {
+        if (!_rpt_cache.monthly.length) { alert('Load the report first.'); return; }
+        rows = [['Date','Client','Service','Tech','Amount'],
+            ..._rpt_cache.monthly.map(j => [
+                j.dateString, j.clientName||'', j.bookedService||'',
+                j.assignedTechName||'', parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2)
+            ])];
+        filename = `monthly-summary-${document.getElementById('rpt_monthlyMonth')?.value||''}.csv`;
+
+    } else if (type === 'tech') {
+        if (!_rpt_cache.tech.length) { alert('Load the report first.'); return; }
+        rows = [['Technician','Email','Clients','Revenue','Avg/Client','Hours'],
+            ..._rpt_cache.tech.map(t => [
+                t.name, t.email, t.count,
+                t.revenue.toFixed(2), (t.revenue/t.count).toFixed(2),
+                Math.round(t.duration/60)
+            ])];
+        filename = `tech-performance-${document.getElementById('rpt_techMonth')?.value||''}.csv`;
+
+    } else if (type === 'clients') {
+        if (!_rpt_cache.clients.length) { alert('Load the report first.'); return; }
+        rows = [['Name','Phone','Email','DOB'],
+            ..._rpt_cache.clients.map(c => [
+                `${c.Forename||''} ${c.Surname||''}`.trim(),
+                c.Tel_Number||'', c.Email||'', c.DOB||''
+            ])];
+        filename = `client-intelligence-${todayDateStr}.csv`;
+
+    } else if (type === 'leave') {
+        if (!_rpt_cache.leave.length) { alert('Load the report first.'); return; }
+        const types = ['Annual Leave','Day Off','Wellness Day','Sick Leave','Leave Without Pay','Public Holiday'];
+        rows = [['Staff','Email',...types,'Total'],
+            ..._rpt_cache.leave.map(d => [
+                d.name, d.email, ...types.map(t => d.types?.[t]||0), d.total
+            ])];
+        filename = `leave-attendance-${document.getElementById('rpt_leaveYear')?.value||''}.csv`;
+    }
+
+    if (!rows.length) return;
+    const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+};
+
+console.log('Thuraya Reports module loaded.');

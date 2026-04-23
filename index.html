@@ -84,6 +84,10 @@
                 <input type="radio" name="main_nav" id="nav_supply" value="supplyView" onchange="switchModule(this.value)">
                 <label for="nav_supply">📦 Supply Chain</label>
             </div>
+            <div class="nav-tab" id="tabReports">
+                <input type="radio" name="main_nav" id="nav_reports" value="reportsView" onchange="switchModule(this.value)">
+                <label for="nav_reports">📊 Reports</label>
+            </div>
             <div class="nav-tab" id="tabAdmin">
                 <input type="radio" name="main_nav" id="nav_admin" value="adminView" onchange="switchModule(this.value)">
                 <label for="nav_admin">⚙️ System Admin</label>
@@ -994,6 +998,144 @@
             </div><!-- /#cip_panel -->
 
         </div><!-- /#clientIntelView -->
+
+        <!-- ══════════════════════════════════════════════════
+             REPORTS MODULE
+        ══════════════════════════════════════════════════ -->
+        <div id="reportsView" class="app-module">
+
+            <!-- Sub-tabs -->
+            <div class="category-tabs" style="margin-bottom:20px; justify-content:flex-start; gap:10px;">
+                <label><input type="radio" name="rpt_sub" value="rpt_upcoming"  checked onchange="rpt_switchSub(this.value)"> 📅 Upcoming Bookings</label>
+                <label><input type="radio" name="rpt_sub" value="rpt_daily"           onchange="rpt_switchSub(this.value)"> 📋 Daily Operations</label>
+                <label><input type="radio" name="rpt_sub" value="rpt_monthly"         onchange="rpt_switchSub(this.value)"> 📈 Weekly / Monthly</label>
+                <label><input type="radio" name="rpt_sub" value="rpt_tech"            onchange="rpt_switchSub(this.value)"> 👩‍🔧 Tech Performance</label>
+                <label><input type="radio" name="rpt_sub" value="rpt_clients"         onchange="rpt_switchSub(this.value)"> 👥 Client Intelligence</label>
+                <label><input type="radio" name="rpt_sub" value="rpt_leave"           onchange="rpt_switchSub(this.value)"> 🌿 Leave & Attendance</label>
+            </div>
+
+            <!-- ── 1. UPCOMING BOOKINGS ──────────────────── -->
+            <div id="rpt_upcoming">
+                <div class="module-box" style="border-top:4px solid var(--primary);">
+                    <h3 style="color:var(--primary);">Upcoming Bookings</h3>
+                    <div class="grid-2" style="gap:12px; margin-bottom:12px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Date Range</label>
+                            <select id="rpt_dateRange" onchange="rpt_onRangeChange()">
+                                <option value="today">Today</option>
+                                <option value="tomorrow">Tomorrow</option>
+                                <option value="week" selected>This Week (7 days)</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Filter by Technician</label>
+                            <select id="rpt_techFilter"><option value="all">All Technicians</option></select>
+                        </div>
+                    </div>
+                    <div id="rpt_customRange" class="grid-2" style="display:none; gap:12px; margin-bottom:12px;">
+                        <div class="form-group" style="margin-bottom:0;"><label>Start Date</label><input type="date" id="rpt_startDate"></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>End Date</label><input type="date" id="rpt_endDate"></div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label>Filter by Status</label>
+                        <select id="rpt_statusFilter">
+                            <option value="all">All Statuses</option>
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="Arrived">Arrived</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Action Required">Action Required</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;">
+                        <button class="btn" style="width:auto; padding:9px 22px;" onclick="rpt_loadUpcoming()">Load Report</button>
+                        <button class="btn btn-secondary" style="width:auto; padding:9px 22px;" onclick="rpt_exportCSV('upcoming')">⬇ Export CSV</button>
+                        <button class="btn btn-secondary" style="width:auto; padding:9px 22px;" onclick="window.print()">🖨 Print</button>
+                    </div>
+                    <div id="rpt_upcomingSummary" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:16px;"></div>
+                    <div id="rpt_upcomingTable"><p style="color:#999; font-style:italic; text-align:center; padding:30px 0;">Select filters and click Load Report.</p></div>
+                </div>
+            </div>
+
+            <!-- ── 2. DAILY OPERATIONS ───────────────────── -->
+            <div id="rpt_daily" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Daily Operations Report</h3>
+                    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
+                        <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;"><label>Select Date</label><input type="date" id="rpt_dailyDate"></div>
+                        <button class="btn" style="width:auto; padding:9px 22px;" onclick="rpt_loadDaily()">Load</button>
+                        <button class="btn btn-secondary" style="width:auto; padding:9px 22px;" onclick="rpt_exportCSV('daily')">⬇ CSV</button>
+                        <button class="btn btn-secondary" style="width:auto; padding:9px 22px;" onclick="window.print()">🖨 Print</button>
+                    </div>
+                    <div id="rpt_dailyMetrics" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:20px;"></div>
+                    <div id="rpt_dailyTable"><p style="color:#999; font-style:italic; text-align:center; padding:30px 0;">Select a date and click Load.</p></div>
+                </div>
+            </div>
+
+            <!-- ── 3. WEEKLY / MONTHLY SUMMARY ──────────── -->
+            <div id="rpt_monthly" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--manager);">
+                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Weekly / Monthly Summary</h3>
+                    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>View</label>
+                            <select id="rpt_monthlyView">
+                                <option value="month">Monthly</option>
+                                <option value="week">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;"><label>Month</label><input type="month" id="rpt_monthlyMonth"></div>
+                        <button class="btn" style="width:auto; padding:9px 22px;" onclick="rpt_loadMonthly()">Load</button>
+                        <button class="btn btn-secondary" style="width:auto; padding:9px 22px;" onclick="rpt_exportCSV('monthly')">⬇ CSV</button>
+                    </div>
+                    <div id="rpt_monthlyMetrics" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:20px;"></div>
+                    <div id="rpt_monthlyTable"><p style="color:#999; font-style:italic; text-align:center; padding:30px 0;">Select a period and click Load.</p></div>
+                </div>
+            </div>
+
+            <!-- ── 4. TECH PERFORMANCE ───────────────────── -->
+            <div id="rpt_tech" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--success);">
+                    <h3 style="color:var(--success); border-bottom-color:var(--success);">Technician Performance</h3>
+                    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
+                        <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;"><label>Month</label><input type="month" id="rpt_techMonth"></div>
+                        <button class="btn" style="width:auto; padding:9px 22px;" onclick="rpt_loadTechPerf()">Load</button>
+                        <button class="btn btn-secondary" style="width:auto; padding:9px 22px;" onclick="rpt_exportCSV('tech')">⬇ CSV</button>
+                    </div>
+                    <div id="rpt_techTable"><p style="color:#999; font-style:italic; text-align:center; padding:30px 0;">Select a month and click Load.</p></div>
+                </div>
+            </div>
+
+            <!-- ── 5. CLIENT INTELLIGENCE ────────────────── -->
+            <div id="rpt_clients" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--admin);">
+                    <h3 style="color:var(--admin); border-bottom-color:var(--admin);">Client Intelligence Report</h3>
+                    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
+                        <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;"><label>Month (for new clients)</label><input type="month" id="rpt_clientMonth"></div>
+                        <button class="btn" style="width:auto; padding:9px 22px;" onclick="rpt_loadClients()">Load</button>
+                        <button class="btn btn-secondary" style="width:auto; padding:9px 22px;" onclick="rpt_exportCSV('clients')">⬇ CSV</button>
+                    </div>
+                    <div id="rpt_clientMetrics" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:20px;"></div>
+                    <div id="rpt_clientTable"><p style="color:#999; font-style:italic; text-align:center; padding:30px 0;">Click Load to run the client intelligence report.</p></div>
+                </div>
+            </div>
+
+            <!-- ── 6. LEAVE & ATTENDANCE ─────────────────── -->
+            <div id="rpt_leave" style="display:none;">
+                <div class="module-box" style="border-top:4px solid var(--supply);">
+                    <h3 style="color:var(--supply); border-bottom-color:var(--supply);">Leave & Attendance Report</h3>
+                    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
+                        <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;"><label>Year</label>
+                            <select id="rpt_leaveYear"></select>
+                        </div>
+                        <button class="btn" style="width:auto; padding:9px 22px;" onclick="rpt_loadLeave()">Load</button>
+                        <button class="btn btn-secondary" style="width:auto; padding:9px 22px;" onclick="rpt_exportCSV('leave')">⬇ CSV</button>
+                    </div>
+                    <div id="rpt_leaveTable"><p style="color:#999; font-style:italic; text-align:center; padding:30px 0;">Select a year and click Load.</p></div>
+                </div>
+            </div>
+
+        </div><!-- /#reportsView -->
 
     </div>
 
