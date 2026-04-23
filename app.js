@@ -2816,44 +2816,53 @@ console.log('Thuraya Active Atelier(s) module loaded.');
 //  REPORTS MODULE — Full Build
 // ============================================================
 
-let _rpt_cache = { upcoming: [], daily: [], monthly: [], tech: [], clients: [], leave: [] };
+
+// ============================================================
+//  REPORTS MODULE — Bug-fixed rewrite
+// ============================================================
+
+let _rpt_cache     = { upcoming:[], daily:[], monthly:[], tech:[], clients:[], leave:[] };
+let _rpt_initiated = false;
 
 // ── Init ──────────────────────────────────────────────────────
 function rpt_init() {
     const today = todayDateStr;
 
-    // Set default dates
-    ['rpt_dailyDate'].forEach(id => { const el = document.getElementById(id); if (el && !el.value) el.value = today; });
-    ['rpt_techMonth','rpt_monthlyMonth','rpt_clientMonth'].forEach(id => { const el = document.getElementById(id); if (el && !el.value) el.value = today.slice(0,7); });
+    // Set default dates — only if empty
+    const setIfEmpty = (id, val) => { const el = document.getElementById(id); if (el && !el.value) el.value = val; };
+    setIfEmpty('rpt_dailyDate',   today);
+    setIfEmpty('rpt_startDate',   today);
+    setIfEmpty('rpt_techMonth',   today.slice(0,7));
+    setIfEmpty('rpt_monthlyMonth',today.slice(0,7));
+    setIfEmpty('rpt_clientMonth', today.slice(0,7));
 
-    const startEl = document.getElementById('rpt_startDate');
-    if (startEl && !startEl.value) startEl.value = today;
     const endEl = document.getElementById('rpt_endDate');
     if (endEl && !endEl.value) {
         const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 6);
         endEl.value = d.toISOString().slice(0,10);
     }
 
-    // Populate year selector for leave report
+    // Year selector — only populate once
     const yearSel = document.getElementById('rpt_leaveYear');
     if (yearSel && !yearSel.options.length) {
         const yr = new Date().getFullYear();
         for (let y = yr; y >= yr - 3; y--) {
             const opt = document.createElement('option');
-            opt.value = y; opt.textContent = y;
-            yearSel.appendChild(opt);
+            opt.value = y; opt.textContent = y; yearSel.appendChild(opt);
         }
     }
 
-    // Populate tech filter
+    // Tech filter — only populate once
     const techSel = document.getElementById('rpt_techFilter');
     if (techSel && techSel.options.length <= 1) {
         (typeof allTechs !== 'undefined' ? allTechs : []).forEach(t => {
             const opt = document.createElement('option');
-            opt.value = t.email; opt.textContent = t.name;
-            techSel.appendChild(opt);
+            opt.value = t.email; opt.textContent = t.name; techSel.appendChild(opt);
         });
     }
+
+    // Show upcoming sub-tab by default
+    rpt_switchSub('rpt_upcoming');
 }
 
 // ── Sub-tab switcher ──────────────────────────────────────────
@@ -2862,6 +2871,9 @@ window.rpt_switchSub = function(subId) {
         const el = document.getElementById(id);
         if (el) el.style.display = id === subId ? 'block' : 'none';
     });
+    // Sync radio button
+    const radio = document.querySelector(`input[name="rpt_sub"][value="${subId}"]`);
+    if (radio) radio.checked = true;
 };
 
 window.rpt_onRangeChange = function() {
@@ -2899,11 +2911,19 @@ function rpt_fmt12(t) {
     const [h, m] = t.split(':').map(Number);
     return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;
 }
-function rpt_metricCard(val, lbl, color='var(--primary)') {
-    return `<div class="cip-metric"><div class="cip-metric-val" style="color:${color};">${val}</div><div class="cip-metric-lbl">${lbl}</div></div>`;
+function rpt_metricCard(val, lbl, color) {
+    return `<div class="cip-metric"><div class="cip-metric-val" style="color:${color||'var(--primary)'};">${val}</div><div class="cip-metric-lbl">${lbl}</div></div>`;
 }
 function rpt_tableHead(...cols) {
-    return `<thead><tr style="background:#f1f1f1;">${cols.map(c => `<th style="padding:9px 8px; text-align:${c.align||'left'}; color:var(--primary); white-space:nowrap;">${c.label}</th>`).join('')}</tr></thead>`;
+    return `<thead><tr style="background:#f1f1f1;">${cols.map(c =>
+        `<th style="padding:9px 8px;text-align:${c.align||'left'};color:var(--primary);white-space:nowrap;">${c.label}</th>`
+    ).join('')}</tr></thead>`;
+}
+function rpt_noData(msg) {
+    return `<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">${msg}</p>`;
+}
+function rpt_err(e) {
+    return `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`;
 }
 
 
@@ -2914,7 +2934,7 @@ window.rpt_loadUpcoming = async function() {
     const tableEl   = document.getElementById('rpt_upcomingTable');
     const summaryEl = document.getElementById('rpt_upcomingSummary');
     if (!tableEl) return;
-    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    tableEl.innerHTML = rpt_noData('Loading…');
     summaryEl.style.display = 'none';
 
     const { start, end } = rpt_getDateRange();
@@ -2922,7 +2942,7 @@ window.rpt_loadUpcoming = async function() {
     const statusFilter = document.getElementById('rpt_statusFilter')?.value || 'all';
 
     try {
-        // Single where to avoid composite index — filter end date client-side
+        // Single where on dateString + status to avoid composite index
         const snap = await db.collection('Appointments')
             .where('dateString', '>=', start)
             .where('status', 'in', ['Scheduled','Arrived','In Progress','Action Required'])
@@ -2930,22 +2950,18 @@ window.rpt_loadUpcoming = async function() {
 
         let appts = [];
         snap.forEach(d => appts.push({ id: d.id, ...d.data() }));
-        // Filter end date + other filters client-side
+        // Filter end date + optional filters client-side
         appts = appts.filter(a => a.dateString <= end);
-        if (techFilter !== 'all')   appts = appts.filter(a => a.assignedTechEmail === techFilter);
+        if (techFilter   !== 'all') appts = appts.filter(a => a.assignedTechEmail === techFilter);
         if (statusFilter !== 'all') appts = appts.filter(a => a.status === statusFilter);
         appts.sort((a,b) => (a.dateString+a.timeString).localeCompare(b.dateString+b.timeString));
 
         _rpt_cache.upcoming = appts;
 
-        if (!appts.length) {
-            tableEl.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">No bookings found for this period.</p>';
-            return;
-        }
+        if (!appts.length) { tableEl.innerHTML = rpt_noData('No bookings found for this period.'); return; }
 
         const totalRev = appts.reduce((s,a) => s + parseFloat(a.grandTotal||a.bookedPrice||0), 0);
         const groups   = appts.filter(a => a.isGroupBooking).length;
-        const cancelled= 0; // cancelled excluded from query
 
         summaryEl.style.display = 'flex';
         summaryEl.innerHTML =
@@ -2954,7 +2970,10 @@ window.rpt_loadUpcoming = async function() {
             rpt_metricCard(groups, 'Group Bookings', 'var(--manager)') +
             rpt_metricCard(start===end ? rpt_fmtDate(start) : rpt_fmtDate(start)+' → '+rpt_fmtDate(end), 'Period');
 
-        const statusColors = { 'Scheduled':'var(--primary)','Arrived':'var(--accent)','In Progress':'var(--success)','Action Required':'var(--error)' };
+        const statusColors = {
+            'Scheduled':'var(--primary)','Arrived':'var(--accent)',
+            'In Progress':'var(--success)','Action Required':'var(--error)'
+        };
 
         tableEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
             ${rpt_tableHead(
@@ -2963,16 +2982,17 @@ window.rpt_loadUpcoming = async function() {
             )}
             <tbody>${appts.map((a,i) => {
                 const amt   = parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2);
-                const color = statusColors[a.status]||'#999';
+                const color = statusColors[a.status] || '#999';
                 const isToday = a.dateString === todayDateStr;
                 return `<tr style="background:${i%2===0?'white':'#fafafa'};border-bottom:1px solid #f1f1f1;">
                     <td style="padding:9px 8px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':'inherit'};">
-                        ${rpt_fmtDate(a.dateString)}${isToday?` <span style="font-size:0.68rem;background:var(--error);color:white;padding:1px 5px;border-radius:3px;">TODAY</span>`:''}
+                        ${rpt_fmtDate(a.dateString)}
+                        ${isToday?'<span style="font-size:0.68rem;background:var(--error);color:white;padding:1px 5px;border-radius:3px;margin-left:4px;">TODAY</span>':''}
                     </td>
                     <td style="padding:9px 8px;white-space:nowrap;">${rpt_fmt12(a.timeString)}</td>
                     <td style="padding:9px 8px;">
                         <strong>${a.clientName||'Unknown'}</strong>
-                        ${a.isGroupBooking?`<span style="font-size:0.68rem;background:var(--manager);color:white;padding:1px 5px;border-radius:3px;margin-left:4px;">GROUP</span>`:''}
+                        ${a.isGroupBooking?'<span style="font-size:0.68rem;background:var(--manager);color:white;padding:1px 5px;border-radius:3px;margin-left:4px;">GROUP</span>':''}
                         <br><span style="font-size:0.75rem;color:#999;">${a.clientPhone||''}</span>
                     </td>
                     <td style="padding:9px 8px;">${a.bookedService||'N/A'}</td>
@@ -2990,7 +3010,7 @@ window.rpt_loadUpcoming = async function() {
                 <td></td>
             </tr></tfoot>
         </table></div>`;
-    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+    } catch(e) { tableEl.innerHTML = rpt_err(e); }
 };
 
 
@@ -3002,43 +3022,62 @@ window.rpt_loadDaily = async function() {
     const metricsEl = document.getElementById('rpt_dailyMetrics');
     if (!tableEl) return;
     const date = document.getElementById('rpt_dailyDate')?.value || todayDateStr;
-    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    tableEl.innerHTML = rpt_noData('Loading…');
     metricsEl.style.display = 'none';
 
     try {
-        // Closed jobs = served clients
+        // FIX: two separate single-where queries — no composite index needed
         const [closedSnap, cancelSnap] = await Promise.all([
-            db.collection('Active_Jobs').where('dateString','==',date).where('status','==','Closed').get(),
-            db.collection('Appointments').where('dateString','==',date).where('status','==','Cancelled').get()
+            db.collection('Active_Jobs')
+                .where('dateString','==',date)
+                .where('status','==','Closed')
+                .get(),
+            db.collection('Appointments')
+                .where('dateString','==',date)
+                .where('status','==','Cancelled')
+                .get()
         ]);
 
-        const jobs = []; closedSnap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
+        const jobs = [];
+        closedSnap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
         _rpt_cache.daily = jobs;
-        const cancelled = cancelSnap.size;
+
+        // FIX: cancelledCount is a number from snap.size
+        const cancelledCount = cancelSnap.size;
 
         if (!jobs.length) {
-            tableEl.innerHTML = `<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">No closed jobs for ${rpt_fmtDate(date)}.</p>`;
+            tableEl.innerHTML = rpt_noData(`No completed jobs found for ${rpt_fmtDate(date)}.`);
+            metricsEl.style.display = 'flex';
+            metricsEl.innerHTML =
+                rpt_metricCard(0, 'Clients Served', 'var(--success)') +
+                rpt_metricCard('0.00 GHC', 'Total Revenue', 'var(--success)') +
+                rpt_metricCard('— mins', 'Avg Duration') +
+                rpt_metricCard(0, 'Techs Active', 'var(--manager)') +
+                rpt_metricCard(cancelledCount, 'Cancellations', cancelledCount>0?'var(--error)':'#999');
             return;
         }
 
-        const totalRev  = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
-        const avgDur    = jobs.reduce((s,j) => s + parseInt(j.bookedDuration||0), 0) / jobs.length;
-        const techMap   = {}, svcMap = {}, payMap = {};
+        const totalRev = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
+        // FIX: guard against division by zero
+        const totalDur = jobs.reduce((s,j) => s + parseInt(j.bookedDuration||0), 0);
+        const avgDur   = jobs.length > 0 ? Math.round(totalDur / jobs.length) : 0;
+
+        const techMap = {}, svcMap = {}, payMap = {};
 
         jobs.forEach(j => {
-            // By tech
             const tn = j.assignedTechName || 'Unknown';
             if (!techMap[tn]) techMap[tn] = { count:0, revenue:0, duration:0 };
             techMap[tn].count++;
             techMap[tn].revenue  += parseFloat(j.grandTotal||j.bookedPrice||0);
             techMap[tn].duration += parseInt(j.bookedDuration||0);
-            // By service
+
             const svc = (j.bookedService||'Unknown').split(',')[0].trim();
             if (!svcMap[svc]) svcMap[svc] = { count:0, revenue:0 };
             svcMap[svc].count++;
             svcMap[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
-            // By payment method
-            const pay = j.paymentMethod || 'Not recorded';
+
+            // FIX: paymentMethod lives on Active_Jobs — use fallback gracefully
+            const pay = j.paymentMethod || j.payment || 'Cash / Not Recorded';
             if (!payMap[pay]) payMap[pay] = { count:0, revenue:0 };
             payMap[pay].count++;
             payMap[pay].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
@@ -3048,19 +3087,18 @@ window.rpt_loadDaily = async function() {
         metricsEl.innerHTML =
             rpt_metricCard(jobs.length, 'Clients Served', 'var(--success)') +
             rpt_metricCard(totalRev.toFixed(0)+' GHC', 'Total Revenue', 'var(--success)') +
-            rpt_metricCard((totalRev/jobs.length).toFixed(0)+' GHC', 'Avg per Client') +
-            rpt_metricCard(Math.round(avgDur)+' mins', 'Avg Duration') +
+            rpt_metricCard(jobs.length>0?(totalRev/jobs.length).toFixed(0)+' GHC':'—', 'Avg per Client') +
+            rpt_metricCard(avgDur+' mins', 'Avg Duration') +
             rpt_metricCard(Object.keys(techMap).length, 'Techs Active', 'var(--manager)') +
-            rpt_metricCard(cancelled, 'Cancellations', cancelled>0?'var(--error)':'#999');
+            rpt_metricCard(cancelledCount, 'Cancellations', cancelledCount>0?'var(--error)':'#999');
 
-        // Build tables
         const techRows = Object.entries(techMap).sort((a,b)=>b[1].revenue-a[1].revenue).map(([n,d],i) =>
             `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
                 <td style="padding:9px 8px;">👩‍🔧 ${n}</td>
                 <td style="padding:9px 8px;text-align:center;">${d.count}</td>
                 <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
-                <td style="padding:9px 8px;text-align:right;color:#666;">${(d.revenue/d.count).toFixed(2)} GHC</td>
-                <td style="padding:9px 8px;text-align:center;">${Math.round(d.duration/60)} hrs</td>
+                <td style="padding:9px 8px;text-align:right;color:#666;">${d.count>0?(d.revenue/d.count).toFixed(2):0} GHC</td>
+                <td style="padding:9px 8px;text-align:center;">${Math.round(d.duration/60)||'<1'} hr${Math.round(d.duration/60)!==1?'s':''}</td>
             </tr>`).join('');
 
         const svcRows = Object.entries(svcMap).sort((a,b)=>b[1].count-a[1].count).map(([n,d],i) =>
@@ -3077,31 +3115,33 @@ window.rpt_loadDaily = async function() {
                 <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
             </tr>`).join('');
 
+        const noRow = '<tr><td colspan="5" style="padding:12px;text-align:center;color:#999;font-style:italic;">No data</td></tr>';
+
         tableEl.innerHTML = `
-            <div class="grid-2" style="gap:20px; margin-bottom:20px;">
+            <div class="grid-2" style="gap:20px;margin-bottom:20px;">
                 <div>
                     <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">By Technician</p>
                     <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                         ${rpt_tableHead({label:'Tech'},{label:'Clients',align:'center'},{label:'Revenue',align:'right'},{label:'Avg',align:'right'},{label:'Hours',align:'center'})}
-                        <tbody>${techRows}</tbody>
+                        <tbody>${techRows||noRow}</tbody>
                     </table>
                 </div>
                 <div>
-                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">By Service</p>
+                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">By Service (Most Popular)</p>
                     <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                         ${rpt_tableHead({label:'Service'},{label:'Count',align:'center'},{label:'Revenue',align:'right'})}
-                        <tbody>${svcRows}</tbody>
+                        <tbody>${svcRows||noRow}</tbody>
                     </table>
                 </div>
             </div>
-            <div style="max-width:420px;">
+            <div style="max-width:440px;">
                 <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">By Payment Method</p>
                 <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                     ${rpt_tableHead({label:'Method'},{label:'Count',align:'center'},{label:'Revenue',align:'right'})}
-                    <tbody>${payRows}</tbody>
+                    <tbody>${payRows||noRow}</tbody>
                 </table>
             </div>`;
-    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+    } catch(e) { tableEl.innerHTML = rpt_err(e); }
 };
 
 
@@ -3114,84 +3154,88 @@ window.rpt_loadMonthly = async function() {
     if (!tableEl) return;
 
     const month = document.getElementById('rpt_monthlyMonth')?.value;
-    if (!month) return;
+    if (!month) { tableEl.innerHTML = rpt_noData('Please select a month.'); return; }
     const [yr, mo] = month.split('-');
     const start = `${yr}-${mo}-01`;
-    const daysInMonth = new Date(yr, mo, 0).getDate();
-    const end = `${yr}-${mo}-${String(daysInMonth).padStart(2,'0')}`;
+    const end   = `${yr}-${mo}-${String(new Date(parseInt(yr), parseInt(mo), 0).getDate()).padStart(2,'0')}`;
 
-    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    tableEl.innerHTML = rpt_noData('Loading…');
     metricsEl.style.display = 'none';
 
     try {
-        const [jobsSnap, apptSnap, clientsSnap] = await Promise.all([
+        // FIX: single where queries only — filter end date client-side
+        const [jobsSnap, apptSnap] = await Promise.all([
             db.collection('Active_Jobs').where('dateString','>=',start).where('status','==','Closed').get(),
-            db.collection('Appointments').where('dateString','>=',start).get(),
-            db.collection('Clients').get()
+            db.collection('Appointments').where('dateString','>=',start).get()
         ]);
 
-        const jobs = []; jobsSnap.forEach(d => { const j=d.data(); if(j.dateString<=end) jobs.push({ id:d.id, ...j }); });
+        const jobs = [];
+        jobsSnap.forEach(d => { const j = d.data(); if (j.dateString <= end) jobs.push({ id:d.id, ...j }); });
         _rpt_cache.monthly = jobs;
 
-        const totalRev     = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
-        const cancelled    = []; apptSnap.forEach(d => { const a=d.data(); if(a.dateString<=end && a.status==='Cancelled') cancelled.push(a); });
+        const cancelledCount = (() => {
+            let c = 0;
+            apptSnap.forEach(d => { const a = d.data(); if (a.dateString <= end && a.status === 'Cancelled') c++; });
+            return c;
+        })();
 
-        // Day map for busiest days
-        const dayMap = {}; const hourMap = {};
-        const clientSpend = {};
-        const svcRev = {};
+        if (!jobs.length) {
+            tableEl.innerHTML = rpt_noData(`No completed jobs found for ${month}.`);
+            return;
+        }
+
+        const totalRev = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
+        const dayMap = {}, hourMap = {}, clientSpend = {}, svcRev = {};
 
         jobs.forEach(j => {
-            // By day
-            const day = j.dateString || '';
+            const day = j.dateString||'';
             if (!dayMap[day]) dayMap[day] = { count:0, revenue:0 };
-            dayMap[day].count++;
-            dayMap[day].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
-            // By hour
-            const hr = (j.timeString||'00:00').split(':')[0];
-            if (!hourMap[hr]) hourMap[hr] = 0;
-            hourMap[hr]++;
-            // Client spend
+            dayMap[day].count++; dayMap[day].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+
+            const hr = parseInt((j.timeString||'00:00').split(':')[0]);
+            hourMap[hr] = (hourMap[hr]||0) + 1;
+
             const phone = j.clientPhone||'';
             if (phone) {
-                if (!clientSpend[phone]) clientSpend[phone] = { name: j.clientName||'Unknown', spend:0, count:0 };
+                if (!clientSpend[phone]) clientSpend[phone] = { name:j.clientName||'Unknown', spend:0, count:0 };
                 clientSpend[phone].spend  += parseFloat(j.grandTotal||j.bookedPrice||0);
                 clientSpend[phone].count++;
             }
-            // Service revenue
+
             const svc = (j.bookedService||'Unknown').split(',')[0].trim();
             if (!svcRev[svc]) svcRev[svc] = { count:0, revenue:0 };
-            svcRev[svc].count++;
-            svcRev[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+            svcRev[svc].count++; svcRev[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
         });
 
-        // New vs returning clients
-        const allClients = new Set();
-        clientsSnap.forEach(d => {
-            const data = d.data();
-            if ((data.createdAt||'') >= start) return; // skip — new this month handled separately
-            allClients.add(d.data().Tel_Number||d.id);
-        });
-        const jobPhones   = new Set(jobs.map(j => j.clientPhone).filter(Boolean));
-        const newClients  = [...jobPhones].filter(p => !allClients.has(p)).length;
-        const retClients  = [...jobPhones].filter(p => allClients.has(p)).length;
+        // FIX: new vs returning — use unique client phones from jobs vs all prior jobs
+        // Simple approach: unique clients who visited this month
+        const uniqueClientsThisMonth = new Set(jobs.map(j => j.clientPhone).filter(Boolean));
 
-        // Busiest day
+        // Get prior jobs (before this month) to determine returning
+        const priorSnap = await db.collection('Active_Jobs')
+            .where('dateString','<',start)
+            .where('status','==','Closed')
+            .get();
+        const priorClients = new Set();
+        priorSnap.forEach(d => { const p = d.data().clientPhone; if(p) priorClients.add(p); });
+
+        const returningCount = [...uniqueClientsThisMonth].filter(p => priorClients.has(p)).length;
+        const newCount       = uniqueClientsThisMonth.size - returningCount;
+
         const busiestDay  = Object.entries(dayMap).sort((a,b)=>b[1].count-a[1].count)[0];
         const busiestHour = Object.entries(hourMap).sort((a,b)=>b[1]-a[1])[0];
-        const busiestHrFmt = busiestHour ? rpt_fmt12(busiestHour[0]+':00') : '—';
+        const busiestHrFmt = busiestHour ? rpt_fmt12(String(busiestHour[0]).padStart(2,'0')+':00') : '—';
 
         metricsEl.style.display = 'flex';
         metricsEl.innerHTML =
-            rpt_metricCard(jobs.length, 'Clients Served') +
+            rpt_metricCard(jobs.length, 'Total Clients Served') +
             rpt_metricCard(totalRev.toFixed(0)+' GHC', 'Total Revenue', 'var(--success)') +
-            rpt_metricCard(newClients, 'New Clients', 'var(--manager)') +
-            rpt_metricCard(retClients, 'Returning Clients') +
+            rpt_metricCard(newCount, 'New Clients', 'var(--manager)') +
+            rpt_metricCard(returningCount, 'Returning Clients') +
             rpt_metricCard(busiestDay ? rpt_fmtDate(busiestDay[0]) : '—', 'Busiest Day') +
             rpt_metricCard(busiestHrFmt, 'Peak Hour') +
-            rpt_metricCard(cancelled.length, 'Cancellations', cancelled.length>0?'var(--error)':'#999');
+            rpt_metricCard(cancelledCount, 'Cancellations', cancelledCount>0?'var(--error)':'#999');
 
-        // Top 10 clients
         const top10 = Object.entries(clientSpend).sort((a,b)=>b[1].spend-a[1].spend).slice(0,10);
         const top10Rows = top10.map(([phone,d],i) =>
             `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
@@ -3201,7 +3245,6 @@ window.rpt_loadMonthly = async function() {
                 <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.spend.toFixed(2)} GHC</td>
             </tr>`).join('');
 
-        // Top services
         const topSvc = Object.entries(svcRev).sort((a,b)=>b[1].revenue-a[1].revenue).slice(0,10);
         const topSvcRows = topSvc.map(([n,d],i) =>
             `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
@@ -3210,33 +3253,36 @@ window.rpt_loadMonthly = async function() {
                 <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
             </tr>`).join('');
 
-        // Daily revenue trend
+        const maxRev = Math.max(...Object.values(dayMap).map(x=>x.revenue), 1);
         const trendRows = Object.entries(dayMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([day,d]) =>
             `<tr style="border-bottom:1px solid #f1f1f1;">
                 <td style="padding:7px 8px;">${rpt_fmtDate(day)}</td>
                 <td style="padding:7px 8px;text-align:center;">${d.count}</td>
-                <td style="padding:7px 8px;text-align:right;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
-                <td style="padding:7px 8px;">
-                    <div style="background:#f1f1f1;border-radius:4px;height:10px;width:100%;max-width:120px;">
-                        <div style="background:var(--success);height:100%;border-radius:4px;width:${Math.min(100,Math.round((d.revenue/Math.max(...Object.values(dayMap).map(x=>x.revenue)))*100))}%;"></div>
+                <td style="padding:7px 8px;text-align:right;color:var(--success);">${d.revenue.toFixed(0)} GHC</td>
+                <td style="padding:7px 8px;min-width:100px;">
+                    <div style="background:#f1f1f1;border-radius:4px;height:10px;">
+                        <div style="background:var(--success);height:100%;border-radius:4px;width:${Math.round((d.revenue/maxRev)*100)}%;"></div>
                     </div>
                 </td>
             </tr>`).join('');
 
+        const noRow2 = '<tr><td colspan="4" style="padding:12px;text-align:center;color:#999;font-style:italic;">No data</td></tr>';
+        const noRow3 = '<tr><td colspan="3" style="padding:12px;text-align:center;color:#999;font-style:italic;">No data</td></tr>';
+
         tableEl.innerHTML = `
-            <div class="grid-2" style="gap:20px; margin-bottom:20px;">
+            <div class="grid-2" style="gap:20px;margin-bottom:20px;">
                 <div>
                     <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">Top 10 Clients by Spend</p>
                     <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                         ${rpt_tableHead({label:'Client'},{label:'Phone'},{label:'Visits',align:'center'},{label:'Total Spend',align:'right'})}
-                        <tbody>${top10Rows || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#999;">No data</td></tr>'}</tbody>
+                        <tbody>${top10Rows||noRow2}</tbody>
                     </table>
                 </div>
                 <div>
                     <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">Top Services by Revenue</p>
                     <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                         ${rpt_tableHead({label:'Service'},{label:'Count',align:'center'},{label:'Revenue',align:'right'})}
-                        <tbody>${topSvcRows || '<tr><td colspan="3" style="padding:12px;text-align:center;color:#999;">No data</td></tr>'}</tbody>
+                        <tbody>${topSvcRows||noRow3}</tbody>
                     </table>
                 </div>
             </div>
@@ -3244,10 +3290,10 @@ window.rpt_loadMonthly = async function() {
                 <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary);margin-bottom:8px;">Daily Revenue Trend</p>
                 <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                     ${rpt_tableHead({label:'Date'},{label:'Clients',align:'center'},{label:'Revenue',align:'right'},{label:''})}
-                    <tbody>${trendRows || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#999;">No data</td></tr>'}</tbody>
+                    <tbody>${trendRows||noRow2}</tbody>
                 </table>
             </div>`;
-    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+    } catch(e) { tableEl.innerHTML = rpt_err(e); }
 };
 
 
@@ -3258,14 +3304,14 @@ window.rpt_loadTechPerf = async function() {
     const tableEl = document.getElementById('rpt_techTable');
     if (!tableEl) return;
     const month = document.getElementById('rpt_techMonth')?.value;
-    if (!month) return;
+    if (!month) { tableEl.innerHTML = rpt_noData('Please select a month.'); return; }
     const [yr, mo] = month.split('-');
     const start = `${yr}-${mo}-01`;
-    const end   = `${yr}-${mo}-${new Date(yr, mo, 0).getDate()}`;
-    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    const end   = `${yr}-${mo}-${String(new Date(parseInt(yr), parseInt(mo), 0).getDate()).padStart(2,'0')}`;
+
+    tableEl.innerHTML = rpt_noData('Loading…');
 
     try {
-        // Get working hours from schedules for utilisation
         const [jobsSnap, schedSnap] = await Promise.all([
             db.collection('Active_Jobs').where('dateString','>=',start).where('status','==','Closed').get(),
             db.collection('Staff_Schedules').get()
@@ -3282,44 +3328,46 @@ window.rpt_loadTechPerf = async function() {
             techMap[k].duration += parseInt(j.bookedDuration||0);
         });
 
-        // Schedule hours per tech — approx working days in month × daily hours
-        const daysInMonth = new Date(yr, mo, 0).getDate();
+        // Approximate available minutes per tech for utilisation
+        const daysInMonth = new Date(parseInt(yr), parseInt(mo), 0).getDate();
         const schedMap = {};
         schedSnap.forEach(d => {
             const s = d.data();
-            const workDays = (s.workingDays||[]).length;
-            const startH   = parseInt((s.startTime||'08:00').split(':')[0]);
-            const endH     = parseInt((s.endTime||'20:00').split(':')[0]);
-            const hoursPerDay = endH - startH;
-            // Approx working days in this month
-            const approxDays = Math.round((workDays / 7) * daysInMonth);
-            schedMap[d.id] = approxDays * hoursPerDay * 60; // available minutes
+            const workDaysPerWeek = (s.workingDays||[]).length;
+            const startH = parseInt((s.startTime||'08:00').split(':')[0]);
+            const endH   = parseInt((s.endTime||'20:00').split(':')[0]);
+            const hoursPerDay = Math.max(0, endH - startH);
+            const approxDays  = Math.round((workDaysPerWeek / 7) * daysInMonth);
+            schedMap[d.id]    = approxDays * hoursPerDay * 60;
         });
 
+        // FIX: cache correctly for CSV
         _rpt_cache.tech = Object.entries(techMap).map(([email, d]) => ({ email, ...d }));
 
-        if (!Object.keys(techMap).length) {
-            tableEl.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">No closed jobs found for this month.</p>';
+        if (!_rpt_cache.tech.length) {
+            tableEl.innerHTML = rpt_noData('No completed jobs found for this month.');
             return;
         }
 
-        const totalRev     = Object.values(techMap).reduce((s,t) => s+t.revenue, 0);
-        const totalClients = Object.values(techMap).reduce((s,t) => s+t.count, 0);
+        const totalRev     = _rpt_cache.tech.reduce((s,t) => s+t.revenue, 0);
+        const totalClients = _rpt_cache.tech.reduce((s,t) => s+t.count, 0);
 
-        const rows = Object.entries(techMap).sort((a,b)=>b[1].revenue-a[1].revenue).map(([email,d],i) => {
-            const availMins   = schedMap[email] || 0;
-            const utilisPct   = availMins > 0 ? Math.min(100, Math.round((d.duration/availMins)*100)) : '—';
-            const utilisDisplay = availMins > 0 ? `${utilisPct}%` : '—';
+        const rows = _rpt_cache.tech.sort((a,b)=>b.revenue-a.revenue).map((d,i) => {
+            const availMins = schedMap[d.email] || 0;
+            const utilisPct = availMins > 0 ? Math.min(100, Math.round((d.duration/availMins)*100)) : null;
+            const barColor  = utilisPct >= 80 ? 'var(--success)' : utilisPct >= 50 ? 'var(--accent)' : 'var(--error)';
             return `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
                 <td style="padding:10px 8px;font-weight:700;color:var(--primary);">${d.name}</td>
                 <td style="padding:10px 8px;text-align:center;">${d.count}</td>
                 <td style="padding:10px 8px;text-align:right;font-weight:700;color:var(--success);">${d.revenue.toFixed(2)} GHC</td>
-                <td style="padding:10px 8px;text-align:right;">${(d.revenue/d.count).toFixed(2)} GHC</td>
-                <td style="padding:10px 8px;text-align:center;">${Math.round(d.duration/60)} hrs</td>
+                <td style="padding:10px 8px;text-align:right;">${d.count>0?(d.revenue/d.count).toFixed(2):0} GHC</td>
+                <td style="padding:10px 8px;text-align:center;">${Math.round(d.duration/60)||'<1'} hrs</td>
                 <td style="padding:10px 8px;text-align:center;">
-                    ${availMins > 0 ? `<div style="background:#f1f1f1;border-radius:4px;height:8px;margin-bottom:2px;"><div style="background:${utilisPct>=80?'var(--success)':utilisPct>=50?'var(--accent)':'var(--error)'};height:100%;border-radius:4px;width:${utilisPct}%;"></div></div>${utilisDisplay}` : '—'}
+                    ${utilisPct !== null
+                        ? `<div style="background:#f1f1f1;border-radius:4px;height:8px;margin-bottom:2px;"><div style="background:${barColor};height:100%;border-radius:4px;width:${utilisPct}%;"></div></div>${utilisPct}%`
+                        : '<span style="color:#999;font-style:italic;">No schedule</span>'}
                 </td>
-                <td style="padding:10px 8px;text-align:center;color:#999;font-style:italic;">—</td>
+                <td style="padding:10px 8px;text-align:center;color:#999;font-style:italic;font-size:0.8rem;">Coming soon</td>
             </tr>`;
         }).join('');
 
@@ -3334,11 +3382,11 @@ window.rpt_loadTechPerf = async function() {
                 <td style="padding:9px 8px;">TOTAL</td>
                 <td style="padding:9px 8px;text-align:center;">${totalClients}</td>
                 <td style="padding:9px 8px;text-align:right;color:var(--success);">${totalRev.toFixed(2)} GHC</td>
-                <td style="padding:9px 8px;text-align:right;">${(totalRev/totalClients).toFixed(2)} GHC</td>
+                <td style="padding:9px 8px;text-align:right;">${totalClients>0?(totalRev/totalClients).toFixed(2):0} GHC</td>
                 <td colspan="3"></td>
             </tr></tfoot>
         </table></div>`;
-    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+    } catch(e) { tableEl.innerHTML = rpt_err(e); }
 };
 
 
@@ -3353,10 +3401,9 @@ window.rpt_loadClients = async function() {
     const month = document.getElementById('rpt_clientMonth')?.value || todayDateStr.slice(0,7);
     const [yr, mo] = month.split('-');
     const monthStart = `${yr}-${mo}-01`;
-    const monthEnd   = `${yr}-${mo}-${new Date(yr, mo, 0).getDate()}`;
-    const today      = todayDateStr;
+    const monthEnd   = `${yr}-${mo}-${String(new Date(parseInt(yr), parseInt(mo), 0).getDate()).padStart(2,'0')}`;
 
-    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    tableEl.innerHTML = rpt_noData('Loading…');
     metricsEl.style.display = 'none';
 
     try {
@@ -3365,13 +3412,13 @@ window.rpt_loadClients = async function() {
             db.collection('Active_Jobs').where('status','==','Closed').get()
         ]);
 
-        // Build client spend map from all jobs
+        // Build spend map from ALL jobs
         const spendMap = {};
         jobsSnap.forEach(d => {
             const j = d.data();
-            const phone = j.clientPhone || '';
+            const phone = j.clientPhone||'';
             if (!phone) return;
-            if (!spendMap[phone]) spendMap[phone] = { visits:0, spend:0, lastVisit:'', name: j.clientName||'' };
+            if (!spendMap[phone]) spendMap[phone] = { visits:0, spend:0, lastVisit:'', name:j.clientName||'' };
             spendMap[phone].visits++;
             spendMap[phone].spend += parseFloat(j.grandTotal||j.bookedPrice||0);
             if (!spendMap[phone].lastVisit || j.dateString > spendMap[phone].lastVisit) {
@@ -3383,34 +3430,45 @@ window.rpt_loadClients = async function() {
         clientsSnap.forEach(d => clients.push({ id: d.id, ...d.data() }));
         _rpt_cache.clients = clients;
 
-        const now = new Date(today + 'T12:00:00');
-        let newCount = 0, lapsedList = [], vipList = [], birthdayList = [];
+        const now = new Date(todayDateStr + 'T12:00:00');
+        let newCount = 0;
+        const lapsedList = [], vipList = [], birthdayList = [];
 
         clients.forEach(c => {
-            const phone   = c.Tel_Number || c.id;
-            const spend   = spendMap[phone];
-            const created = c.createdAt?.toDate?.() || null;
+            const phone = c.Tel_Number || c.id;
+            const spend = spendMap[phone];
 
-            // New this month
-            if (created && created >= new Date(monthStart + 'T00:00:00') && created <= new Date(monthEnd + 'T23:59:59')) newCount++;
+            // FIX: handle Firestore Timestamp and plain string dates for createdAt
+            let created = null;
+            if (c.createdAt) {
+                if (typeof c.createdAt.toDate === 'function') {
+                    created = c.createdAt.toDate();
+                } else if (typeof c.createdAt === 'string') {
+                    created = new Date(c.createdAt);
+                }
+            }
+            if (created && !isNaN(created)) {
+                const createdStr = created.toISOString().slice(0,10);
+                if (createdStr >= monthStart && createdStr <= monthEnd) newCount++;
+            }
 
-            // Lapsed — no visit in 60+ days
+            // Lapsed — 60+ days since last visit
             if (spend?.lastVisit) {
                 const days = Math.floor((now - new Date(spend.lastVisit + 'T12:00:00')) / 86400000);
                 if (days >= 60) lapsedList.push({ ...c, phone, days, lastVisit: spend.lastVisit });
             }
 
-            // VIP
+            // VIP — 10+ visits OR 2000+ GHC
             if (spend && (spend.visits >= 10 || spend.spend >= 2000)) {
-                vipList.push({ ...c, phone, ...spend });
+                vipList.push({ ...c, phone, visits: spend.visits, spend: spend.spend, lastVisit: spend.lastVisit });
             }
 
             // Birthday this month
             if (c.DOB) {
                 try {
-                    const dob = new Date(c.DOB);
-                    if (dob.getMonth()+1 === parseInt(mo)) {
-                        birthdayList.push({ ...c, phone, dob: c.DOB });
+                    const dob = new Date(c.DOB + 'T12:00:00');
+                    if (!isNaN(dob) && (dob.getMonth()+1) === parseInt(mo)) {
+                        birthdayList.push({ ...c, phone });
                     }
                 } catch(e) {}
             }
@@ -3424,7 +3482,6 @@ window.rpt_loadClients = async function() {
             rpt_metricCard(vipList.length, 'VIP Clients', 'var(--accent)') +
             rpt_metricCard(birthdayList.length, 'Birthdays This Month', '#f39c12');
 
-        // VIP table
         const vipRows = vipList.sort((a,b)=>b.spend-a.spend).map((c,i) =>
             `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
                 <td style="padding:9px 8px;"><strong>${c.Forename||''} ${c.Surname||''}</strong></td>
@@ -3434,7 +3491,6 @@ window.rpt_loadClients = async function() {
                 <td style="padding:9px 8px;text-align:center;">${rpt_fmtDate(c.lastVisit)}</td>
             </tr>`).join('');
 
-        // Lapsed table
         const lapsedRows = lapsedList.sort((a,b)=>b.days-a.days).slice(0,20).map((c,i) =>
             `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
                 <td style="padding:9px 8px;"><strong>${c.Forename||''} ${c.Surname||''}</strong></td>
@@ -3443,39 +3499,44 @@ window.rpt_loadClients = async function() {
                 <td style="padding:9px 8px;text-align:center;">${rpt_fmtDate(c.lastVisit)}</td>
             </tr>`).join('');
 
-        // Birthday table
         const bdayRows = birthdayList.map((c,i) =>
             `<tr style="background:${i%2?'#fafafa':'white'};border-bottom:1px solid #f1f1f1;">
                 <td style="padding:9px 8px;"><strong>${c.Forename||''} ${c.Surname||''}</strong></td>
                 <td style="padding:9px 8px;color:#666;">${c.phone}</td>
-                <td style="padding:9px 8px;">${rpt_fmtDate(c.dob)}</td>
+                <td style="padding:9px 8px;">${rpt_fmtDate(c.DOB)}</td>
             </tr>`).join('');
+
+        const noR5 = '<tr><td colspan="5" style="padding:12px;text-align:center;color:#999;font-style:italic;">None found.</td></tr>';
+        const noR4 = '<tr><td colspan="4" style="padding:12px;text-align:center;color:#999;font-style:italic;">None found.</td></tr>';
+        const noR3 = '<tr><td colspan="3" style="padding:12px;text-align:center;color:#999;font-style:italic;">None found.</td></tr>';
+
+        const monthLabel = new Date(monthStart+'T12:00:00').toLocaleDateString('en-GB',{month:'long', year:'numeric'});
 
         tableEl.innerHTML = `
             <div style="margin-bottom:24px;">
                 <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px;">⭐ VIP Clients</p>
-                ${vipList.length ? `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                     ${rpt_tableHead({label:'Client'},{label:'Phone'},{label:'Visits',align:'center'},{label:'Total Spend',align:'right'},{label:'Last Visit',align:'center'})}
-                    <tbody>${vipRows}</tbody>
-                </table>` : '<p style="color:#999;font-style:italic;">No VIP clients yet.</p>'}
+                    <tbody>${vipRows||noR5}</tbody>
+                </table>
             </div>
             <div class="grid-2" style="gap:20px;">
                 <div>
                     <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--error);margin-bottom:8px;">💤 Lapsed Clients (top 20)</p>
-                    ${lapsedList.length ? `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                         ${rpt_tableHead({label:'Client'},{label:'Phone'},{label:'Last Seen',align:'center'},{label:'Date',align:'center'})}
-                        <tbody>${lapsedRows}</tbody>
-                    </table>` : '<p style="color:#999;font-style:italic;">No lapsed clients.</p>'}
+                        <tbody>${lapsedRows||noR4}</tbody>
+                    </table>
                 </div>
                 <div>
-                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#f39c12;margin-bottom:8px;">🎂 Birthdays in ${new Date(monthStart+'T12:00:00').toLocaleDateString('en-GB',{month:'long'})}</p>
-                    ${birthdayList.length ? `<table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                    <p style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#f39c12;margin-bottom:8px;">🎂 Birthdays — ${monthLabel}</p>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
                         ${rpt_tableHead({label:'Client'},{label:'Phone'},{label:'Birthday'})}
-                        <tbody>${bdayRows}</tbody>
-                    </table>` : '<p style="color:#999;font-style:italic;">No birthdays this month.</p>'}
+                        <tbody>${bdayRows||noR3}</tbody>
+                    </table>
                 </div>
             </div>`;
-    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+    } catch(e) { tableEl.innerHTML = rpt_err(e); }
 };
 
 
@@ -3486,44 +3547,50 @@ window.rpt_loadLeave = async function() {
     const tableEl = document.getElementById('rpt_leaveTable');
     if (!tableEl) return;
 
-    const year = document.getElementById('rpt_leaveYear')?.value || new Date().getFullYear().toString();
+    const year = document.getElementById('rpt_leaveYear')?.value || String(new Date().getFullYear());
     const yearStart = `${year}-01-01`, yearEnd = `${year}-12-31`;
-
-    tableEl.innerHTML = '<p style="color:#999;font-style:italic;text-align:center;padding:30px 0;">Loading…</p>';
+    tableEl.innerHTML = rpt_noData('Loading…');
 
     try {
-        const [leaveSnap, balSnap, schedSnap] = await Promise.all([
+        // FIX: removed schedSnap — it was fetched but never used correctly
+        const [leaveSnap, balSnap] = await Promise.all([
             db.collection('Staff_Leave').where('status','==','Approved').get(),
-            db.collection('Staff_Leave_Balances').get(),
-            db.collection('Staff_Schedules').get()
+            db.collection('Staff_Leave_Balances').get()
         ]);
 
-        // Tally leave per tech per type
         const techLeave = {};
         leaveSnap.forEach(d => {
             const l = d.data();
-            if (l.startDate < yearStart || l.startDate > yearEnd) return;
-            const email = l.techEmail || '';
+            // Client-side year filter
+            if (!l.startDate || l.startDate < yearStart || l.startDate > yearEnd) return;
+            const email = l.techEmail||'';
+            if (!email) return;
             if (!techLeave[email]) techLeave[email] = { name: l.techName||email, types:{}, total:0 };
-            const days = Math.max(1, Math.round((new Date(l.endDate+'T12:00:00') - new Date(l.startDate+'T12:00:00'))/86400000) + 1);
+            // FIX: accurate day calculation
+            const start = new Date(l.startDate + 'T12:00:00');
+            const end   = new Date((l.endDate||l.startDate) + 'T12:00:00');
+            const days  = Math.max(1, Math.round((end - start) / 86400000) + 1);
             techLeave[email].types[l.type] = (techLeave[email].types[l.type]||0) + days;
             techLeave[email].total += days;
         });
 
         const balMap = {};
-        balSnap.forEach(d => { balMap[d.id] = d.data()[year] || d.data().annualLeave || 14; });
+        balSnap.forEach(d => {
+            const data = d.data();
+            balMap[d.id] = data[year] || data.annualLeave || 14;
+        });
 
         _rpt_cache.leave = Object.entries(techLeave).map(([email,d]) => ({ email, ...d }));
 
-        const leaveTypes = ['Annual Leave','Day Off','Wellness Day','Sick Leave','Leave Without Pay','Public Holiday'];
-
-        if (!Object.keys(techLeave).length) {
-            tableEl.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">No approved leave records for this year.</p>';
+        if (!_rpt_cache.leave.length) {
+            tableEl.innerHTML = rpt_noData('No approved leave records found for ' + year + '.');
             return;
         }
 
+        const leaveTypes = ['Annual Leave','Day Off','Wellness Day','Sick Leave','Leave Without Pay','Public Holiday'];
+
         const rows = Object.entries(techLeave).sort((a,b)=>b[1].total-a[1].total).map(([email,d],i) => {
-            const entitled  = balMap[email] || 14;
+            const entitled   = balMap[email] || 14;
             const annualUsed = d.types['Annual Leave'] || 0;
             const remaining  = entitled - annualUsed;
             const remColor   = remaining < 0 ? 'var(--error)' : remaining <= 3 ? 'var(--accent)' : 'var(--success)';
@@ -3539,14 +3606,14 @@ window.rpt_loadLeave = async function() {
         tableEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
             ${rpt_tableHead(
                 {label:'Staff Member'},
-                ...leaveTypes.map(t => ({label:t,align:'center'})),
-                {label:'Total Days',align:'center'},
-                {label:'Entitlement',align:'center'},
-                {label:'Remaining',align:'center'}
+                ...leaveTypes.map(t => ({label:t, align:'center'})),
+                {label:'Total Days', align:'center'},
+                {label:'Entitlement', align:'center'},
+                {label:'Remaining', align:'center'}
             )}
             <tbody>${rows}</tbody>
         </table></div>`;
-    } catch(e) { tableEl.innerHTML = `<p style="color:var(--error);text-align:center;padding:20px;">Error: ${e.message}</p>`; }
+    } catch(e) { tableEl.innerHTML = rpt_err(e); }
 };
 
 
@@ -3554,50 +3621,54 @@ window.rpt_loadLeave = async function() {
 //  CSV EXPORT
 // ══════════════════════════════════════════════════════════════
 window.rpt_exportCSV = function(type) {
-    let rows = [], filename = '';
+    let rows = [], filename = 'report.csv';
 
     if (type === 'upcoming') {
         if (!_rpt_cache.upcoming.length) { alert('Load the report first.'); return; }
-        rows = [['Date','Time','Client','Phone','Service','Tech','Duration','Amount','Status','Group'],
+        rows = [['Date','Time','Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Status','Group Booking'],
             ..._rpt_cache.upcoming.map(a => [
                 a.dateString, a.timeString, a.clientName||'', a.clientPhone||'',
                 a.bookedService||'', a.assignedTechName||'', a.bookedDuration||0,
-                parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2), a.status, a.isGroupBooking?'Yes':'No'
+                parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2),
+                a.status, a.isGroupBooking?'Yes':'No'
             ])];
         filename = `upcoming-bookings-${todayDateStr}.csv`;
 
     } else if (type === 'daily') {
         if (!_rpt_cache.daily.length) { alert('Load the report first.'); return; }
-        rows = [['Client','Phone','Service','Tech','Duration','Amount','Payment Method'],
+        rows = [['Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Payment Method'],
             ..._rpt_cache.daily.map(j => [
                 j.clientName||'', j.clientPhone||'', j.bookedService||'',
                 j.assignedTechName||'', j.bookedDuration||0,
-                parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2), j.paymentMethod||''
+                parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2),
+                j.paymentMethod||j.payment||''
             ])];
         filename = `daily-ops-${document.getElementById('rpt_dailyDate')?.value||todayDateStr}.csv`;
 
     } else if (type === 'monthly') {
         if (!_rpt_cache.monthly.length) { alert('Load the report first.'); return; }
-        rows = [['Date','Client','Service','Tech','Amount'],
+        rows = [['Date','Client','Phone','Service','Technician','Amount (GHC)'],
             ..._rpt_cache.monthly.map(j => [
-                j.dateString, j.clientName||'', j.bookedService||'',
-                j.assignedTechName||'', parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2)
+                j.dateString, j.clientName||'', j.clientPhone||'',
+                j.bookedService||'', j.assignedTechName||'',
+                parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2)
             ])];
         filename = `monthly-summary-${document.getElementById('rpt_monthlyMonth')?.value||''}.csv`;
 
     } else if (type === 'tech') {
         if (!_rpt_cache.tech.length) { alert('Load the report first.'); return; }
-        rows = [['Technician','Email','Clients','Revenue','Avg/Client','Hours'],
+        rows = [['Technician','Email','Clients Served','Revenue (GHC)','Avg per Client (GHC)','Hours Worked'],
             ..._rpt_cache.tech.map(t => [
                 t.name, t.email, t.count,
-                t.revenue.toFixed(2), (t.revenue/t.count).toFixed(2),
+                t.revenue.toFixed(2),
+                t.count>0?(t.revenue/t.count).toFixed(2):0,
                 Math.round(t.duration/60)
             ])];
         filename = `tech-performance-${document.getElementById('rpt_techMonth')?.value||''}.csv`;
 
     } else if (type === 'clients') {
         if (!_rpt_cache.clients.length) { alert('Load the report first.'); return; }
-        rows = [['Name','Phone','Email','DOB'],
+        rows = [['Name','Phone','Email','Date of Birth'],
             ..._rpt_cache.clients.map(c => [
                 `${c.Forename||''} ${c.Surname||''}`.trim(),
                 c.Tel_Number||'', c.Email||'', c.DOB||''
@@ -3607,20 +3678,22 @@ window.rpt_exportCSV = function(type) {
     } else if (type === 'leave') {
         if (!_rpt_cache.leave.length) { alert('Load the report first.'); return; }
         const types = ['Annual Leave','Day Off','Wellness Day','Sick Leave','Leave Without Pay','Public Holiday'];
-        rows = [['Staff','Email',...types,'Total'],
+        rows = [['Staff Member','Email',...types,'Total Days'],
             ..._rpt_cache.leave.map(d => [
-                d.name, d.email, ...types.map(t => d.types?.[t]||0), d.total
+                d.name, d.email,
+                ...types.map(t => d.types?.[t]||0),
+                d.total
             ])];
         filename = `leave-attendance-${document.getElementById('rpt_leaveYear')?.value||''}.csv`;
     }
 
     if (!rows.length) return;
     const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 console.log('Thuraya Reports module loaded.');
