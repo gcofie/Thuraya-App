@@ -9,7 +9,7 @@ if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 const auth = firebase.auth();
 const db = firebase.firestore();
 const provider = new firebase.auth.GoogleAuthProvider();
-const firebaseConfig = window.THURAYA_CONFIG;
+
 let secondaryApp;
 try { secondaryApp = firebase.app("SecondaryApp"); } 
 catch (e) { secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp"); }
