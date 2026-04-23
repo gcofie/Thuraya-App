@@ -55,6 +55,7 @@ window.switchModule = function(moduleId) {
     document.querySelectorAll('.app-module').forEach(mod => mod.style.display = 'none');
     document.getElementById(moduleId).style.display = 'block';
     if (moduleId === 'adminView') { loadStaffDirectory(); }
+    if (moduleId === 'activeAteliersView') { aa_load(); }
 }
 
 window.toggleClientsSubView = function() {
@@ -132,10 +133,13 @@ auth.onAuthStateChanged(async (user) => {
                     try { startFohBillingListener(); } catch(e){}
                 }
 
-                if(isManager || isTech || isAdmin) {
+                if(isTech) {
                     document.getElementById('tabAtelier').style.display = 'flex';
                     try { startTechFinancialListener(); } catch(e){}
                     try { startTechQueueListener(); } catch(e){}
+                }
+                if(isManager || isAdmin) {
+                    document.getElementById('tabActiveAteliers').style.display = 'flex';
                 }
 
                 if(isManager || isFOH || isTech || isAdmin) { document.getElementById('tabMenu').style.display = 'flex'; }
@@ -2564,3 +2568,209 @@ function cip_fmtDate(dateStr) {
 }
 
 console.log('Thuraya Client Intelligence Panel loaded.');
+
+
+// ============================================================
+//  ACTIVE ATELIER(S) — Manager & Admin supervisory view
+// ============================================================
+
+let _aa_listener = null;
+
+window.aa_load = function() {
+    const listEl       = document.getElementById('aa_jobList');
+    const activeCount  = document.getElementById('aa_activeCount');
+    const waitingCount = document.getElementById('aa_waitingCount');
+    const overdueCount = document.getElementById('aa_overdueCount');
+    const revenueEl    = document.getElementById('aa_revenueInProgress');
+
+    if (!listEl) return;
+    listEl.innerHTML = '<p style="color:#999; font-style:italic; text-align:center; padding:40px 0;">Loading active floor…</p>';
+
+    // Detach previous listener
+    if (_aa_listener) { _aa_listener(); _aa_listener = null; }
+
+    _aa_listener = db.collection('Appointments')
+        .where('status', 'in', ['In Progress', 'Arrived'])
+        .onSnapshot(snap => {
+            if (snap.empty) {
+                listEl.innerHTML = '<div style="text-align:center; padding:60px 20px;"><p style="font-size:2rem; margin-bottom:10px;">✅</p><p style="color:#999; font-size:1rem;">Floor is clear — no active or arrived clients.</p></div>';
+                if (activeCount)  activeCount.textContent  = '0';
+                if (waitingCount) waitingCount.textContent = '0';
+                if (overdueCount) overdueCount.textContent = '0';
+                if (revenueEl)    revenueEl.textContent    = '0.00 GHC';
+                return;
+            }
+
+            const now  = new Date();
+            const jobs = [];
+            snap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
+
+            // Sort: overdue first, then by start time
+            jobs.sort((a, b) => {
+                const aOver = aa_isOverdue(a, now);
+                const bOver = aa_isOverdue(b, now);
+                if (aOver && !bOver) return -1;
+                if (!aOver && bOver) return 1;
+                return (a.timeString||'').localeCompare(b.timeString||'');
+            });
+
+            // Summary counts
+            const inProgress = jobs.filter(j => j.status === 'In Progress');
+            const arrived    = jobs.filter(j => j.status === 'Arrived');
+            const overdue    = jobs.filter(j => aa_isOverdue(j, now));
+            const revenue    = jobs.reduce((s, j) => s + parseFloat(j.grandTotal || j.bookedPrice || 0), 0);
+
+            if (activeCount)  activeCount.textContent  = inProgress.length;
+            if (waitingCount) waitingCount.textContent = arrived.length;
+            if (overdueCount) {
+                overdueCount.textContent = overdue.length;
+                overdueCount.style.color = overdue.length > 0 ? 'var(--error)' : 'var(--success)';
+            }
+            if (revenueEl) revenueEl.textContent = revenue.toFixed(2) + ' GHC';
+
+            // Render job cards
+            listEl.innerHTML = jobs.map(job => {
+                const isOverdue   = aa_isOverdue(job, now);
+                const elapsed     = aa_elapsedMins(job, now);
+                const duration    = parseInt(job.bookedDuration) || 60;
+                const progress    = Math.min(100, Math.round((elapsed / duration) * 100));
+                const remaining   = duration - elapsed;
+                const isGroup     = job.isGroupBooking;
+                const isArrived   = job.status === 'Arrived';
+
+                const statusColor = isOverdue   ? 'var(--error)'   :
+                                    isArrived   ? 'var(--accent)'  : 'var(--success)';
+                const statusLabel = isOverdue   ? '🔴 OVERDUE'     :
+                                    isArrived   ? '🟡 ARRIVED'     : '🟢 IN PROGRESS';
+                const borderColor = isOverdue   ? 'var(--error)'   :
+                                    isArrived   ? 'var(--accent)'  : 'var(--success)';
+
+                const progressColor = isOverdue ? 'var(--error)' : progress > 80 ? 'var(--accent)' : 'var(--success)';
+                const amt = parseFloat(job.grandTotal || job.bookedPrice || 0).toFixed(2);
+
+                return `
+                <div style="border:2px solid ${borderColor}; border-radius:8px; padding:16px 18px; margin-bottom:14px; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+                    <!-- Card header -->
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <h4 style="margin:0; font-size:1.05rem; color:var(--primary);">${job.clientName || 'Unknown Client'}</h4>
+                                <span style="background:${statusColor}22; color:${statusColor}; border:1px solid ${statusColor}44; font-size:0.72rem; font-weight:700; padding:2px 9px; border-radius:10px;">${statusLabel}</span>
+                                ${isGroup ? `<span class="group-badge">👥 GROUP · ${job.groupSize || ''}</span>` : ''}
+                            </div>
+                            <p style="margin:4px 0 0; font-size:0.82rem; color:#666;">📞 ${job.clientPhone || 'N/A'}</p>
+                        </div>
+                        <div style="text-align:right;">
+                            <p style="font-size:1rem; font-weight:700; color:var(--success); margin:0;">${amt} GHC</p>
+                            <p style="font-size:0.78rem; color:#999; margin:2px 0 0;">📅 ${job.dateString} · ⏰ ${aa_fmt12(job.timeString)}</p>
+                        </div>
+                    </div>
+
+                    <!-- Service + Tech -->
+                    <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:12px;">
+                        <div>
+                            <p style="font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; color:#999; margin-bottom:2px;">Service</p>
+                            <p style="font-size:0.88rem; font-weight:600; color:var(--primary); margin:0;">💅 ${job.bookedService || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <p style="font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; color:#999; margin-bottom:2px;">Technician</p>
+                            <p style="font-size:0.88rem; font-weight:600; color:var(--primary); margin:0;">👩‍🔧 ${job.assignedTechName || 'Unassigned'}</p>
+                        </div>
+                        <div>
+                            <p style="font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; color:#999; margin-bottom:2px;">Duration</p>
+                            <p style="font-size:0.88rem; font-weight:600; color:var(--primary); margin:0;">⏱ ${duration} mins</p>
+                        </div>
+                        <div>
+                            <p style="font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; color:#999; margin-bottom:2px;">${isOverdue ? 'Overdue by' : 'Remaining'}</p>
+                            <p style="font-size:0.88rem; font-weight:700; color:${statusColor}; margin:0;">${isOverdue ? Math.abs(remaining) : remaining} mins</p>
+                        </div>
+                    </div>
+
+                    <!-- Progress bar (only for In Progress) -->
+                    ${!isArrived ? `
+                    <div style="margin-bottom:12px;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:#999; margin-bottom:4px;">
+                            <span>Progress</span><span>${progress}%</span>
+                        </div>
+                        <div style="background:#f1f1f1; border-radius:20px; height:8px; overflow:hidden;">
+                            <div style="width:${Math.min(progress,100)}%; background:${progressColor}; height:100%; border-radius:20px; transition:width 0.3s;"></div>
+                        </div>
+                    </div>` : ''}
+
+                    <!-- Quick actions -->
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; border-top:1px solid #f1f1f1; padding-top:10px;">
+                        <select onchange="aa_reassign('${job.id}', this)" style="flex:1; min-width:160px; padding:6px 10px; font-size:0.82rem; border:1px solid var(--border); border-radius:4px;">
+                            <option value="">🔄 Reassign tech…</option>
+                            ${(typeof allTechs !== 'undefined' ? allTechs : []).map(t => `<option value="${t.email}|${t.name}" ${t.email === job.assignedTechEmail ? 'selected' : ''}>${t.name}</option>`).join('')}
+                        </select>
+                        <button onclick="aa_markReady('${job.id}')" style="background:var(--success); color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:0.82rem; font-weight:700;">✓ Ready for Payment</button>
+                        <button onclick="aa_flag('${job.id}')" style="background:transparent; border:1px solid var(--accent); color:var(--accent); padding:6px 14px; border-radius:4px; cursor:pointer; font-size:0.82rem; font-weight:700;">⚑ Flag</button>
+                    </div>
+
+                </div>`;
+            }).join('');
+
+        }, err => {
+            listEl.innerHTML = `<p style="color:var(--error); text-align:center; padding:20px;">Error: ${err.message}</p>`;
+        });
+};
+
+// ── Helpers ───────────────────────────────────────────────────
+function aa_isOverdue(job, now) {
+    if (job.status !== 'In Progress') return false;
+    return aa_elapsedMins(job, now) > (parseInt(job.bookedDuration) || 60);
+}
+
+function aa_elapsedMins(job, now) {
+    if (!job.dateString || !job.timeString) return 0;
+    try {
+        const start = new Date(`${job.dateString}T${job.timeString}:00`);
+        return Math.floor((now - start) / 60000);
+    } catch(e) { return 0; }
+}
+
+function aa_fmt12(timeStr) {
+    if (!timeStr) return '—';
+    const [h, m] = timeStr.split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
+// ── Quick actions ─────────────────────────────────────────────
+window.aa_reassign = async function(jobId, select) {
+    const val = select.value;
+    if (!val) return;
+    const [email, name] = val.split('|');
+    try {
+        await db.collection('Appointments').doc(jobId).update({
+            assignedTechEmail: email,
+            assignedTechName:  name,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch(e) { alert('Reassign failed: ' + e.message); }
+};
+
+window.aa_markReady = async function(jobId) {
+    if (!confirm('Mark this job as Ready for Payment?')) return;
+    try {
+        await db.collection('Appointments').doc(jobId).update({
+            status:    'Ready for Payment',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch(e) { alert('Error: ' + e.message); }
+};
+
+window.aa_flag = async function(jobId) {
+    const note = prompt('Add a follow-up note for this job (optional):') || '';
+    try {
+        await db.collection('Appointments').doc(jobId).update({
+            flagged:   true,
+            flagNote:  note,
+            flaggedBy: typeof currentUserEmail !== 'undefined' ? currentUserEmail : '',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert('Job flagged for follow-up.');
+    } catch(e) { alert('Error: ' + e.message); }
+};
+
+console.log('Thuraya Active Atelier(s) module loaded.');
