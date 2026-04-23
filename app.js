@@ -2589,8 +2589,8 @@ window.aa_load = function() {
     // Detach previous listener
     if (_aa_listener) { _aa_listener(); _aa_listener = null; }
 
-    _aa_listener = db.collection('Appointments')
-        .where('status', 'in', ['In Progress', 'Arrived'])
+    _aa_listener = db.collection('Active_Jobs')
+        .where('status', 'in', ['In Progress', 'Waiting'])
         .onSnapshot(snap => {
             if (snap.empty) {
                 listEl.innerHTML = '<div style="text-align:center; padding:60px 20px;"><p style="font-size:2rem; margin-bottom:10px;">✅</p><p style="color:#999; font-size:1rem;">Floor is clear — no active or arrived clients.</p></div>';
@@ -2616,7 +2616,7 @@ window.aa_load = function() {
 
             // Summary counts
             const inProgress = jobs.filter(j => j.status === 'In Progress');
-            const arrived    = jobs.filter(j => j.status === 'Arrived');
+            const arrived    = jobs.filter(j => j.status === 'Waiting');
             const overdue    = jobs.filter(j => aa_isOverdue(j, now));
             const revenue    = jobs.reduce((s, j) => s + parseFloat(j.grandTotal || j.bookedPrice || 0), 0);
 
@@ -2636,12 +2636,12 @@ window.aa_load = function() {
                 const progress    = Math.min(100, Math.round((elapsed / duration) * 100));
                 const remaining   = duration - elapsed;
                 const isGroup     = job.isGroupBooking;
-                const isArrived   = job.status === 'Arrived';
+                const isArrived   = job.status === 'Waiting';
 
                 const statusColor = isOverdue   ? 'var(--error)'   :
                                     isArrived   ? 'var(--accent)'  : 'var(--success)';
                 const statusLabel = isOverdue   ? '🔴 OVERDUE'     :
-                                    isArrived   ? '🟡 ARRIVED'     : '🟢 IN PROGRESS';
+                                    isArrived   ? '🟡 WAITING'     : '🟢 IN PROGRESS';
                 const borderColor = isOverdue   ? 'var(--error)'   :
                                     isArrived   ? 'var(--accent)'  : 'var(--success)';
 
@@ -2742,7 +2742,7 @@ window.aa_reassign = async function(jobId, select) {
     if (!val) return;
     const [email, name] = val.split('|');
     try {
-        await db.collection('Appointments').doc(jobId).update({
+        await db.collection('Active_Jobs').doc(jobId).update({
             assignedTechEmail: email,
             assignedTechName:  name,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -2753,10 +2753,44 @@ window.aa_reassign = async function(jobId, select) {
 window.aa_markReady = async function(jobId) {
     if (!confirm('Mark this job as Ready for Payment?')) return;
     try {
-        await db.collection('Appointments').doc(jobId).update({
+        // Get the appointment to find matching Active_Job by phone + date
+        const apptDoc = await db.collection('Appointments').doc(jobId).get();
+        if (!apptDoc.exists) { alert('Appointment not found.'); return; }
+        const appt = apptDoc.data();
+
+        // Find the matching Active_Job
+        const activeSnap = await db.collection('Active_Jobs')
+            .where('clientPhone', '==', appt.clientPhone)
+            .where('dateString',  '==', appt.dateString || todayDateStr)
+            .where('status', 'in', ['Waiting', 'In Progress'])
+            .get();
+
+        if (activeSnap.empty) {
+            // No Active_Job found — client may not have checked in yet
+            // Update Appointments status as fallback
+            await db.collection('Appointments').doc(jobId).update({
+                status:    'Ready for Payment',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert('Job marked ready. Note: client not yet on the active floor — FOH will see this when they check in.');
+            return;
+        }
+
+        // Update the Active_Job — this triggers FOH billing listener
+        const batch = db.batch();
+        activeSnap.forEach(d => {
+            batch.update(d.ref, {
+                status:    'Ready for Payment',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        });
+        // Also update Appointments
+        batch.update(db.collection('Appointments').doc(jobId), {
             status:    'Ready for Payment',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        await batch.commit();
+
     } catch(e) { alert('Error: ' + e.message); }
 };
 
