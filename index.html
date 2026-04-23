@@ -52,6 +52,10 @@
                 <input type="radio" name="main_nav" id="nav_atelier" value="atelierView" onchange="switchModule(this.value)">
                 <label for="nav_atelier">💅 The Atelier</label>
             </div>
+            <div class="nav-tab" id="tabActiveAteliers">
+                <input type="radio" name="main_nav" id="nav_active_ateliers" value="activeAteliersView" onchange="switchModule(this.value)">
+                <label for="nav_active_ateliers">🎯 Active Atelier(s)</label>
+            </div>
             <div class="nav-tab" id="tabMenu">
                 <input type="radio" name="main_nav" id="nav_menu" value="menuView" onchange="switchModule(this.value)">
                 <label for="nav_menu">📋 Service Menu</label>
@@ -337,7 +341,40 @@
             </div>
         </div>
 
-        <!-- SERVICE MENU — read-only, all roles -->
+        </div><!-- /#atelierView -->
+
+        <!-- ── ACTIVE ATELIER(S) — Manager & Admin supervisory view ── -->
+        <div id="activeAteliersView" class="app-module">
+
+            <!-- Floor summary bar -->
+            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+                <div class="metric-card" style="border-color:var(--success); background:#f0fff4; flex:1; min-width:140px;">
+                    <div style="font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; color:#666;">Active Now</div>
+                    <div class="metric-value" id="aa_activeCount" style="color:var(--success);">—</div>
+                </div>
+                <div class="metric-card" style="border-color:var(--accent); background:#fffaf0; flex:1; min-width:140px;">
+                    <div style="font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; color:#666;">Arrived / Waiting</div>
+                    <div class="metric-value" id="aa_waitingCount" style="color:var(--accent);">—</div>
+                </div>
+                <div class="metric-card" style="border-color:var(--error); background:#fff5f5; flex:1; min-width:140px;">
+                    <div style="font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; color:#666;">Overdue</div>
+                    <div class="metric-value" id="aa_overdueCount" style="color:var(--error);">—</div>
+                </div>
+                <div class="metric-card" style="flex:1; min-width:140px;">
+                    <div style="font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; color:#666;">Revenue In Progress</div>
+                    <div class="metric-value" id="aa_revenueInProgress" style="color:var(--primary);">—</div>
+                </div>
+                <div style="display:flex; align-items:center; margin-left:auto;">
+                    <button class="btn btn-secondary" style="width:auto; padding:8px 16px; font-size:0.82rem;" onclick="aa_load()">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <!-- Live job cards -->
+            <div id="aa_jobList">
+                <p style="color:#999; font-style:italic; text-align:center; padding:40px 0;">Loading active floor…</p>
+            </div>
+
+        </div><!-- /#activeAteliersView -->
         <div id="menuView" class="app-module">
             <div class="module-box" style="border-top: 4px solid var(--primary);">
                 <h3>Service Menu</h3>
