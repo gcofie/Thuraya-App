@@ -1,14 +1,9 @@
 // ⚠️ PASTE YOUR GOOGLE CHAT WEBHOOK URL HERE
 const GOOGLE_CHAT_WEBHOOK = ""; 
 
-const firebaseConfig = {
-    apiKey: "AIzaSyBTZOVjppINaVyYslRnAkC04EjJyMt40j8",
-    authDomain: "thuraya-client-telling.firebaseapp.com",
-    projectId: "thuraya-client-telling",
-    storageBucket: "thuraya-client-telling.firebasestorage.app",
-    messagingSenderId: "1061064260367",
-    appId: "1:1061064260367:web:ffedb019649bcf1cbadc7a"
-};
+// ── Firebase config loaded from firebase-config.js ───────────
+// Switches automatically between production and staging
+const firebaseConfig = window.THURAYA_CONFIG;
 
 if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 const auth = firebase.auth();
