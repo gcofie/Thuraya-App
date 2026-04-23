@@ -2922,14 +2922,16 @@ window.rpt_loadUpcoming = async function() {
     const statusFilter = document.getElementById('rpt_statusFilter')?.value || 'all';
 
     try {
+        // Single where to avoid composite index — filter end date client-side
         const snap = await db.collection('Appointments')
             .where('dateString', '>=', start)
-            .where('dateString', '<=', end)
             .where('status', 'in', ['Scheduled','Arrived','In Progress','Action Required'])
             .get();
 
         let appts = [];
         snap.forEach(d => appts.push({ id: d.id, ...d.data() }));
+        // Filter end date + other filters client-side
+        appts = appts.filter(a => a.dateString <= end);
         if (techFilter !== 'all')   appts = appts.filter(a => a.assignedTechEmail === techFilter);
         if (statusFilter !== 'all') appts = appts.filter(a => a.status === statusFilter);
         appts.sort((a,b) => (a.dateString+a.timeString).localeCompare(b.dateString+b.timeString));
@@ -3123,16 +3125,16 @@ window.rpt_loadMonthly = async function() {
 
     try {
         const [jobsSnap, apptSnap, clientsSnap] = await Promise.all([
-            db.collection('Active_Jobs').where('dateString','>=',start).where('dateString','<=',end).where('status','==','Closed').get(),
-            db.collection('Appointments').where('dateString','>=',start).where('dateString','<=',end).get(),
+            db.collection('Active_Jobs').where('dateString','>=',start).where('status','==','Closed').get(),
+            db.collection('Appointments').where('dateString','>=',start).get(),
             db.collection('Clients').get()
         ]);
 
-        const jobs = []; jobsSnap.forEach(d => jobs.push({ id:d.id, ...d.data() }));
+        const jobs = []; jobsSnap.forEach(d => { const j=d.data(); if(j.dateString<=end) jobs.push({ id:d.id, ...j }); });
         _rpt_cache.monthly = jobs;
 
         const totalRev     = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
-        const cancelled    = []; apptSnap.forEach(d => { if(d.data().status==='Cancelled') cancelled.push(d.data()); });
+        const cancelled    = []; apptSnap.forEach(d => { const a=d.data(); if(a.dateString<=end && a.status==='Cancelled') cancelled.push(a); });
 
         // Day map for busiest days
         const dayMap = {}; const hourMap = {};
@@ -3265,13 +3267,14 @@ window.rpt_loadTechPerf = async function() {
     try {
         // Get working hours from schedules for utilisation
         const [jobsSnap, schedSnap] = await Promise.all([
-            db.collection('Active_Jobs').where('dateString','>=',start).where('dateString','<=',end).where('status','==','Closed').get(),
+            db.collection('Active_Jobs').where('dateString','>=',start).where('status','==','Closed').get(),
             db.collection('Staff_Schedules').get()
         ]);
 
         const techMap = {};
         jobsSnap.forEach(d => {
             const j = d.data();
+            if (j.dateString > end) return; // client-side end filter
             const k = j.assignedTechEmail || 'unknown';
             if (!techMap[k]) techMap[k] = { name: j.assignedTechName||'Unknown', count:0, revenue:0, duration:0 };
             techMap[k].count++;
