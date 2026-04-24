@@ -393,11 +393,11 @@
 
         <!-- MENU SETTINGS — Manager + Admin only -->
         <div id="menuSettingsView" class="app-module">
-            <div class="module-box" style="border-top: 4px solid var(--manager);">
-                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Menu Settings</h3>
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
+                <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Menu Settings</h3>
 
                 <div id="managerMenuControls" style="background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 25px;">
-                    <h4 style="margin-bottom: 15px; font-size: 1rem; color: var(--manager); border-bottom: 2px solid var(--manager); padding-bottom: 5px;">Add / Edit Service</h4>
+                    <h4 style="margin-bottom: 15px; font-size: 1rem; color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 5px;">Add / Edit Service</h4>
 
                     <div class="grid-2">
                         <div class="form-group"><label>Service Category</label><select id="adv_category" onchange="updateAdvForm()"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
@@ -428,7 +428,7 @@
 
                     <div style="text-align: right; border-top: 1px solid var(--border); padding-top: 15px;">
                         <button class="btn btn-secondary" style="width: auto; margin-right: 10px;" onclick="clearAdvForm()">Clear Form</button>
-                        <button class="btn" id="btnSaveServiceConfig" style="width: auto; background-color: var(--manager);" onclick="addNewMenuServiceAdv()">Save Service Configuration</button>
+                        <button class="btn" id="btnSaveServiceConfig" style="width: auto; background-color: var(--primary);" onclick="addNewMenuServiceAdv()">Save Service Configuration</button>
                     </div>
                 </div>
 
@@ -447,8 +447,8 @@
 
         <div id="hrView" class="app-module">
             
-            <div class="module-box" style="border-top: 4px solid var(--manager);">
-                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Consultation Form Builder</h3>
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
+                <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Consultation Form Builder</h3>
                 <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Add extra custom fields to the Technician's intake form.</p>
                 <div class="grid-3" style="align-items: end;">
                     <div class="form-group"><label>Question Prompt / Label:</label><input type="text" id="bld_label" placeholder="e.g. Current Medications"></div>
@@ -462,18 +462,18 @@
                     </div>
                     <div class="form-group" id="bld_opts_wrap" style="display:none;"><label>Options (comma separated):</label><input type="text" id="bld_opts" placeholder="e.g. Asthma, Diabetes"></div>
                 </div>
-                <div style="text-align:right;"><button class="btn" style="background-color: var(--manager); width:auto;" onclick="addConsultQuestion()">Save Question to Template</button></div>
+                <div style="text-align:right;"><button class="btn" style="background-color: var(--primary); width:auto;" onclick="addConsultQuestion()">Save Question to Template</button></div>
                 <div id="consultBuilderList" style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;"></div>
             </div>
 
-            <div class="module-box" style="border-top: 4px solid var(--manager);">
-                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Tax Configuration</h3>
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
+                <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Tax Configuration</h3>
                 <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Define taxes and levies. These automatically apply on top of the base service prices during checkout.</p>
                 
                 <div class="grid-3" style="align-items: end;">
                     <div class="form-group"><label>Tax Name (e.g., VAT):</label><input type="text" id="cfgTaxName"></div>
                     <div class="form-group"><label>Rate (%) (e.g., 15):</label><input type="number" id="cfgTaxRate" step="0.1"></div>
-                    <button class="btn" id="btnAddTax" style="background-color: var(--manager); margin-bottom: 15px;" onclick="addTax()">Add / Update Tax</button>
+                    <button class="btn" id="btnAddTax" style="background-color: var(--primary); margin-bottom: 15px;" onclick="addTax()">Add / Update Tax</button>
                 </div>
                 
                 <div id="taxConfigList" style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
@@ -481,7 +481,7 @@
                 </div>
 
                 <div style="margin-top: 30px; background: #eef5f9; padding: 20px; border-radius: 8px; border: 1px solid #b8cddb;">
-                    <h4 style="color: var(--manager); margin-bottom: 15px;">Tax Simulator & Price Preview</h4>
+                    <h4 style="color: var(--accent); margin-bottom: 15px;">Tax Simulator & Price Preview</h4>
                     <div class="grid-2" style="align-items: start;">
                         <div>
                             <div class="form-group">
@@ -490,12 +490,12 @@
                             </div>
                             <div class="form-group" style="margin-bottom: 15px;">
                                 <label style="display:inline-block; font-weight:normal; margin-bottom:5px; font-size: 0.85rem; cursor:pointer;">
-                                    <input type="radio" name="tax_inclusive_toggle" value="exclusive" checked onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--manager);"> 
+                                    <input type="radio" name="tax_inclusive_toggle" value="exclusive" checked onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--accent);"> 
                                     Price is Tax <strong>Exclusive</strong> <span style="color:#666;">(Add taxes on top)</span>
                                 </label>
                                 <br>
                                 <label style="display:inline-block; font-weight:normal; font-size: 0.85rem; cursor:pointer;">
-                                    <input type="radio" name="tax_inclusive_toggle" value="inclusive" onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--manager);"> 
+                                    <input type="radio" name="tax_inclusive_toggle" value="inclusive" onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--accent);"> 
                                     Price is Tax <strong>Inclusive</strong> <span style="color:#666;">(Extract taxes from total)</span>
                                 </label>
                             </div>
@@ -506,7 +506,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div style="background: white; padding: 15px; border-radius: 4px; border: 1px dashed var(--manager);">
+                        <div style="background: white; padding: 15px; border-radius: 4px; border: 1px dashed var(--accent);">
                             <div style="display:flex; justify-content:space-between; margin-bottom:10px; color:#555; font-size: 0.9rem;">
                                 <span>Base Price (Subtotal):</span> <span id="prevBaseOut">0.00 GHC</span>
                             </div>
@@ -519,12 +519,12 @@
                 </div>
             </div>
 
-            <div class="module-box" style="border-top: 4px solid var(--manager);">
-                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Payroll & Revenue Analytics</h3>
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
+                <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Payroll & Revenue Analytics</h3>
                 <div class="grid-3" style="align-items: end;">
                     <div class="form-group"><label>Start Date:</label><input type="date" id="reportStart"></div>
                     <div class="form-group"><label>End Date:</label><input type="date" id="reportEnd"></div>
-                    <button class="btn" id="btnGenerateReport" style="background-color: var(--manager); margin-bottom: 15px;" onclick="generateReport()">Run Report</button>
+                    <button class="btn" id="btnGenerateReport" style="background-color: var(--primary); margin-bottom: 15px;" onclick="generateReport()">Run Report</button>
                 </div>
                 <div id="reportResults" style="display: none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px;">
                     <h4 style="color: var(--primary);">Total Salon Revenue: <span id="reportTotalRevenue" style="color: var(--success);">0.00 GHC</span></h4>
@@ -594,15 +594,15 @@
 
             <!-- Daily Roster -->
             <div id="att_roster" class="att-sub">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
-                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Daily Roster</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Daily Roster</h3>
                     <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">See who is scheduled, on leave, or absent for any date.</p>
                     <div class="grid-2" style="align-items:end; margin-bottom:20px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Date</label>
                             <input type="date" id="att_rosterDate" onchange="att_loadRoster()">
                         </div>
-                        <button class="btn" style="background:var(--manager); margin-bottom:0;" onclick="att_loadRoster()">View Roster</button>
+                        <button class="btn" style="background:var(--primary); margin-bottom:0;" onclick="att_loadRoster()">View Roster</button>
                     </div>
                     <div id="att_rosterList">
                         <p style="color:#999; font-style:italic; text-align:center; padding:20px 0;">Select a date to view roster.</p>
@@ -612,8 +612,8 @@
 
             <!-- Working Hours -->
             <div id="att_schedule" class="att-sub" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
-                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Working Hours</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Working Hours</h3>
                     <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Set working days and hours per staff member. Changes take effect from the effective date.</p>
                     <div class="grid-2" style="align-items:end; margin-bottom:20px;">
                         <div class="form-group" style="margin-bottom:0;">
@@ -644,7 +644,7 @@
                                 <label class="att-day-label"><input type="checkbox" value="Sun" class="att-day-cb"> Sun</label>
                             </div>
                         </div>
-                        <button class="btn" id="btnSaveSchedule" style="background:var(--manager); width:auto; padding:10px 25px;" onclick="att_saveSchedule()">Save Working Hours</button>
+                        <button class="btn" id="btnSaveSchedule" style="background:var(--primary); width:auto; padding:10px 25px;" onclick="att_saveSchedule()">Save Working Hours</button>
                     </div>
                 </div>
                 <div class="module-box" id="att_schedHistoryBox" style="display:none;">
@@ -655,8 +655,8 @@
 
             <!-- Leave Management -->
             <div id="att_leave" class="att-sub" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
-                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Submit Leave Request</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Submit Leave Request</h3>
                     <div class="grid-2" style="margin-bottom:0;">
                         <div class="form-group">
                             <label>Staff Member <span class="required-star">*</span></label>
@@ -688,7 +688,7 @@
                         <textarea id="att_leaveNote" rows="2" placeholder="Any additional context…"></textarea>
                     </div>
                     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <button class="btn" id="btnSubmitLeave" style="background:var(--manager); width:auto; padding:10px 25px;" onclick="att_submitLeave()">Submit Leave Request</button>
+                        <button class="btn" id="btnSubmitLeave" style="background:var(--primary); width:auto; padding:10px 25px;" onclick="att_submitLeave()">Submit Leave Request</button>
                         <span id="att_leaveMsg" style="font-size:0.85rem; font-weight:bold;"></span>
                     </div>
                 </div>
@@ -716,9 +716,9 @@
 
             <!-- Leave Balances -->
             <div id="att_balances" class="att-sub" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
+                <div class="module-box" style="border-top:4px solid var(--accent);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
-                        <h3 style="margin:0; border:none; padding:0; color:var(--manager);">Leave Balances</h3>
+                        <h3 style="margin:0; border:none; padding:0; color:var(--accent);">Leave Balances</h3>
                         <div style="display:flex; gap:10px; align-items:center;">
                             <select id="att_balYear" onchange="att_loadBalances()" style="width:auto; padding:7px 10px; font-size:0.85rem;"></select>
                             <button class="btn btn-secondary" style="width:auto; padding:7px 15px; font-size:0.82rem;" onclick="att_loadBalances()">Refresh</button>
@@ -1075,8 +1075,8 @@
 
             <!-- ── 3. WEEKLY / MONTHLY SUMMARY ──────────── -->
             <div id="rpt_monthly" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
-                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Weekly / Monthly Summary</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Weekly / Monthly Summary</h3>
                     <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <label>View</label>
@@ -1144,7 +1144,7 @@
         <div class="consult-modal">
             <button class="consult-close" id="btnCloseConsultation" onclick="closeConsultation()">&times;</button>
             <h2 style="color:var(--primary); margin-bottom:5px;">Consultation & Assessment</h2>
-            <p style="color:var(--manager); font-weight:bold; margin-bottom:20px; font-size:1.1rem;">Client: <span id="consultClientName">...</span></p>
+            <p style="color:var(--accent); font-weight:bold; margin-bottom:20px; font-size:1.1rem;">Client: <span id="consultClientName">...</span></p>
             
             <div class="consult-section-title">II. MEDICAL HISTORY & SAFETY</div>
             <div class="checkbox-grid">
