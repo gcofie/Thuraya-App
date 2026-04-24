@@ -861,7 +861,7 @@ window.editAppointment = async function(id) {
 
         // Scroll to form after tab renders
         setTimeout(() => {
-            const bookingForm = document.getElementById('sched_selectedClientDisplay');
+            const bookingForm = document.getElementById('subView_Schedule');
             if (bookingForm) bookingForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 350);
 
