@@ -864,6 +864,12 @@ window.editAppointment = async function(id) {
         document.getElementById('btnConfirmBooking').innerText = "Update Appointment";
         document.getElementById('btnCancelEdit').style.display = 'inline-block';
 
+        // Scroll to the booking form
+        setTimeout(() => {
+            const bookingForm = document.getElementById('sched_selectedClientDisplay') || document.getElementById('sched_search');
+            if (bookingForm) bookingForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+
         clearAllSelections();
 
         setTimeout(() => {
