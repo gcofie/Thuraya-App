@@ -652,6 +652,23 @@ window.clearAllSelections = function() {
     calculateScheduleTotals();
 }
 
+window.clearScheduleClient = function() {
+    const phone = document.getElementById('sched_phone');
+    const name = document.getElementById('sched_name');
+    const displayName = document.getElementById('sched_displayName');
+    const displayPhone = document.getElementById('sched_displayPhone');
+    const selectedDisplay = document.getElementById('sched_selectedClientDisplay');
+    const search = document.getElementById('sched_search');
+    const searchResults = document.getElementById('sched_searchResults');
+    if (phone) phone.value = '';
+    if (name) name.value = '';
+    if (displayName) displayName.innerText = '';
+    if (displayPhone) displayPhone.innerText = '';
+    if (selectedDisplay) selectedDisplay.style.display = 'none';
+    if (search) search.value = '';
+    if (searchResults) searchResults.style.display = 'none';
+}
+
 function calculateScheduleTotals() {
     let totalMins = 0;
     let subtotalCost = 0;
