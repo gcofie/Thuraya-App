@@ -794,7 +794,7 @@ async function generateTimeSlots() {
         let slotsFound = false;
 
         for (let t = openTime; t + duration <= closeTime; t += interval) {
-            if (isToday && t <= currentMins) continue;
+            if (isToday && t < currentMins + 30) continue;
 
             let slotEnd = t + duration;
 
