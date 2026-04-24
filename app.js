@@ -850,12 +850,20 @@ window.editAppointment = async function(id) {
         if(!doc.exists) return;
         let appt = doc.data();
 
-        // Step 1: Switch to the Clients main tab
-        const clientsTab = document.getElementById('nav_clients');
-        if (clientsTab) { clientsTab.checked = true; switchModule('clientsView'); }
-        // Step 2: Switch to the Book Appointment sub-tab
-        const scheduleTab = document.getElementById('tab_toggle_schedule');
-        if (scheduleTab) { scheduleTab.checked = true; toggleClientsSubView(); }
+        // Step 1: Switch to Clients main tab
+        const clientsTabEl = document.getElementById('nav_clients');
+        if (clientsTabEl) { clientsTabEl.checked = true; switchModule('clientsView'); }
+        // Step 2: Switch to Book Appointment sub-tab
+        const schedTabEl = document.getElementById('tab_toggle_schedule');
+        if (schedTabEl) { schedTabEl.checked = true; toggleClientsSubView(); }
+
+        editingApptId = id;
+
+        // Scroll to form after tab renders
+        setTimeout(() => {
+            const bookingForm = document.getElementById('sched_selectedClientDisplay');
+            if (bookingForm) bookingForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 350);
 
         document.getElementById('sched_phone').value = appt.clientPhone || '';
         document.getElementById('sched_name').value = appt.clientName || '';
@@ -868,12 +876,6 @@ window.editAppointment = async function(id) {
         editingApptId = id;
         document.getElementById('btnConfirmBooking').innerText = "Update Appointment";
         document.getElementById('btnCancelEdit').style.display = 'inline-block';
-
-        // Scroll to the booking form
-        setTimeout(() => {
-            const bookingForm = document.getElementById('sched_selectedClientDisplay') || document.getElementById('sched_search');
-            if (bookingForm) bookingForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
 
         clearAllSelections();
 
