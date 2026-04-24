@@ -3701,3 +3701,554 @@ window.rpt_exportCSV = function(type) {
 };
 
 console.log('Thuraya Reports module loaded.');
+
+
+// ============================================================
+// STAFF BILLING UPGRADE — GROUP-AWARE CHECKOUT
+// Version: staff-group-billing-upgrade-20260424
+// Safe override: placed at bottom to replace old FOH checkout logic.
+// Handles:
+// - lead_pays_all
+// - split_equally
+// - each_pays_own
+// - subgroup_pays_separately
+// - lead_pays_all_after_last
+// ============================================================
+console.log('✅ Staff group billing upgrade loaded: staff-group-billing-upgrade-20260424');
+
+function gb_money(v) {
+    const n = Number(parseFloat(v || 0));
+    return isNaN(n) ? 0 : n;
+}
+
+function gb_fmt(v) {
+    return gb_money(v).toFixed(2);
+}
+
+function gb_modeLabel(mode) {
+    const labels = {
+        lead_pays_all: 'Lead booker pays for all',
+        split_equally: 'Split equally',
+        each_pays_own: 'Each pays own',
+        subgroup_pays_separately: 'Sub-group pays separately',
+        lead_pays_all_after_last: 'Lead pays after last sub-group'
+    };
+    return labels[mode] || (mode || 'Standard checkout');
+}
+
+function gb_isGroup(job) {
+    return !!(job && job.groupId && job.isGroupBooking);
+}
+
+function gb_isLead(job) {
+    return job?.isLeadBooker === true || job?.groupRole === 'lead' || job?.payableBy === 'lead_booker' || job?.payableBy === 'lead_booker_final_bill';
+}
+
+function gb_memberAmount(job) {
+    return gb_money(job.amountDue || job.totalGHC || job.grandTotal || job.bookedPrice || 0);
+}
+
+function gb_serviceAmount(job) {
+    return gb_money(job.memberServiceTotal || job.grandTotal || job.bookedPrice || 0);
+}
+
+async function gb_getGroupJobs(groupId) {
+    const snap = await db.collection('Active_Jobs').where('groupId', '==', groupId).get();
+    const jobs = [];
+    snap.forEach(doc => jobs.push({ id: doc.id, ...doc.data() }));
+    jobs.sort((a, b) => {
+        const aKey = `${a.subGroupIndex || 0}_${a.timeString || ''}_${a.clientName || ''}`;
+        const bKey = `${b.subGroupIndex || 0}_${b.timeString || ''}_${b.clientName || ''}`;
+        return aKey.localeCompare(bKey);
+    });
+    return jobs;
+}
+
+function gb_groupReadyJobs(groupJobs) {
+    return groupJobs.filter(j => j.status === 'Ready for Payment');
+}
+
+function gb_groupOpenJobs(groupJobs) {
+    return groupJobs.filter(j => !['Closed', 'Cancelled', 'No Show'].includes(j.status));
+}
+
+function gb_allOpenJobsReady(groupJobs) {
+    const open = gb_groupOpenJobs(groupJobs);
+    return open.length > 0 && open.every(j => j.status === 'Ready for Payment');
+}
+
+function gb_subgroupJobs(groupJobs, subGroupIndex) {
+    return groupJobs.filter(j => String(j.subGroupIndex || 1) === String(subGroupIndex || 1));
+}
+
+function gb_subgroupReady(groupJobs, subGroupIndex) {
+    const sg = gb_subgroupJobs(groupJobs, subGroupIndex).filter(j => !['Closed', 'Cancelled', 'No Show'].includes(j.status));
+    return sg.length > 0 && sg.every(j => j.status === 'Ready for Payment');
+}
+
+function gb_computeCheckoutPlan(job, groupJobs) {
+    const mode = job.billingMode || '';
+    const isGroup = gb_isGroup(job);
+
+    if (!isGroup) {
+        return {
+            type: 'solo',
+            title: job.clientName || 'Client',
+            services: job.bookedService || '',
+            amount: gb_memberAmount(job),
+            subtotal: gb_money(job.bookedPrice || job.grandTotal || 0),
+            jobsToClose: [job],
+            canCheckout: true,
+            note: 'Standard individual checkout.'
+        };
+    }
+
+    const readyJobs = gb_groupReadyJobs(groupJobs);
+    const openJobs = gb_groupOpenJobs(groupJobs);
+    const lead = groupJobs.find(gb_isLead) || groupJobs[0] || job;
+
+    if (mode === 'lead_pays_all') {
+        const amount = gb_money(job.groupTotal) || groupJobs.reduce((s, j) => s + gb_serviceAmount(j), 0);
+        return {
+            type: 'group_lead_all',
+            title: `Group checkout — ${lead.clientName || 'Lead booker'}`,
+            services: `Lead pays for all ${groupJobs.length} group member(s)`,
+            amount,
+            subtotal: amount,
+            jobsToClose: openJobs,
+            canCheckout: gb_allOpenJobsReady(groupJobs),
+            note: gb_allOpenJobsReady(groupJobs)
+                ? 'All open group members are ready. One payment will close the full group.'
+                : 'Wait until all group members are ready before final group checkout.'
+        };
+    }
+
+    if (mode === 'lead_pays_all_after_last') {
+        const amount = gb_money(job.groupTotal) || groupJobs.reduce((s, j) => s + gb_serviceAmount(j), 0);
+        return {
+            type: 'group_lead_final',
+            title: `Final group bill — ${lead.clientName || 'Lead booker'}`,
+            services: `Lead pays after the last sub-group finishes`,
+            amount,
+            subtotal: amount,
+            jobsToClose: openJobs,
+            canCheckout: gb_allOpenJobsReady(groupJobs),
+            note: gb_allOpenJobsReady(groupJobs)
+                ? 'All sub-groups are ready. You can raise one final bill.'
+                : 'Final lead payment should wait until the last sub-group is ready.'
+        };
+    }
+
+    if (mode === 'subgroup_pays_separately') {
+        const sgIndex = job.subGroupIndex || 1;
+        const sgJobs = gb_subgroupJobs(groupJobs, sgIndex).filter(j => !['Closed', 'Cancelled', 'No Show'].includes(j.status));
+        const amount = sgJobs.reduce((s, j) => s + gb_serviceAmount(j), 0);
+        return {
+            type: 'subgroup',
+            title: `Sub-group ${sgIndex} checkout`,
+            services: `${sgJobs.length} member(s) in this sub-group`,
+            amount,
+            subtotal: amount,
+            jobsToClose: sgJobs,
+            canCheckout: gb_subgroupReady(groupJobs, sgIndex),
+            note: gb_subgroupReady(groupJobs, sgIndex)
+                ? 'This sub-group is ready for checkout.'
+                : 'Wait until all members in this sub-group are ready.'
+        };
+    }
+
+    if (mode === 'split_equally') {
+        const amount = gb_memberAmount(job) || ((gb_money(job.groupTotal) || groupJobs.reduce((s, j) => s + gb_serviceAmount(j), 0)) / Math.max(1, groupJobs.length));
+        return {
+            type: 'member_equal_share',
+            title: `${job.clientName || 'Group member'} — equal share`,
+            services: job.bookedService || '',
+            amount,
+            subtotal: amount,
+            jobsToClose: [job],
+            canCheckout: job.status === 'Ready for Payment',
+            note: 'This member pays an equal share of the group total.'
+        };
+    }
+
+    // each_pays_own or fallback
+    return {
+        type: 'member_own',
+        title: `${job.clientName || 'Group member'} — own bill`,
+        services: job.bookedService || '',
+        amount: gb_memberAmount(job) || gb_serviceAmount(job),
+        subtotal: gb_memberAmount(job) || gb_serviceAmount(job),
+        jobsToClose: [job],
+        canCheckout: job.status === 'Ready for Payment',
+        note: mode === 'each_pays_own' ? 'This member pays for their own services.' : 'Group member checkout.'
+    };
+}
+
+function gb_taxHtmlForPlan(plan, primaryJob) {
+    // For group/subgroup aggregate checkout, avoid mixing per-member taxes; show a clean total line.
+    if (plan.jobsToClose.length > 1) {
+        return `<div style="font-size:0.8rem;color:#777;">Group/sub-group aggregate billing</div>`;
+    }
+
+    let taxes = [];
+    try { taxes = JSON.parse(primaryJob.taxBreakdown || '[]'); } catch(e) {}
+    return taxes.map(t => {
+        const amt = gb_money(t.amount);
+        const name = t.name || 'Tax';
+        return `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#777;"><span>+ ${name}</span><span>${amt.toFixed(2)} GHC</span></div>`;
+    }).join('');
+}
+
+function gb_groupSummaryHtml(groupJobs, plan) {
+    if (!groupJobs || !groupJobs.length) return '';
+
+    const mode = groupJobs[0]?.billingMode || plan?.billingMode || '';
+    const rows = groupJobs.map(j => {
+        const isClosed = j.status === 'Closed';
+        const badgeColor = isClosed ? 'var(--success)' : (j.status === 'Ready for Payment' ? 'var(--manager)' : '#999');
+        const amt = gb_memberAmount(j) || gb_serviceAmount(j);
+        return `
+            <div style="display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #eee;padding:6px 0;font-size:0.78rem;">
+                <span>
+                    <strong>${j.clientName || 'Member'}</strong>
+                    ${j.isLeadBooker ? '<span style="font-size:0.68rem;color:var(--accent);font-weight:bold;"> · Lead</span>' : ''}
+                    <br><small>Sub-group ${j.subGroupIndex || 1} · ${j.status || '—'}</small>
+                </span>
+                <span style="text-align:right;">
+                    <strong>${amt.toFixed(2)} GHC</strong><br>
+                    <small style="color:${badgeColor};">${j.payableBy || ''}</small>
+                </span>
+            </div>`;
+    }).join('');
+
+    return `
+        <div style="background:#f9fafb;border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:8px;max-width:360px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;">
+                <strong style="color:var(--primary);font-size:0.84rem;">👥 Group billing</strong>
+                <span style="font-size:0.74rem;color:var(--accent);font-weight:bold;">${gb_modeLabel(mode)}</span>
+            </div>
+            ${rows}
+            <div style="display:flex;justify-content:space-between;margin-top:8px;font-weight:bold;">
+                <span>Checkout amount</span><span>${gb_fmt(plan.amount)} GHC</span>
+            </div>
+            <p style="margin:6px 0 0;color:#666;font-size:0.75rem;">${plan.note || ''}</p>
+        </div>`;
+}
+
+function gb_renderCheckoutCard(job, groupJobs) {
+    const plan = gb_computeCheckoutPlan(job, groupJobs || [job]);
+    const subtotal = gb_fmt(plan.subtotal);
+    const grandTotal = gb_fmt(plan.amount);
+    const taxHtml = gb_taxHtmlForPlan(plan, job);
+    const groupHtml = gb_isGroup(job) ? gb_groupSummaryHtml(groupJobs, plan) : '';
+
+    const div = document.createElement('div');
+    div.className = 'ticket';
+    div.style.borderColor = plan.canCheckout ? 'var(--success)' : 'var(--accent)';
+    div.style.padding = '10px';
+
+    const infoDiv = document.createElement('div');
+    infoDiv.style.flexGrow = '1';
+    infoDiv.innerHTML = `
+        <h4 style="margin:0; font-size:1rem; color:${plan.canCheckout ? 'var(--success)' : 'var(--accent)'};">
+            ${gb_isGroup(job) ? '👥 ' : ''}${plan.title}
+        </h4>
+        <p style="margin:0; font-size:0.8rem; margin-bottom:5px;">💅 ${plan.services}</p>
+        <div style="background:#f1f1f1; padding:8px; border-radius:4px; max-width:300px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.8rem;"><span>Subtotal:</span><span>${subtotal} GHC</span></div>
+            ${taxHtml}
+            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:0.9rem; margin-top:3px; border-top:1px solid #ddd; padding-top:3px;"><span>Total:</span><span>${grandTotal} GHC</span></div>
+        </div>
+        ${groupHtml}
+    `;
+
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.style.background = plan.canCheckout ? 'var(--success)' : '#aaa';
+    btn.style.width = 'auto';
+    btn.style.padding = '5px 15px';
+    btn.style.fontSize = '0.8rem';
+    btn.innerText = plan.canCheckout ? 'Checkout' : 'Waiting';
+    btn.disabled = !plan.canCheckout;
+    btn.onclick = function() {
+        window.openCheckoutV2(plan, job, groupJobs || [job], subtotal, taxHtml, grandTotal);
+    };
+
+    div.appendChild(infoDiv);
+    div.appendChild(btn);
+    return div;
+}
+
+// Override FOH pending checkout list
+function startFohBillingListener() {
+    const listDiv = document.getElementById('fohPendingCheckoutList');
+    if (!listDiv) return;
+
+    try {
+        if (fohBillingListener) {
+            try { fohBillingListener(); } catch(e) {}
+        }
+
+        fohBillingListener = db.collection('Active_Jobs')
+            .where('status', '==', 'Ready for Payment')
+            .onSnapshot(async snap => {
+                if (snap.empty) {
+                    listDiv.innerHTML = '<p style="color: #999; font-style: italic;">No pending checkouts.</p>';
+                    const panel = document.getElementById('checkoutPanel');
+                    if (panel) panel.style.display = 'none';
+                    return;
+                }
+
+                listDiv.innerHTML = '<p style="color:#666;font-size:0.85rem;">Loading checkouts...</p>';
+
+                const docs = [];
+                snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+
+                const renderedKeys = new Set();
+                const listFrag = document.createDocumentFragment();
+
+                for (const job of docs) {
+                    if (gb_isGroup(job)) {
+                        const groupJobs = await gb_getGroupJobs(job.groupId);
+                        const mode = job.billingMode || '';
+
+                        let key = job.id;
+                        if (mode === 'lead_pays_all' || mode === 'lead_pays_all_after_last') {
+                            key = `group:${job.groupId}:lead_all`;
+                        } else if (mode === 'subgroup_pays_separately') {
+                            key = `group:${job.groupId}:sg:${job.subGroupIndex || 1}`;
+                        }
+
+                        if (renderedKeys.has(key)) continue;
+                        renderedKeys.add(key);
+                        listFrag.appendChild(gb_renderCheckoutCard(job, groupJobs));
+                    } else {
+                        listFrag.appendChild(gb_renderCheckoutCard(job, [job]));
+                    }
+                }
+
+                listDiv.innerHTML = '';
+                listDiv.appendChild(listFrag);
+            });
+    } catch(e) { console.error(e); }
+}
+
+window.openCheckoutV2 = function(plan, primaryJob, groupJobs, subtotal, taxHtml, grandTotal) {
+    document.getElementById('checkoutJobId').value = primaryJob.id;
+    document.getElementById('checkoutClientName').innerText = plan.title;
+    document.getElementById('checkoutServices').innerText = plan.services;
+    document.getElementById('checkoutSubtotal').innerText = subtotal + ' GHC';
+    document.getElementById('checkoutTaxList').innerHTML = taxHtml;
+    document.getElementById('checkoutTotal').innerText = grandTotal + ' GHC';
+    document.getElementById('checkoutGrandTotalVal').value = grandTotal;
+    document.getElementById('checkoutPaymentMethod').value = '';
+
+    window._checkoutPlan = {
+        plan,
+        primaryJob,
+        groupJobs,
+        jobIds: plan.jobsToClose.map(j => j.id),
+        amount: gb_money(plan.amount)
+    };
+
+    const panel = document.getElementById('checkoutPanel');
+    let summary = document.getElementById('checkoutGroupSummary');
+    if (!summary) {
+        summary = document.createElement('div');
+        summary.id = 'checkoutGroupSummary';
+        summary.style.cssText = 'margin:10px 0;padding:10px;border:1px solid var(--border);border-radius:6px;background:#f9fafb;font-size:0.85rem;';
+        const totalEl = document.getElementById('checkoutTotal');
+        totalEl?.parentElement?.after(summary);
+    }
+
+    if (gb_isGroup(primaryJob)) {
+        summary.style.display = 'block';
+        summary.innerHTML = `
+            <strong>👥 Group checkout mode:</strong> ${gb_modeLabel(primaryJob.billingMode)}<br>
+            <span>${plan.note}</span><br>
+            <small>${plan.jobsToClose.length} job(s) will be closed by this payment.</small>
+        `;
+    } else {
+        summary.style.display = 'none';
+        summary.innerHTML = '';
+    }
+
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth' });
+};
+
+// Backward-compatible old opener
+window.openCheckout = function(id, name, services, subtotal, taxHtml, grandTotal) {
+    window._checkoutPlan = null;
+    document.getElementById('checkoutJobId').value = id;
+    document.getElementById('checkoutClientName').innerText = name;
+    document.getElementById('checkoutServices').innerText = services;
+    document.getElementById('checkoutSubtotal').innerText = subtotal + ' GHC';
+    document.getElementById('checkoutTaxList').innerHTML = taxHtml;
+    document.getElementById('checkoutTotal').innerText = grandTotal + ' GHC';
+    document.getElementById('checkoutGrandTotalVal').value = grandTotal;
+    document.getElementById('checkoutPaymentMethod').value = '';
+    document.getElementById('checkoutPanel').style.display = 'block';
+    document.getElementById('checkoutPanel').scrollIntoView({behavior: 'smooth'});
+};
+
+window.confirmPayment = async function() {
+    const method = document.getElementById('checkoutPaymentMethod').value;
+    if (!method) { alert("Please select a Payment Method."); return; }
+
+    const checkoutPlan = window._checkoutPlan;
+    const fallbackId = document.getElementById('checkoutJobId').value;
+    const fallbackPrice = gb_money(document.getElementById('checkoutGrandTotalVal').value);
+
+    try {
+        const batch = db.batch();
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+
+        if (checkoutPlan && checkoutPlan.jobIds && checkoutPlan.jobIds.length) {
+            checkoutPlan.jobIds.forEach(jobId => {
+                batch.update(db.collection('Active_Jobs').doc(jobId), {
+                    status: 'Closed',
+                    paymentStatus: 'Paid',
+                    paymentMethod: method,
+                    totalGHC: checkoutPlan.amount,
+                    groupCheckoutAmount: checkoutPlan.amount,
+                    groupCheckoutType: checkoutPlan.plan.type,
+                    closedAt: now,
+                    closedBy: currentUserEmail
+                });
+            });
+
+            // Best effort: also mark matching appointments paid if sourceAppointmentId exists in future.
+            checkoutPlan.plan.jobsToClose.forEach(j => {
+                if (j.sourceAppointmentId) {
+                    batch.update(db.collection('Appointments').doc(j.sourceAppointmentId), {
+                        paymentStatus: 'Paid',
+                        paidAt: now,
+                        paidBy: currentUserEmail,
+                        paymentMethod: method
+                    });
+                }
+            });
+
+            await batch.commit();
+            alert("Group payment processed successfully!");
+        } else {
+            await db.collection('Active_Jobs').doc(fallbackId).update({
+                status: 'Closed',
+                paymentStatus: 'Paid',
+                paymentMethod: method,
+                totalGHC: fallbackPrice,
+                closedAt: now,
+                closedBy: currentUserEmail
+            });
+            alert("Payment processed successfully!");
+        }
+
+        window._checkoutPlan = null;
+        document.getElementById('checkoutPanel').style.display = 'none';
+    } catch(e) { alert("Error processing payment: " + e.message); }
+};
+
+// Override check-in helpers so group billing metadata reaches Active_Jobs.
+async function checkInGroupByGroupId(groupId) {
+    try {
+        const snap = await db.collection('Appointments')
+            .where('groupId', '==', groupId)
+            .where('status', '==', 'Scheduled')
+            .get();
+
+        if (snap.empty) { alert('No scheduled group members found.'); return; }
+
+        const batch = db.batch();
+        const jobPromises = [];
+
+        snap.forEach(doc => {
+            batch.update(doc.ref, { status: 'Arrived' });
+            const appt = doc.data();
+            jobPromises.push(db.collection('Active_Jobs').add({
+                sourceAppointmentId: doc.id,
+                clientPhone:       appt.clientPhone || '',
+                clientName:        appt.clientName || '',
+                clientEmail:       appt.clientEmail || '',
+                assignedTechEmail: appt.assignedTechEmail || '',
+                assignedTechName:  appt.assignedTechName || '',
+                bookedService:     appt.bookedService  || 'N/A',
+                bookedDuration:    appt.bookedDuration || '0',
+                bookedPrice:       appt.bookedPrice    || '0',
+                grandTotal:        appt.grandTotal     || appt.amountDue || '0',
+                totalGHC:          appt.totalGHC       || appt.amountDue || appt.grandTotal || '0',
+                taxBreakdown:      appt.taxBreakdown   || '[]',
+
+                groupId:           appt.groupId        || '',
+                isGroupBooking:    true,
+                groupSize:         appt.groupSize      || 1,
+                splitGroup:        appt.splitGroup     || false,
+                subGroupIndex:     appt.subGroupIndex  || 1,
+                billingScenario:   appt.billingScenario || '',
+                billingMode:       appt.billingMode || '',
+                groupTotal:        appt.groupTotal || '',
+                amountDue:         appt.amountDue || appt.grandTotal || '',
+                payableBy:         appt.payableBy || '',
+                isLeadBooker:      appt.isLeadBooker === true,
+                memberServiceTotal: appt.memberServiceTotal || appt.grandTotal || '',
+
+                status:            'Waiting',
+                paymentStatus:     'Unpaid',
+                fohCreator:        currentUserEmail,
+                createdAt:         firebase.firestore.FieldValue.serverTimestamp(),
+                dateString:        todayDateStr,
+                timeString:        appt.timeString || ''
+            }));
+        });
+
+        await batch.commit();
+        await Promise.all(jobPromises);
+        alert(`Group ${groupId} checked in — ${snap.size} member(s) routed to the floor.`);
+    } catch(e) { alert('Error checking in group: ' + e.message); }
+}
+
+async function _doCheckIn(id, appt) {
+    await db.collection('Appointments').doc(id).update({ status: 'Arrived' });
+    await db.collection('Active_Jobs').add({
+        sourceAppointmentId: id,
+        clientPhone:       appt.clientPhone || '',
+        clientName:        appt.clientName || '',
+        clientEmail:       appt.clientEmail || '',
+        assignedTechEmail: appt.assignedTechEmail || '',
+        assignedTechName:  appt.assignedTechName || '',
+        bookedService:     appt.bookedService  || 'N/A',
+        bookedDuration:    appt.bookedDuration || '0',
+        bookedPrice:       appt.bookedPrice    || '0',
+        grandTotal:        appt.grandTotal     || appt.amountDue || '0',
+        totalGHC:          appt.totalGHC       || appt.amountDue || appt.grandTotal || '0',
+        taxBreakdown:      appt.taxBreakdown   || '[]',
+
+        groupId:           appt.groupId        || '',
+        isGroupBooking:    appt.isGroupBooking || false,
+        groupSize:         appt.groupSize      || 1,
+        splitGroup:        appt.splitGroup     || false,
+        subGroupIndex:     appt.subGroupIndex  || 1,
+        billingScenario:   appt.billingScenario || '',
+        billingMode:       appt.billingMode || '',
+        groupTotal:        appt.groupTotal || '',
+        amountDue:         appt.amountDue || appt.grandTotal || '',
+        payableBy:         appt.payableBy || '',
+        isLeadBooker:      appt.isLeadBooker === true,
+        memberServiceTotal: appt.memberServiceTotal || appt.grandTotal || '',
+
+        status:            'Waiting',
+        paymentStatus:     'Unpaid',
+        fohCreator:        currentUserEmail,
+        createdAt:         firebase.firestore.FieldValue.serverTimestamp(),
+        dateString:        todayDateStr,
+        timeString:        appt.timeString || ''
+    });
+
+    if (GOOGLE_CHAT_WEBHOOK !== "") {
+        fetch(GOOGLE_CHAT_WEBHOOK, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: `🛎️ *Client Arrived*\n*Client:* ${appt.clientName}\n*Service:* ${appt.bookedService}\n*Assigned Tech:* ${appt.assignedTechName}\n_Please check your Dashboard._` })
+        }).catch(err => console.error(err));
+    }
+}
+
