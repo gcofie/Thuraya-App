@@ -1225,7 +1225,7 @@ function startScheduleListener() {
                             <h4 style="margin:0; font-size:1rem; color:var(--manager);">${appt.clientName || 'Unknown'} ${isToday} ${actionReq}${appt.isGroupBooking ? `<span class="group-badge">👥 GROUP · ${appt.groupSize}</span>` : ''}</h4>
                             <p style="margin:0; font-size:0.8rem; color: var(--primary); font-weight: bold;">💅 ${appt.bookedService} (${appt.bookedDuration} mins | ${displayAmt} GHC)</p>
                             <p style="margin:0; font-size:0.8rem;">📅 ${appt.dateString} at ⏰ ${hr12}:${min} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'}</p>
-                            ${appt.isGroupBooking ? `<div class="group-member-list"><p>🔑 Group ID: <strong>${appt.groupId}</strong></p></div>` : ''}
+                            
                         </div>
                         <div style="display:flex; flex-direction:column; gap:5px;">
                             <button class="btn btn-secondary" style="width:100%; padding:5px 10px; font-size:0.75rem;" onclick="editAppointment('${appt.id}')">Edit</button>
@@ -1236,6 +1236,17 @@ function startScheduleListener() {
             listDiv.innerHTML = html;
         });
     } catch(e) { console.error(e); }
+}
+
+window.markNoShow = async function(id) {
+    if(confirm("Mark this client as a No Show?")) {
+        try {
+            await db.collection('Appointments').doc(id).update({ 
+                status: 'No Show',
+                noShowAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch(e) { alert("Error marking no show: " + e.message); }
+    }
 }
 
 window.cancelAppointment = async function(id) {
@@ -1463,12 +1474,13 @@ function startExpectedTodayListener() {
                             <h4 style="margin:0; font-size:1rem;">${appt.clientName || 'Unknown'}${appt.isGroupBooking ? `<span class="group-badge">👥 GROUP · ${appt.groupSize}</span>` : ''}</h4>
                             <p style="margin:0; font-size:0.8rem; color: var(--primary);">💅 <strong>${appt.bookedService || 'N/A'}</strong></p>
                             <p style="margin:0; font-size:0.8rem;">⏰ ${hr12}:${displayMins} ${ampm} | Tech: ${appt.assignedTechName || 'Unknown'} | 📞 ${appt.clientPhone || 'N/A'}</p>
-                            ${appt.isGroupBooking ? `<div class="group-member-list"><p>🔑 Group ID: <strong>${appt.groupId}</strong></p></div>` : ''}
+                            
                         </div>
                         <div style="display:flex; flex-direction:column; gap:5px; width:80px;">
                             <button class="btn" style="width:100%; padding:5px; font-size:0.75rem;" onclick="checkInAppointment('${appt.id}')">Check-In</button>
                             <button class="btn btn-secondary" style="width:100%; padding:5px; font-size:0.75rem;" onclick="editAppointment('${appt.id}')">Edit</button>
                             <button class="btn btn-secondary" style="width:100%; padding:5px; font-size:0.75rem; color:var(--error); border-color:var(--error);" onclick="cancelAppointment('${appt.id}')">Cancel</button>
+                            <button class="btn btn-secondary" style="width:100%; padding:5px; font-size:0.75rem; color:#888; border-color:#888;" onclick="markNoShow('${appt.id}')">No Show</button>
                         </div>
                     </div>`;
             });
