@@ -432,61 +432,58 @@
 
         <!-- MENU SETTINGS — Manager + Admin only -->
         <div id="menuSettingsView" class="app-module">
-            <div style="display:flex; flex-direction:column; gap:20px;">
 
-                <!-- LEFT: Add / Edit Service Form -->
-                <div>
-                    <div class="module-box" style="border-top: 4px solid var(--accent);">
-                        <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Menu Settings</h3>
-                        <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Add, edit or remove services from the booking menu.</p>
+                <!-- Add / Edit Service Form -->
+                <div class="module-box" style="border-top: 4px solid var(--accent); width:100%; box-sizing:border-box;">
+                    <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Menu Settings</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Add, edit or remove services from the booking menu.</p>
 
-                        <div id="managerMenuControls">
-                            <h4 style="margin-bottom:15px; font-size:1rem; color:var(--primary); border-bottom:2px solid var(--accent); padding-bottom:8px;">Add / Edit Service</h4>
+                    <div id="managerMenuControls">
+                        <h4 style="margin-bottom:15px; font-size:1rem; color:var(--primary); border-bottom:2px solid var(--accent); padding-bottom:8px;">Add / Edit Service</h4>
 
-                            <div class="grid-2">
-                                <div class="form-group"><label>Service Category</label><select id="adv_category" onchange="updateAdvForm()"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
-                                <div class="form-group"><label>Service Type</label><select id="adv_type"><option value="Main Therapy">Main Therapy (Single Select)</option></select></div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                            <div class="form-group"><label>Service Category</label><select id="adv_category" onchange="updateAdvForm()"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
+                            <div class="form-group"><label>Service Type</label><select id="adv_type"><option value="Main Therapy">Main Therapy (Single Select)</option></select></div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
+                            <div class="form-group"><label>Service Name:</label><input type="text" id="adv_name"></div>
+                            <div class="form-group"><label>Duration (mins):</label><input type="number" id="adv_duration"></div>
+                            <div class="form-group"><label>Price (GHC):</label><input type="number" id="adv_price"></div>
+                            <div class="form-group"><label>Pricing Type:</label><select id="adv_pricing_type"><option value="Fixed">Fixed Price</option><option value="Per Unit">Per Unit (e.g., per nail)</option></select></div>
+                            <div class="form-group"><label>Availability:</label><select id="adv_status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                        </div>
+
+                        <div class="form-group"><label>Description:</label><textarea id="adv_desc" rows="2"></textarea></div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:10px;">
+                            <div>
+                                <h5 style="margin-bottom:10px; color:var(--primary); font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">Selection Rules</h5>
+                                <div class="form-group"><label>Applies To (Department):</label><select id="adv_applies_to"><option value="Hand">Hand Only</option><option value="Foot">Foot Only</option><option value="Both">Both (Hand &amp; Foot)</option></select></div>
+                                <div class="form-group"><label>Selection Type:</label><select id="adv_selection"><option value="Single">Single Select (Main Base Ritual)</option><option value="Multi">Multi Select (Add-on)</option></select></div>
                             </div>
-
-                            <div class="grid-3">
-                                <div class="form-group"><label>Service Name:</label><input type="text" id="adv_name"></div>
-                                <div class="form-group"><label>Duration (mins):</label><input type="number" id="adv_duration"></div>
-                                <div class="form-group"><label>Price (GHC):</label><input type="number" id="adv_price"></div>
-                                <div class="form-group"><label>Pricing Type:</label><select id="adv_pricing_type"><option value="Fixed">Fixed Price</option><option value="Per Unit">Per Unit (e.g., per nail)</option></select></div>
-                                <div class="form-group"><label>Availability:</label><select id="adv_status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                            <div>
+                                <h5 style="margin-bottom:10px; color:var(--primary); font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">Display Settings</h5>
+                                <div class="form-group"><label>Category Section Name (Header):</label><input type="text" id="adv_section" placeholder="e.g., I. HAND THERAPY RITUALS"></div>
+                                <div class="form-group"><label>Highlight Tag:</label><select id="adv_tag"><option value="None">None</option><option value="New">New</option><option value="Popular">Popular</option><option value="Recommended">Recommended</option></select></div>
                             </div>
+                        </div>
 
-                            <div class="form-group"><label>Description:</label><textarea id="adv_desc" rows="2"></textarea></div>
-
-                            <div class="grid-2" style="margin-top:10px;">
-                                <div>
-                                    <h5 style="margin-bottom:10px; color:var(--primary); font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">Selection Rules</h5>
-                                    <div class="form-group"><label>Applies To (Department):</label><select id="adv_applies_to"><option value="Hand">Hand Only</option><option value="Foot">Foot Only</option><option value="Both">Both (Hand &amp; Foot)</option></select></div>
-                                    <div class="form-group"><label>Selection Type:</label><select id="adv_selection"><option value="Single">Single Select (Main Base Ritual)</option><option value="Multi">Multi Select (Add-on)</option></select></div>
-                                </div>
-                                <div>
-                                    <h5 style="margin-bottom:10px; color:var(--primary); font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">Display Settings</h5>
-                                    <div class="form-group"><label>Category Section Name (Header):</label><input type="text" id="adv_section" placeholder="e.g., I. HAND THERAPY RITUALS"></div>
-                                    <div class="form-group"><label>Highlight Tag:</label><select id="adv_tag"><option value="None">None</option><option value="New">New</option><option value="Popular">Popular</option><option value="Recommended">Recommended</option></select></div>
-                                </div>
-                            </div>
-
-                            <div style="display:flex; gap:10px; justify-content:flex-end; border-top:1px solid var(--border); padding-top:15px; margin-top:10px; flex-wrap:wrap;">
-                                <button class="btn btn-secondary" style="width:auto;" onclick="clearAdvForm()">Clear Form</button>
-                                <button class="btn" id="btnSaveServiceConfig" style="width:auto;" onclick="addNewMenuServiceAdv()">Save Service Configuration</button>
-                            </div>
+                        <div style="display:flex; gap:10px; justify-content:flex-end; border-top:1px solid var(--border); padding-top:15px; margin-top:10px; flex-wrap:wrap;">
+                            <button class="btn btn-secondary" style="width:auto;" onclick="clearAdvForm()">Clear Form</button>
+                            <button class="btn" id="btnSaveServiceConfig" style="width:auto;" onclick="addNewMenuServiceAdv()">Save Service Configuration</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- RIGHT: Live Menu List -->
-                <div class="module-box" style="border-top: 4px solid var(--primary);">
+                <!-- Live Menu List -->
+                <div class="module-box" style="border-top: 4px solid var(--primary); width:100%; box-sizing:border-box; margin-top:20px;">
                     <h3 style="color:var(--primary); border-bottom-color:var(--accent);">Live Menu</h3>
                     <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Current services on the booking menu.</p>
 
                     <div class="dept-tabs">
-                        <label><input type="radio" name="admin_dept_toggle" value="Hand" checked onchange="toggleAdminDeptView()"> HAND</label>
-                        <label><input type="radio" name="admin_dept_toggle" value="Foot" onchange="toggleAdminDeptView()"> FOOT</label>
+                        <label><input type="radio" name="admin_dept_toggle" value="Hand" checked onchange="toggleAdminDeptView()"> HAND THERAPY MENU</label>
+                        <label><input type="radio" name="admin_dept_toggle" value="Foot" onchange="toggleAdminDeptView()"> FOOT THERAPY MENU</label>
                     </div>
 
                     <div id="menuManagerList"><p style="text-align:center; color:#999; font-style:italic;">Loading menu database...</p></div>
@@ -496,7 +493,6 @@
                     </div>
                 </div>
 
-            </div>
         </div>
 
         <div id="hrView" class="app-module">
