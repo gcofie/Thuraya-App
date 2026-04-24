@@ -1,6 +1,6 @@
 
 // ⚠️ PASTE YOUR GOOGLE CHAT WEBHOOK URL HERE
-const GOOGLE_CHAT_WEBHOOK = ""; 
+const GOOGLE_CHAT_WEBHOOK = "";   
 
 // ── Firebase config loaded from firebase-config.js ───────────
 // Switches automatically between production and staging
