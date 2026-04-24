@@ -19,7 +19,7 @@ body { background-color: var(--bg); color: var(--text); line-height: 1.6; displa
 .header h1 { font-size: 2.5rem; color: var(--primary); letter-spacing: 4px; margin-bottom: 5px; text-transform: uppercase;}
 .header p { font-size: 0.9rem; color: #666; font-style: italic; letter-spacing: 1px; text-transform: uppercase;}
 
-.container { width: 100%; max-width: 1000px; padding: 20px; }
+.container { width: 100%; max-width: 1000px; padding: 20px; overflow: hidden; }
 
 /* Login Card Styles */
 #loginScreen { max-width: 400px; margin: 40px auto; text-align: center; }
@@ -256,4 +256,193 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .cip-tab--active {
     color: var(--primary);
     border-bottom-color: var(--accent);
+}
+
+
+/* ============================================================
+   THURAYA LAYOUT POLISH PATCH
+   Fixes wide-open pages outside the Check-In tab.
+   Paste-safe: added at the end so it overrides earlier rules.
+   ============================================================ */
+
+/* Give the logged-in dashboard a polished app frame */
+#appDashboard.container {
+    width: 100%;
+    max-width: 1180px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 24px;
+    padding-right: 24px;
+}
+
+/* Keep every main page centered and controlled */
+.app-module {
+    width: 100%;
+    max-width: 1120px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Keep the Clients module comfortable, since Check-In already looks good */
+#clientsView {
+    max-width: 1120px;
+}
+
+/* Make all module cards feel like panels, not full-screen slabs */
+.module-box {
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Improve 2-column layouts: prevents columns from becoming too wide */
+.grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Improve 3-column layouts: wrap more gracefully on medium screens */
+.grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Pages that are mainly forms/settings should not stretch too wide */
+#menuSettingsView,
+#hrView,
+#adminView,
+#attendanceView,
+#supplyView,
+#reportsView,
+#clientIntelView,
+#activeAteliersView,
+#menuView {
+    max-width: 1040px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Some sections have wide grids/tables; allow safe scrolling inside card instead of stretching page */
+.module-box table,
+.module-box .breakdown-table {
+    width: 100%;
+}
+
+.module-box [style*="overflow-x: auto"] {
+    max-width: 100%;
+}
+
+/* Better dashboard and metric card spacing */
+.dashboard-header,
+#topNavMenu,
+.category-tabs {
+    max-width: 1120px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Make action buttons inside form grids less oversized */
+.grid-2 .btn,
+.grid-3 .btn {
+    width: auto;
+    min-width: 160px;
+}
+
+/* But keep login and primary wide buttons full width when intentionally designed */
+.login-card .btn,
+.login-card .btn-google,
+#btnConfirmBooking,
+#btnEmailLogin {
+    width: 100%;
+}
+
+/* Avoid very wide inner flex panels */
+.metric-card {
+    min-width: 160px;
+}
+
+/* Booking sub-pages: keep left/right layout elegant */
+#subView_Schedule > .grid-2,
+#subView_Billing > .grid-2,
+#subView_Ops > .grid-2,
+#subView_Checkin > .grid-2 {
+    grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+}
+
+/* Attendance subtabs and reports should read like clean admin pages */
+.att-sub,
+.rpt-sub {
+    max-width: 1040px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Keep wide admin/forms readable on tablets */
+@media (max-width: 1100px) {
+    #appDashboard.container {
+        max-width: 100%;
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
+    .app-module,
+    #clientsView,
+    #menuSettingsView,
+    #hrView,
+    #adminView,
+    #attendanceView,
+    #supplyView,
+    #reportsView,
+    #clientIntelView,
+    #activeAteliersView,
+    #menuView {
+        max-width: 100%;
+    }
+}
+
+/* Mobile/tablet: stack cleanly */
+@media (max-width: 900px) {
+    .grid-2,
+    .grid-3,
+    #subView_Schedule > .grid-2,
+    #subView_Billing > .grid-2,
+    #subView_Ops > .grid-2,
+    #subView_Checkin > .grid-2 {
+        grid-template-columns: 1fr;
+    }
+
+    .module-box {
+        padding: 20px;
+    }
+
+    .category-tabs,
+    .dept-tabs {
+        justify-content: flex-start;
+        gap: 10px;
+    }
+
+    .grid-2 .btn,
+    .grid-3 .btn {
+        width: 100%;
+    }
+}
+
+/* Small phones */
+@media (max-width: 520px) {
+    #appDashboard.container,
+    .container {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .module-box {
+        padding: 16px;
+        border-radius: 7px;
+    }
+
+    .header {
+        padding-top: 28px;
+    }
+
+    .header h1 {
+        font-size: 2rem;
+    }
 }
