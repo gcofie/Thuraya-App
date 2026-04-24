@@ -539,9 +539,9 @@
         </div>
 
         <div id="adminView" class="app-module">
-            <div class="module-box" style="border-top: 4px solid var(--admin);">
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                    <h3 style="margin:0; border:none; padding:0; color: var(--admin);">Staff Matrix & Access Control</h3>
+                    <h3 style="margin:0; border:none; padding:0; color: var(--accent);">Staff Matrix & Access Control</h3>
                     <button class="btn btn-secondary" id="btnRefreshDirectory" style="width:auto; padding:5px 15px; font-size:0.8rem;" onclick="loadStaffDirectory()">Refresh Directory</button>
                 </div>
                 <div style="background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 30px;">
@@ -560,10 +560,10 @@
                             <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--accent);"><input type="checkbox" class="role-checkbox" value="Test Tech" style="width: auto;"> Test Tech (24/7)</label>
                             <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--supply);"><input type="checkbox" class="role-checkbox" value="Supply Chain" style="width: auto;"> Supply Chain</label>
                             <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--manager);"><input type="checkbox" class="role-checkbox" value="Manager" style="width: auto;"> Manager</label>
-                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--admin);"><input type="checkbox" class="role-checkbox" value="System Admin" style="width: auto;"> System Admin</label>
+                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--primary);"><input type="checkbox" class="role-checkbox" value="System Admin" style="width: auto;"> System Admin</label>
                         </div>
                     </div>
-                    <button class="btn" id="btnSaveStaffAccount" style="background-color: var(--admin); width: auto; padding: 10px 20px;" onclick="addStaffAccount()">Save Matrix Settings & Create/Update User</button>
+                    <button class="btn" id="btnSaveStaffAccount" style="background-color: var(--primary); width: auto; padding: 10px 20px;" onclick="addStaffAccount()">Save Matrix Settings & Create/Update User</button>
                 </div>
                 <div style="overflow-x: auto;">
                     <div id="adminStaffList"><p style="color: #999; font-style: italic;">Loading directory...</p></div>
@@ -1109,8 +1109,8 @@
 
             <!-- ── 5. CLIENT INTELLIGENCE ────────────────── -->
             <div id="rpt_clients" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--admin);">
-                    <h3 style="color:var(--admin); border-bottom-color:var(--admin);">Client Intelligence Report</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Client Intelligence Report</h3>
                     <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
                         <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;"><label>Month (for new clients)</label><input type="month" id="rpt_clientMonth"></div>
                         <button class="btn" style="width:auto; padding:9px 22px;" onclick="rpt_loadClients()">Load</button>
