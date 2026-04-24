@@ -260,52 +260,253 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 
 
 /* ============================================================
-   THURAYA LAYOUT POLISH PATCH
-   Fixes wide-open pages outside the Check-In tab.
-   Paste-safe: added at the end so it overrides earlier rules.
+   THURAYA BASE LAYOUT RECOVERY + BOOK APPOINTMENT SINGLE COLUMN
+   Added to prevent raw/wide layout and keep booking page vertical.
    ============================================================ */
 
-/* Give the logged-in dashboard a polished app frame */
+/* Base safety reset */
+html, body {
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    background-color: var(--bg) !important;
+    color: var(--text) !important;
+    line-height: 1.6;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Header should be centered and polished */
+.header {
+    text-align: center !important;
+    width: 100% !important;
+    padding: 40px 20px 20px !important;
+}
+
+.header h1 {
+    font-size: 2.5rem !important;
+    color: var(--primary) !important;
+    letter-spacing: 4px !important;
+    margin-bottom: 5px !important;
+    text-transform: uppercase !important;
+}
+
+/* Core app frame */
+.container {
+    width: 100% !important;
+    max-width: 1100px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+}
+
+/* Login remains compact */
+#loginScreen {
+    max-width: 400px !important;
+    margin: 40px auto !important;
+    text-align: center !important;
+}
+
+/* Dashboard frame */
 #appDashboard.container {
-    width: 100%;
-    max-width: 1180px;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 24px;
-    padding-right: 24px;
+    width: 100% !important;
+    max-width: 1180px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+    box-sizing: border-box !important;
 }
 
-/* Keep every main page centered and controlled */
+/* Prevent hidden modules from becoming visible due to override */
 .app-module {
-    width: 100%;
-    max-width: 1120px;
-    margin-left: auto;
-    margin-right: auto;
+    width: 100% !important;
+    max-width: 1120px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    overflow: visible !important;
 }
 
-/* Keep the Clients module comfortable, since Check-In already looks good */
-#clientsView {
-    max-width: 1120px;
+.app-module[style*="display: none"] {
+    display: none !important;
 }
 
-/* Make all module cards feel like panels, not full-screen slabs */
+/* Cards/panels */
+.card,
 .module-box {
-    max-width: 100%;
-    margin-left: auto;
-    margin-right: auto;
+    background: var(--card-bg) !important;
+    padding: 25px !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
 }
 
-/* Improve 2-column layouts: prevents columns from becoming too wide */
+/* Dashboard header and navigation */
+.dashboard-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-bottom: 15px !important;
+    margin-bottom: 10px !important;
+    flex-wrap: wrap !important;
+    gap: 15px !important;
+}
+
+#topNavMenu {
+    display: flex;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    margin-bottom: 25px !important;
+    padding-bottom: 15px !important;
+    border-bottom: 2px solid var(--border) !important;
+    flex-wrap: wrap !important;
+}
+
+.nav-tab label {
+    background: #f1f1f1 !important;
+    padding: 10px 15px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-weight: bold !important;
+    color: #555 !important;
+    border: 1px solid var(--border) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    font-size: 0.9rem !important;
+}
+
+.nav-tab input[type="radio"] {
+    display: none !important;
+}
+
+.nav-tab input[type="radio"]:checked + label {
+    background: var(--primary) !important;
+    color: #fff !important;
+    border-color: var(--primary) !important;
+}
+
+/* Tab rows */
+.category-tabs,
+.dept-tabs {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 20px !important;
+    margin-bottom: 20px !important;
+    padding: 15px !important;
+    background: #f1f1f1 !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    flex-wrap: wrap !important;
+}
+
+.category-tabs label,
+.dept-tabs label {
+    font-size: 1rem !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    cursor: pointer !important;
+    color: var(--primary) !important;
+    margin: 0 !important;
+}
+
+/* Grids */
 .grid-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 20px !important;
+    align-items: start !important;
 }
 
-/* Improve 3-column layouts: wrap more gracefully on medium screens */
 .grid-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 15px !important;
 }
 
-/* Pages that are mainly forms/settings should not stretch too wide */
+.grid-2 > *,
+.grid-3 > * {
+    min-width: 0 !important;
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 15px !important;
+    text-align: left !important;
+    position: relative !important;
+}
+
+label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    color: var(--primary);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="tel"],
+input[type="date"],
+input[type="time"],
+input[type="password"],
+select,
+textarea {
+    width: 100% !important;
+    padding: 10px !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+    font-size: 1rem !important;
+    box-sizing: border-box !important;
+}
+
+/* Buttons */
+.btn {
+    background-color: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: bold;
+}
+
+.btn-secondary {
+    background-color: transparent !important;
+    border: 1px solid var(--primary) !important;
+    color: var(--primary) !important;
+}
+
+.search-box {
+    display: flex !important;
+    gap: 10px !important;
+    margin-top: 10px !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    position: relative !important;
+    z-index: 999 !important;
+}
+
+.search-box input {
+    flex: 1 !important;
+}
+
+/* Keep main admin-style pages from looking too wide */
 #menuSettingsView,
 #hrView,
 #adminView,
@@ -315,134 +516,97 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 #clientIntelView,
 #activeAteliersView,
 #menuView {
-    max-width: 1040px;
-    margin-left: auto;
-    margin-right: auto;
+    max-width: 1040px !important;
 }
 
-/* Some sections have wide grids/tables; allow safe scrolling inside card instead of stretching page */
+/* ============================================================
+   BOOK APPOINTMENT PAGE — SINGLE COLUMN
+   ============================================================ */
+
+#subView_Schedule > .grid-2 {
+    grid-template-columns: 1fr !important;
+}
+
+#subView_Schedule > .grid-2 > * {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+#subView_Schedule .module-box .grid-2 {
+    grid-template-columns: 1fr !important;
+}
+
+#subView_Schedule .module-box {
+    margin-bottom: 20px !important;
+}
+
+/* Keep Check-In page looking balanced */
+#subView_Checkin > .grid-2 {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr) !important;
+}
+
+/* Billing and Ops can stay balanced */
+#subView_Billing > .grid-2,
+#subView_Ops > .grid-2 {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr) !important;
+}
+
+/* Tables and wide content should scroll inside panels */
 .module-box table,
 .module-box .breakdown-table {
-    width: 100%;
+    width: 100% !important;
 }
 
 .module-box [style*="overflow-x: auto"] {
-    max-width: 100%;
+    max-width: 100% !important;
 }
 
-/* Better dashboard and metric card spacing */
-.dashboard-header,
-#topNavMenu,
-.category-tabs {
-    max-width: 1120px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-/* Make action buttons inside form grids less oversized */
-.grid-2 .btn,
-.grid-3 .btn {
-    width: auto;
-    min-width: 160px;
-}
-
-/* But keep login and primary wide buttons full width when intentionally designed */
-.login-card .btn,
-.login-card .btn-google,
-#btnConfirmBooking,
-#btnEmailLogin {
-    width: 100%;
-}
-
-/* Avoid very wide inner flex panels */
-.metric-card {
-    min-width: 160px;
-}
-
-/* Booking sub-pages: keep left/right layout elegant */
-#subView_Schedule > .grid-2,
-#subView_Billing > .grid-2,
-#subView_Ops > .grid-2,
-#subView_Checkin > .grid-2 {
-    grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
-}
-
-/* Attendance subtabs and reports should read like clean admin pages */
-.att-sub,
-.rpt-sub {
-    max-width: 1040px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-/* Keep wide admin/forms readable on tablets */
-@media (max-width: 1100px) {
-    #appDashboard.container {
-        max-width: 100%;
-        padding-left: 18px;
-        padding-right: 18px;
-    }
-
-    .app-module,
-    #clientsView,
-    #menuSettingsView,
-    #hrView,
-    #adminView,
-    #attendanceView,
-    #supplyView,
-    #reportsView,
-    #clientIntelView,
-    #activeAteliersView,
-    #menuView {
-        max-width: 100%;
-    }
-}
-
-/* Mobile/tablet: stack cleanly */
+/* Responsive */
 @media (max-width: 900px) {
+    #appDashboard.container,
+    .container {
+        max-width: 100% !important;
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+
     .grid-2,
     .grid-3,
-    #subView_Schedule > .grid-2,
+    #subView_Checkin > .grid-2,
     #subView_Billing > .grid-2,
     #subView_Ops > .grid-2,
-    #subView_Checkin > .grid-2 {
-        grid-template-columns: 1fr;
+    #subView_Schedule > .grid-2 {
+        grid-template-columns: 1fr !important;
     }
 
-    .module-box {
-        padding: 20px;
+    .module-box,
+    .card {
+        padding: 18px !important;
     }
 
     .category-tabs,
     .dept-tabs {
-        justify-content: flex-start;
-        gap: 10px;
+        justify-content: flex-start !important;
+        gap: 10px !important;
     }
 
-    .grid-2 .btn,
-    .grid-3 .btn {
-        width: 100%;
+    .search-box {
+        flex-direction: column !important;
+    }
+
+    .search-box .btn,
+    .search-box button {
+        width: 100% !important;
     }
 }
 
-/* Small phones */
 @media (max-width: 520px) {
-    #appDashboard.container,
-    .container {
-        padding-left: 12px;
-        padding-right: 12px;
-    }
-
-    .module-box {
-        padding: 16px;
-        border-radius: 7px;
-    }
-
-    .header {
-        padding-top: 28px;
-    }
-
     .header h1 {
-        font-size: 2rem;
+        font-size: 2rem !important;
+    }
+
+    .module-box,
+    .card {
+        padding: 16px !important;
     }
 }
