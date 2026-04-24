@@ -3842,3 +3842,6 @@ window.rpt_exportCSV = function(type) {
 };
 
 console.log('Thuraya Reports module loaded.');
+
+
+
