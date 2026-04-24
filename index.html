@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="thuraya-env" content="production">
+    <meta name="thuraya-env" content="production"
     <title>THURAYA - Salon Operations OS</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -152,172 +152,211 @@
             </div>
 
             <div id="subView_Schedule" style="display: none;">
-                <div class="module-box" style="border-top: 4px solid var(--primary);">
-                    <h3 style="color: var(--primary); border-bottom-color: var(--primary);">Book Appointment</h3>
-                    
-                    <div class="form-group" style="margin-bottom: 20px; z-index: 50;">
-                        <label>1. Search Client (Name or Phone): <span class="required-star">*</span></label>
-                        <div class="search-box">
-                            <input type="text" id="sched_search" placeholder="Type to search..." autocomplete="off" onkeyup="liveClientSearch()">
-                            <button type="button" class="btn" id="btnSchedSearch" style="width: auto;" onclick="liveClientSearch()">Search</button>
-                            <div id="sched_searchResults" class="dropdown-results"></div>
-                        </div>
-                    </div>
+                <div class="grid-2" style="align-items: start;">
 
-                    <input type="hidden" id="sched_phone">
-                    <input type="hidden" id="sched_name">
-                    
-                    <div id="sched_selectedClientDisplay" style="display:none; padding: 10px; background: #eef5f9; border: 1px solid #b8cddb; border-radius: 4px; margin-bottom: 20px; font-weight: bold; color: var(--primary);">
-                        Selected Client: <span id="sched_displayName"></span> (<span id="sched_displayPhone"></span>)
-                        <button type="button" id="btnClearScheduleClient" style="float:right; background:transparent; border:none; color:var(--error); cursor:pointer; font-weight:bold;" onclick="clearScheduleClient()">X</button>
-                    </div>
+                    <!-- LEFT: Booking Form -->
+                    <div>
+                        <!-- Client Search Card -->
+                        <div class="module-box" style="border-top: 4px solid var(--primary);">
+                            <h3 style="color: var(--primary); border-bottom-color: var(--accent);">Book Appointment</h3>
 
-                    <!-- Group Booking Toggle -->
-                    <div style="background:#f9f7f4; border:1px solid var(--border); border-radius:6px; padding:12px 16px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <label style="font-weight:700; color:var(--primary); margin:0; font-size:0.9rem;">👥 Group Booking?</label>
-                            <select id="sched_groupSize" onchange="onGroupSizeChange()" style="width:auto; padding:6px 10px; font-size:0.875rem; border:1px solid var(--border); border-radius:4px;">
-                                <option value="1">No — Individual</option>
-                                <option value="2">Yes — 2 people</option>
-                                <option value="3">3 people</option>
-                                <option value="4">4 people</option>
-                                <option value="5">5 people</option>
-                                <option value="6">6 people</option>
-                            </select>
-                        </div>
-                        <div id="groupSizeNote" style="font-size:0.8rem; color:var(--manager); display:none;">
-                            ℹ️ System will find a slot where <strong id="groupSizeNoteCount">2</strong> technicians are free simultaneously.
-                        </div>
-                    </div>
-                    <input type="hidden" id="sched_groupId" value="">
-
-                    <div class="form-group" style="margin-top: 25px; border-top: 1px solid var(--border); padding-top: 20px;">
-                        <h3 style="text-align:center; color: var(--primary); margin-bottom: 15px;">FROM OUR MENU</h3>
-                        
-                        <div class="dept-tabs">
-                            <label><input type="radio" name="dept_toggle" value="Hand" checked onchange="toggleDeptView()"> HAND THERAPY MENU</label>
-                            <label><input type="radio" name="dept_toggle" value="Foot" onchange="toggleDeptView()"> FOOT THERAPY MENU</label>
-                        </div>
-
-                        <div id="sched_serviceMenu" style="margin-bottom: 20px;">
-                            <p style="color:#999; font-style:italic; text-align:center;">Loading live menu...</p>
-                        </div>
-                        
-                        <div id="sched_breakdown">
-                            <h4 style="color: var(--primary); margin-bottom: 10px; font-size: 1rem; border-bottom: 1px dashed var(--border); padding-bottom: 5px; text-transform: uppercase;">Selected Services</h4>
-                            <div id="sched_breakdownList"></div>
-                            
-                            <div id="sched_taxBreakdown" style="margin-top:10px; padding-top:10px; border-top: 1px dashed #ddd; display:none;"></div>
-
-                            <div style="display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); font-size: 1.1rem; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
-                                <span>Grand Total:</span>
-                                <span><span id="sched_totalDuration" style="color: var(--accent);">0</span> mins | <span id="sched_totalCost" style="color: var(--success);">0.00</span> GHC</span>
+                            <div class="form-group" style="margin-bottom: 20px; position:relative; z-index: 50;">
+                                <label>Search Client (Name or Phone): <span class="required-star">*</span></label>
+                                <div class="search-box">
+                                    <input type="text" id="sched_search" placeholder="Type to search..." autocomplete="off" onkeyup="liveClientSearch()">
+                                    <button type="button" class="btn" id="btnSchedSearch" style="width: auto;" onclick="liveClientSearch()">Search</button>
+                                    <div id="sched_searchResults" class="dropdown-results"></div>
+                                </div>
                             </div>
-                            
-                            <input type="hidden" id="sched_subtotalVal" value="0">
-                            <input type="hidden" id="sched_taxData" value="[]">
-                            <input type="hidden" id="sched_grandTotalVal" value="0">
 
-                            <div style="text-align: right; margin-top: 15px;">
-                                <button class="btn btn-secondary" id="btnClearAllSelections" style="padding: 5px 15px; font-size: 0.8rem; width: auto;" onclick="clearAllSelections()">Clear All Selections</button>
-                            </div>
-                        </div>
-                    </div>
+                            <input type="hidden" id="sched_phone">
+                            <input type="hidden" id="sched_name">
 
-                    <div class="grid-2" style="align-items: start; border-top: 1px solid var(--border); padding-top: 20px;">
-                        <div>
-                            <div class="form-group">
-                                <label>Date: <span class="required-star">*</span></label>
-                                <input type="date" id="sched_date" onchange="generateTimeSlots()">
+                            <div id="sched_selectedClientDisplay" style="display:none; padding: 12px 15px; background: #eef5f9; border: 1px solid #b8cddb; border-radius: 6px; margin-bottom: 15px; font-weight: bold; color: var(--primary);">
+                                ✅ Selected: <span id="sched_displayName"></span> &nbsp;|&nbsp; 📞 <span id="sched_displayPhone"></span>
+                                <button type="button" id="btnClearScheduleClient" style="float:right; background:transparent; border:none; color:var(--error); cursor:pointer; font-weight:bold; font-size:1rem;" onclick="clearScheduleClient()">✕</button>
                             </div>
-                            <div class="form-group" style="margin-bottom: 25px;">
-                                <label>Assign Technician: <span class="required-star">*</span></label>
-                                <select id="sched_techSelect" style="background-color: #fffaf0; border-color: var(--accent);" onchange="generateTimeSlots()">
-                                    <option value="" disabled selected>Select Technician...</option>
+
+                            <!-- Group Booking -->
+                            <div style="background:#f9f7f4; border:1px solid var(--border); border-radius:6px; padding:12px 16px; margin-bottom:5px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                                <label style="font-weight:700; color:var(--primary); margin:0; font-size:0.9rem;">👥 Group Booking?</label>
+                                <select id="sched_groupSize" onchange="onGroupSizeChange()" style="width:auto; padding:6px 10px; font-size:0.875rem; border:1px solid var(--border); border-radius:4px;">
+                                    <option value="1">No — Individual</option>
+                                    <option value="2">Yes — 2 people</option>
+                                    <option value="3">3 people</option>
+                                    <option value="4">4 people</option>
+                                    <option value="5">5 people</option>
+                                    <option value="6">6 people</option>
                                 </select>
                             </div>
+                            <div id="groupSizeNote" style="font-size:0.8rem; color:var(--primary); background:#fff8e1; border:1px solid var(--accent); border-radius:4px; padding:8px 12px; margin-bottom:15px; display:none;">
+                                ℹ️ System will find a slot where <strong id="groupSizeNoteCount">2</strong> technicians are free simultaneously.
+                            </div>
+                            <input type="hidden" id="sched_groupId" value="">
                         </div>
-                        <div>
-                            <div class="form-group">
-                                <label>Available Time Slots: <span class="required-star">*</span></label>
-                                <input type="hidden" id="sched_time">
-                                <div id="sched_timeSlots" style="background: #ffffff; border: 1px solid var(--border); border-radius: 4px; padding: 15px; min-height: 120px;">
-                                    <p style="color:#999; font-size:0.85rem; margin:0; font-style: italic;">⚠️ Please select at least one Service, a Date, and a Technician to generate available times.</p>
+
+                        <!-- Service Menu Card -->
+                        <div class="module-box" style="border-top: 4px solid var(--accent);">
+                            <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Select Services</h3>
+                            <div class="dept-tabs">
+                                <label><input type="radio" name="dept_toggle" value="Hand" checked onchange="toggleDeptView()"> HAND THERAPY MENU</label>
+                                <label><input type="radio" name="dept_toggle" value="Foot" onchange="toggleDeptView()"> FOOT THERAPY MENU</label>
+                            </div>
+                            <div id="sched_serviceMenu" style="margin-bottom: 20px;">
+                                <p style="color:#999; font-style:italic; text-align:center;">Loading live menu...</p>
+                            </div>
+
+                            <!-- Cost Breakdown -->
+                            <div id="sched_breakdown" style="display:none;">
+                                <div style="background:#fff; border:2px dashed var(--accent); border-radius:8px; padding:15px;">
+                                    <h4 style="color:var(--primary); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; border-bottom:1px dashed var(--border); padding-bottom:8px;">Selected Services</h4>
+                                    <div id="sched_breakdownList"></div>
+                                    <div id="sched_taxBreakdown" style="margin-top:10px; padding-top:10px; border-top:1px dashed #ddd; display:none;"></div>
+                                    <div style="display:flex; justify-content:space-between; font-weight:bold; color:var(--primary); font-size:1.1rem; border-top:2px solid var(--border); padding-top:10px; margin-top:10px;">
+                                        <span>Grand Total:</span>
+                                        <span><span id="sched_totalDuration" style="color:var(--accent);">0</span> mins &nbsp;|&nbsp; <span id="sched_totalCost" style="color:var(--success);">0.00</span> GHC</span>
+                                    </div>
+                                    <input type="hidden" id="sched_subtotalVal" value="0">
+                                    <input type="hidden" id="sched_taxData" value="[]">
+                                    <input type="hidden" id="sched_grandTotalVal" value="0">
+                                    <div style="text-align:right; margin-top:12px;">
+                                        <button class="btn btn-secondary" style="padding:5px 15px; font-size:0.8rem; width:auto;" onclick="clearAllSelections()">Clear All Selections</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div style="display:flex; gap: 10px; margin-top: 15px;">
-                        <button id="btnConfirmBooking" class="btn" onclick="bookAppointment()">Confirm & Book Appointment</button>
-                        <button id="btnCancelEdit" class="btn btn-secondary" style="display:none; width: auto; border-color: var(--error); color: var(--error);" onclick="cancelEditMode()">Cancel Edit</button>
-                    </div>
-                </div>
 
-                <div class="module-box">
-                    <h3>Upcoming Schedule</h3>
-                    <div id="upcomingScheduleList"><p style="color: #999; font-style: italic;">Loading...</p></div>
+                        <!-- Date, Tech & Time Card -->
+                        <div class="module-box" style="border-top: 4px solid var(--primary);">
+                            <h3 style="color:var(--primary); border-bottom-color:var(--accent);">Date, Technician & Time</h3>
+                            <div class="grid-2" style="align-items:start;">
+                                <div>
+                                    <div class="form-group">
+                                        <label>Date: <span class="required-star">*</span></label>
+                                        <input type="date" id="sched_date" onchange="generateTimeSlots()">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Assign Technician: <span class="required-star">*</span></label>
+                                        <select id="sched_techSelect" style="background-color:#fffaf0; border-color:var(--accent);" onchange="generateTimeSlots()">
+                                            <option value="" disabled selected>Select Technician...</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="form-group">
+                                        <label>Available Time Slots: <span class="required-star">*</span></label>
+                                        <input type="hidden" id="sched_time">
+                                        <div id="sched_timeSlots" style="background:#ffffff; border:1px solid var(--border); border-radius:6px; padding:15px; min-height:120px;">
+                                            <p style="color:#999; font-size:0.85rem; margin:0; font-style:italic;">⚠️ Select a service, date and technician to see available times.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                                <button id="btnConfirmBooking" class="btn" onclick="bookAppointment()">Confirm & Book Appointment</button>
+                                <button id="btnCancelEdit" class="btn btn-secondary" style="display:none; width:auto; border-color:var(--error); color:var(--error);" onclick="cancelEditMode()">Cancel Edit</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: Upcoming Schedule -->
+                    <div class="module-box" style="border-top: 4px solid var(--accent);">
+                        <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Upcoming Schedule</h3>
+                        <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">All scheduled and upcoming appointments.</p>
+                        <div id="upcomingScheduleList">
+                            <p style="color:#999; font-style:italic;">Loading...</p>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
             <div id="subView_Billing" style="display: none;">
-                <div class="module-box" style="border-top: 4px solid var(--success);">
-                    <h3 style="color: var(--success); border-bottom-color: var(--success);">Billing & Checkout</h3>
-                    <p style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">Jobs marked as complete by Technicians and ready for payment.</p>
-                    
-                    <div id="fohPendingCheckoutList">
-                        <p style="color: #999; font-style: italic;">Loading pending checkouts...</p>
-                    </div>
-                    
-                    <div id="checkoutPanel" style="display:none; margin-top:20px; border-top: 2px dashed var(--border); padding-top:20px;">
-                        <h4 style="color:var(--primary); margin-bottom:10px;">Process Payment</h4>
-                        <div class="ticket" style="border-color:var(--success);">
-                            <div style="flex-grow:1;">
-                                <h4 id="checkoutClientName" style="margin:0; font-size:1.2rem; color:var(--primary);">...</h4>
-                                <p id="checkoutServices" style="margin:0; font-size:0.85rem; color:#666; margin-bottom: 10px;">...</p>
-                                
-                                <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; font-size: 0.85rem; margin-bottom: 10px;">
-                                    <div style="display:flex; justify-content:space-between;"><span>Subtotal:</span><span id="checkoutSubtotal">0.00 GHC</span></div>
-                                    <div id="checkoutTaxList" style="color:#777; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 5px;"></div>
-                                    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1rem; color:var(--success);"><span>Grand Total:</span><span id="checkoutTotal">0.00 GHC</span></div>
-                                </div>
-                            </div>
-                            <div style="min-width: 200px;">
-                                <div class="form-group">
-                                    <label>Payment Method: <span class="required-star">*</span></label>
-                                    <select id="checkoutPaymentMethod" style="border-color:var(--success);">
-                                        <option value="" disabled selected>Select...</option>
-                                        <option value="Cash">Cash</option>
-                                        <option value="Card / POS">Card / POS</option>
-                                        <option value="Mobile Money">Mobile Money</option>
-                                    </select>
-                                </div>
-                                <input type="hidden" id="checkoutJobId">
-                                <input type="hidden" id="checkoutGrandTotalVal">
-                                <button class="btn" id="btnConfirmPayment" style="background-color: var(--success);" onclick="confirmPayment()">Confirm & Close Job</button>
-                            </div>
+                <div class="grid-2" style="align-items: start;">
+
+                    <!-- LEFT: Pending Checkouts -->
+                    <div class="module-box" style="border-top: 4px solid var(--success);">
+                        <h3 style="color: var(--success); border-bottom-color: var(--success);">Pending Checkouts</h3>
+                        <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Jobs marked complete by Technicians and ready for payment.</p>
+                        <div id="fohPendingCheckoutList">
+                            <p style="color: #999; font-style: italic;">No pending checkouts.</p>
                         </div>
                     </div>
+
+                    <!-- RIGHT: Process Payment Panel -->
+                    <div id="checkoutPanel" style="display:none;">
+                        <div class="module-box" style="border-top: 4px solid var(--accent);">
+                            <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Process Payment</h3>
+
+                            <!-- Client & Service Summary -->
+                            <div style="background: #fffaf0; border: 1px solid var(--accent); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                                <h4 id="checkoutClientName" style="margin:0 0 5px; font-size:1.2rem; color:var(--primary);">...</h4>
+                                <p id="checkoutServices" style="margin:0; font-size:0.85rem; color:#666;">...</p>
+                            </div>
+
+                            <!-- Bill Breakdown -->
+                            <div style="background: #f9f9f9; border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                                <div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-bottom:8px;">
+                                    <span style="color:#666;">Subtotal:</span>
+                                    <span id="checkoutSubtotal" style="font-weight:600;">0.00 GHC</span>
+                                </div>
+                                <div id="checkoutTaxList" style="color:#777; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px; font-size:0.85rem;"></div>
+                                <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.1rem; color:var(--success);">
+                                    <span>Grand Total:</span>
+                                    <span id="checkoutTotal">0.00 GHC</span>
+                                </div>
+                            </div>
+
+                            <!-- Payment Method -->
+                            <div class="form-group">
+                                <label>Payment Method: <span class="required-star">*</span></label>
+                                <select id="checkoutPaymentMethod" style="border-color:var(--success);">
+                                    <option value="" disabled selected>Select method...</option>
+                                    <option value="Cash">💵 Cash</option>
+                                    <option value="Card / POS">💳 Card / POS</option>
+                                    <option value="Mobile Money">📱 Mobile Money</option>
+                                </select>
+                            </div>
+
+                            <input type="hidden" id="checkoutJobId">
+                            <input type="hidden" id="checkoutGrandTotalVal">
+                            <button class="btn" id="btnConfirmPayment" style="background-color: var(--success); margin-top:10px;" onclick="confirmPayment()">✓ Confirm & Close Job</button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
             <div id="subView_Ops" style="display: none;">
-                <div class="module-box" style="border-top: 4px solid var(--primary);">
-                    <h3>End of Day Financials</h3>
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                        <div class="metric-card" style="border-color: var(--success); background: #f0fff4;">
-                            <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Total Daily Revenue</div>
-                            <div class="metric-value" id="fohDailyRevenue" style="color: var(--success);">0 GHC</div>
-                        </div>
-                        <div class="metric-card">
-                            <div style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #666;">Jobs Closed Today</div>
-                            <div class="metric-value" id="fohDailyJobs" style="color: var(--primary);">0</div>
+                <div class="grid-2" style="align-items: start;">
+
+                    <!-- LEFT: Daily Summary Metrics -->
+                    <div class="module-box" style="border-top: 4px solid var(--accent);">
+                        <h3 style="color: var(--accent); border-bottom-color: var(--accent);">End of Day Summary</h3>
+                        <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">Today's financial performance at a glance.</p>
+
+                        <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:20px;">
+                            <div class="metric-card" style="border-color: var(--success); background: #f0fff4; flex:1; min-width:120px;">
+                                <div style="font-size:0.78rem; text-transform:uppercase; letter-spacing:1px; color:#666; margin-bottom:5px;">Total Revenue</div>
+                                <div class="metric-value" id="fohDailyRevenue" style="color: var(--success);">0 GHC</div>
+                            </div>
+                            <div class="metric-card" style="flex:1; min-width:120px;">
+                                <div style="font-size:0.78rem; text-transform:uppercase; letter-spacing:1px; color:#666; margin-bottom:5px;">Jobs Closed</div>
+                                <div class="metric-value" id="fohDailyJobs" style="color: var(--primary);">0</div>
+                            </div>
                         </div>
                     </div>
-                    <div style="margin-top: 20px;">
-                        <h4 style="color: var(--primary);">Active Tech Roster</h4>
-                        <div id="fohRosterList"></div>
+
+                    <!-- RIGHT: Active Tech Roster -->
+                    <div class="module-box" style="border-top: 4px solid var(--primary);">
+                        <h3 style="color: var(--primary); border-bottom-color: var(--accent);">Active Tech Roster</h3>
+                        <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Technicians currently clocked in today.</p>
+                        <div id="fohRosterList">
+                            <p style="color:#999; font-style:italic;">Loading roster...</p>
+                        </div>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -393,62 +432,73 @@
 
         <!-- MENU SETTINGS — Manager + Admin only -->
         <div id="menuSettingsView" class="app-module">
-            <div class="module-box" style="border-top: 4px solid var(--manager);">
-                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Menu Settings</h3>
 
-                <div id="managerMenuControls" style="background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 25px;">
-                    <h4 style="margin-bottom: 15px; font-size: 1rem; color: var(--manager); border-bottom: 2px solid var(--manager); padding-bottom: 5px;">Add / Edit Service</h4>
+                <!-- Add / Edit Service Form -->
+                <div class="module-box" style="border-top: 4px solid var(--accent); width:100%; box-sizing:border-box;">
+                    <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Menu Settings</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Add, edit or remove services from the booking menu.</p>
 
-                    <div class="grid-2">
-                        <div class="form-group"><label>Service Category</label><select id="adv_category" onchange="updateAdvForm()"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
-                        <div class="form-group"><label>Service Type</label><select id="adv_type"><option value="Main Therapy">Main Therapy (Single Select)</option></select></div>
-                    </div>
+                    <div id="managerMenuControls">
+                        <h4 style="margin-bottom:15px; font-size:1rem; color:var(--primary); border-bottom:2px solid var(--accent); padding-bottom:8px;">Add / Edit Service</h4>
 
-                    <div class="grid-3">
-                        <div class="form-group"><label>Service Name:</label><input type="text" id="adv_name"></div>
-                        <div class="form-group"><label>Duration (mins):</label><input type="number" id="adv_duration"></div>
-                        <div class="form-group"><label>Price (GHC):</label><input type="number" id="adv_price"></div>
-                        <div class="form-group"><label>Pricing Type:</label><select id="adv_pricing_type"><option value="Fixed">Fixed Price</option><option value="Per Unit">Per Unit (e.g., per nail)</option></select></div>
-                        <div class="form-group"><label>Availability:</label><select id="adv_status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
-                    </div>
-                    <div class="form-group"><label>Description:</label><textarea id="adv_desc" rows="2"></textarea></div>
-
-                    <div class="grid-2">
-                        <div>
-                            <h5 style="margin-bottom:10px; color:var(--primary);">Selection Rules</h5>
-                            <div class="form-group"><label>Applies To (Department):</label><select id="adv_applies_to"><option value="Hand">Hand Only</option><option value="Foot">Foot Only</option><option value="Both">Both (Hand &amp; Foot)</option></select></div>
-                            <div class="form-group"><label>Selection Type:</label><select id="adv_selection"><option value="Single">Single Select (Main Base Ritual)</option><option value="Multi">Multi Select (Add-on)</option></select></div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                            <div class="form-group"><label>Service Category</label><select id="adv_category" onchange="updateAdvForm()"><option value="Hand Therapy">Hand Therapy</option><option value="Foot Therapy">Foot Therapy</option><option value="Add-On">Add-On / Upgrade</option></select></div>
+                            <div class="form-group"><label>Service Type</label><select id="adv_type"><option value="Main Therapy">Main Therapy (Single Select)</option></select></div>
                         </div>
-                        <div>
-                            <h5 style="margin-bottom:10px; color:var(--primary);">Display Settings</h5>
-                            <div class="form-group"><label>Category Section Name (Header):</label><input type="text" id="adv_section" placeholder="e.g., I. HAND THERAPY RITUALS"></div>
-                            <div class="form-group"><label>Highlight Tag:</label><select id="adv_tag"><option value="None">None</option><option value="New">New</option><option value="Popular">Popular</option><option value="Recommended">Recommended</option></select></div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px;">
+                            <div class="form-group"><label>Service Name:</label><input type="text" id="adv_name"></div>
+                            <div class="form-group"><label>Duration (mins):</label><input type="number" id="adv_duration"></div>
+                            <div class="form-group"><label>Price (GHC):</label><input type="number" id="adv_price"></div>
+                            <div class="form-group"><label>Pricing Type:</label><select id="adv_pricing_type"><option value="Fixed">Fixed Price</option><option value="Per Unit">Per Unit (e.g., per nail)</option></select></div>
+                            <div class="form-group"><label>Availability:</label><select id="adv_status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                        </div>
+
+                        <div class="form-group"><label>Description:</label><textarea id="adv_desc" rows="2"></textarea></div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:10px;">
+                            <div>
+                                <h5 style="margin-bottom:10px; color:var(--primary); font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">Selection Rules</h5>
+                                <div class="form-group"><label>Applies To (Department):</label><select id="adv_applies_to"><option value="Hand">Hand Only</option><option value="Foot">Foot Only</option><option value="Both">Both (Hand &amp; Foot)</option></select></div>
+                                <div class="form-group"><label>Selection Type:</label><select id="adv_selection"><option value="Single">Single Select (Main Base Ritual)</option><option value="Multi">Multi Select (Add-on)</option></select></div>
+                            </div>
+                            <div>
+                                <h5 style="margin-bottom:10px; color:var(--primary); font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;">Display Settings</h5>
+                                <div class="form-group"><label>Category Section Name (Header):</label><input type="text" id="adv_section" placeholder="e.g., I. HAND THERAPY RITUALS"></div>
+                                <div class="form-group"><label>Highlight Tag:</label><select id="adv_tag"><option value="None">None</option><option value="New">New</option><option value="Popular">Popular</option><option value="Recommended">Recommended</option></select></div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap:10px; justify-content:flex-end; border-top:1px solid var(--border); padding-top:15px; margin-top:10px; flex-wrap:wrap;">
+                            <button class="btn btn-secondary" style="width:auto;" onclick="clearAdvForm()">Clear Form</button>
+                            <button class="btn" id="btnSaveServiceConfig" style="width:auto;" onclick="addNewMenuServiceAdv()">Save Service Configuration</button>
                         </div>
                     </div>
+                </div>
 
-                    <div style="text-align: right; border-top: 1px solid var(--border); padding-top: 15px;">
-                        <button class="btn btn-secondary" style="width: auto; margin-right: 10px;" onclick="clearAdvForm()">Clear Form</button>
-                        <button class="btn" id="btnSaveServiceConfig" style="width: auto; background-color: var(--manager);" onclick="addNewMenuServiceAdv()">Save Service Configuration</button>
+                <!-- Live Menu List -->
+                <div class="module-box" style="border-top: 4px solid var(--primary); width:100%; box-sizing:border-box; margin-top:20px;">
+                    <h3 style="color:var(--primary); border-bottom-color:var(--accent);">Live Menu</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">Current services on the booking menu.</p>
+
+                    <div class="dept-tabs">
+                        <label><input type="radio" name="admin_dept_toggle" value="Hand" checked onchange="toggleAdminDeptView()"> HAND THERAPY MENU</label>
+                        <label><input type="radio" name="admin_dept_toggle" value="Foot" onchange="toggleAdminDeptView()"> FOOT THERAPY MENU</label>
+                    </div>
+
+                    <div id="menuManagerList"><p style="text-align:center; color:#999; font-style:italic;">Loading menu database...</p></div>
+
+                    <div id="seedMenuBtnContainer" style="display:none; margin-top:15px; padding-top:15px; border-top:1px dashed var(--border); text-align:right;">
+                        <button class="btn btn-secondary" style="width:auto; font-size:0.8rem;" onclick="seedDefaultMenu()">Initialise Default Menu</button>
                     </div>
                 </div>
 
-                <div class="dept-tabs">
-                    <label><input type="radio" name="admin_dept_toggle" value="Hand" checked onchange="toggleAdminDeptView()"> HAND THERAPY MENU</label>
-                    <label><input type="radio" name="admin_dept_toggle" value="Foot" onchange="toggleAdminDeptView()"> FOOT THERAPY MENU</label>
-                </div>
-
-                <div id="menuManagerList"><p style="text-align:center; color:#999; font-style:italic;">Loading menu database...</p></div>
-
-                <div id="seedMenuBtnContainer" style="display:none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border); text-align: right;">
-                    <button class="btn btn-secondary" style="width: auto; font-size: 0.8rem;" onclick="seedDefaultMenu()">Initialise Default Menu</button>
-                </div>
-            </div>
         </div>
 
         <div id="hrView" class="app-module">
             
-            <div class="module-box" style="border-top: 4px solid var(--manager);">
-                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Consultation Form Builder</h3>
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
+                <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Consultation Form Builder</h3>
                 <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Add extra custom fields to the Technician's intake form.</p>
                 <div class="grid-3" style="align-items: end;">
                     <div class="form-group"><label>Question Prompt / Label:</label><input type="text" id="bld_label" placeholder="e.g. Current Medications"></div>
@@ -462,18 +512,18 @@
                     </div>
                     <div class="form-group" id="bld_opts_wrap" style="display:none;"><label>Options (comma separated):</label><input type="text" id="bld_opts" placeholder="e.g. Asthma, Diabetes"></div>
                 </div>
-                <div style="text-align:right;"><button class="btn" style="background-color: var(--manager); width:auto;" onclick="addConsultQuestion()">Save Question to Template</button></div>
+                <div style="text-align:right;"><button class="btn" style="background-color: var(--primary); width:auto;" onclick="addConsultQuestion()">Save Question to Template</button></div>
                 <div id="consultBuilderList" style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;"></div>
             </div>
 
-            <div class="module-box" style="border-top: 4px solid var(--manager);">
-                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Tax Configuration</h3>
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
+                <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Tax Configuration</h3>
                 <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Define taxes and levies. These automatically apply on top of the base service prices during checkout.</p>
                 
                 <div class="grid-3" style="align-items: end;">
                     <div class="form-group"><label>Tax Name (e.g., VAT):</label><input type="text" id="cfgTaxName"></div>
                     <div class="form-group"><label>Rate (%) (e.g., 15):</label><input type="number" id="cfgTaxRate" step="0.1"></div>
-                    <button class="btn" id="btnAddTax" style="background-color: var(--manager); margin-bottom: 15px;" onclick="addTax()">Add / Update Tax</button>
+                    <button class="btn" id="btnAddTax" style="background-color: var(--primary); margin-bottom: 15px;" onclick="addTax()">Add / Update Tax</button>
                 </div>
                 
                 <div id="taxConfigList" style="margin-top: 15px; border-top: 1px dashed var(--border); padding-top: 15px;">
@@ -481,7 +531,7 @@
                 </div>
 
                 <div style="margin-top: 30px; background: #eef5f9; padding: 20px; border-radius: 8px; border: 1px solid #b8cddb;">
-                    <h4 style="color: var(--manager); margin-bottom: 15px;">Tax Simulator & Price Preview</h4>
+                    <h4 style="color: var(--accent); margin-bottom: 15px;">Tax Simulator & Price Preview</h4>
                     <div class="grid-2" style="align-items: start;">
                         <div>
                             <div class="form-group">
@@ -490,12 +540,12 @@
                             </div>
                             <div class="form-group" style="margin-bottom: 15px;">
                                 <label style="display:inline-block; font-weight:normal; margin-bottom:5px; font-size: 0.85rem; cursor:pointer;">
-                                    <input type="radio" name="tax_inclusive_toggle" value="exclusive" checked onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--manager);"> 
+                                    <input type="radio" name="tax_inclusive_toggle" value="exclusive" checked onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--accent);"> 
                                     Price is Tax <strong>Exclusive</strong> <span style="color:#666;">(Add taxes on top)</span>
                                 </label>
                                 <br>
                                 <label style="display:inline-block; font-weight:normal; font-size: 0.85rem; cursor:pointer;">
-                                    <input type="radio" name="tax_inclusive_toggle" value="inclusive" onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--manager);"> 
+                                    <input type="radio" name="tax_inclusive_toggle" value="inclusive" onchange="calculatePreview()" style="width:14px; height:14px; accent-color:var(--accent);"> 
                                     Price is Tax <strong>Inclusive</strong> <span style="color:#666;">(Extract taxes from total)</span>
                                 </label>
                             </div>
@@ -506,7 +556,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div style="background: white; padding: 15px; border-radius: 4px; border: 1px dashed var(--manager);">
+                        <div style="background: white; padding: 15px; border-radius: 4px; border: 1px dashed var(--accent);">
                             <div style="display:flex; justify-content:space-between; margin-bottom:10px; color:#555; font-size: 0.9rem;">
                                 <span>Base Price (Subtotal):</span> <span id="prevBaseOut">0.00 GHC</span>
                             </div>
@@ -519,12 +569,12 @@
                 </div>
             </div>
 
-            <div class="module-box" style="border-top: 4px solid var(--manager);">
-                <h3 style="color: var(--manager); border-bottom-color: var(--manager);">Payroll & Revenue Analytics</h3>
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
+                <h3 style="color: var(--accent); border-bottom-color: var(--accent);">Payroll & Revenue Analytics</h3>
                 <div class="grid-3" style="align-items: end;">
                     <div class="form-group"><label>Start Date:</label><input type="date" id="reportStart"></div>
                     <div class="form-group"><label>End Date:</label><input type="date" id="reportEnd"></div>
-                    <button class="btn" id="btnGenerateReport" style="background-color: var(--manager); margin-bottom: 15px;" onclick="generateReport()">Run Report</button>
+                    <button class="btn" id="btnGenerateReport" style="background-color: var(--primary); margin-bottom: 15px;" onclick="generateReport()">Run Report</button>
                 </div>
                 <div id="reportResults" style="display: none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px;">
                     <h4 style="color: var(--primary);">Total Salon Revenue: <span id="reportTotalRevenue" style="color: var(--success);">0.00 GHC</span></h4>
@@ -539,9 +589,9 @@
         </div>
 
         <div id="adminView" class="app-module">
-            <div class="module-box" style="border-top: 4px solid var(--admin);">
+            <div class="module-box" style="border-top: 4px solid var(--accent);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                    <h3 style="margin:0; border:none; padding:0; color: var(--admin);">Staff Matrix & Access Control</h3>
+                    <h3 style="margin:0; border:none; padding:0; color: var(--accent);">Staff Matrix & Access Control</h3>
                     <button class="btn btn-secondary" id="btnRefreshDirectory" style="width:auto; padding:5px 15px; font-size:0.8rem;" onclick="loadStaffDirectory()">Refresh Directory</button>
                 </div>
                 <div style="background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 30px;">
@@ -560,10 +610,10 @@
                             <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--accent);"><input type="checkbox" class="role-checkbox" value="Test Tech" style="width: auto;"> Test Tech (24/7)</label>
                             <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--supply);"><input type="checkbox" class="role-checkbox" value="Supply Chain" style="width: auto;"> Supply Chain</label>
                             <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--manager);"><input type="checkbox" class="role-checkbox" value="Manager" style="width: auto;"> Manager</label>
-                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--admin);"><input type="checkbox" class="role-checkbox" value="System Admin" style="width: auto;"> System Admin</label>
+                            <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--primary);"><input type="checkbox" class="role-checkbox" value="System Admin" style="width: auto;"> System Admin</label>
                         </div>
                     </div>
-                    <button class="btn" id="btnSaveStaffAccount" style="background-color: var(--admin); width: auto; padding: 10px 20px;" onclick="addStaffAccount()">Save Matrix Settings & Create/Update User</button>
+                    <button class="btn" id="btnSaveStaffAccount" style="background-color: var(--primary); width: auto; padding: 10px 20px;" onclick="addStaffAccount()">Save Matrix Settings & Create/Update User</button>
                 </div>
                 <div style="overflow-x: auto;">
                     <div id="adminStaffList"><p style="color: #999; font-style: italic;">Loading directory...</p></div>
@@ -594,15 +644,15 @@
 
             <!-- Daily Roster -->
             <div id="att_roster" class="att-sub">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
-                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Daily Roster</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Daily Roster</h3>
                     <p style="font-size:0.85rem; color:#666; margin-bottom:15px;">See who is scheduled, on leave, or absent for any date.</p>
                     <div class="grid-2" style="align-items:end; margin-bottom:20px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Date</label>
                             <input type="date" id="att_rosterDate" onchange="att_loadRoster()">
                         </div>
-                        <button class="btn" style="background:var(--manager); margin-bottom:0;" onclick="att_loadRoster()">View Roster</button>
+                        <button class="btn" style="background:var(--primary); margin-bottom:0;" onclick="att_loadRoster()">View Roster</button>
                     </div>
                     <div id="att_rosterList">
                         <p style="color:#999; font-style:italic; text-align:center; padding:20px 0;">Select a date to view roster.</p>
@@ -612,8 +662,8 @@
 
             <!-- Working Hours -->
             <div id="att_schedule" class="att-sub" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
-                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Working Hours</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Working Hours</h3>
                     <p style="font-size:0.85rem; color:#666; margin-bottom:20px;">Set working days and hours per staff member. Changes take effect from the effective date.</p>
                     <div class="grid-2" style="align-items:end; margin-bottom:20px;">
                         <div class="form-group" style="margin-bottom:0;">
@@ -644,7 +694,7 @@
                                 <label class="att-day-label"><input type="checkbox" value="Sun" class="att-day-cb"> Sun</label>
                             </div>
                         </div>
-                        <button class="btn" id="btnSaveSchedule" style="background:var(--manager); width:auto; padding:10px 25px;" onclick="att_saveSchedule()">Save Working Hours</button>
+                        <button class="btn" id="btnSaveSchedule" style="background:var(--primary); width:auto; padding:10px 25px;" onclick="att_saveSchedule()">Save Working Hours</button>
                     </div>
                 </div>
                 <div class="module-box" id="att_schedHistoryBox" style="display:none;">
@@ -655,8 +705,8 @@
 
             <!-- Leave Management -->
             <div id="att_leave" class="att-sub" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
-                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Submit Leave Request</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Submit Leave Request</h3>
                     <div class="grid-2" style="margin-bottom:0;">
                         <div class="form-group">
                             <label>Staff Member <span class="required-star">*</span></label>
@@ -688,7 +738,7 @@
                         <textarea id="att_leaveNote" rows="2" placeholder="Any additional context…"></textarea>
                     </div>
                     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <button class="btn" id="btnSubmitLeave" style="background:var(--manager); width:auto; padding:10px 25px;" onclick="att_submitLeave()">Submit Leave Request</button>
+                        <button class="btn" id="btnSubmitLeave" style="background:var(--primary); width:auto; padding:10px 25px;" onclick="att_submitLeave()">Submit Leave Request</button>
                         <span id="att_leaveMsg" style="font-size:0.85rem; font-weight:bold;"></span>
                     </div>
                 </div>
@@ -716,9 +766,9 @@
 
             <!-- Leave Balances -->
             <div id="att_balances" class="att-sub" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
+                <div class="module-box" style="border-top:4px solid var(--accent);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
-                        <h3 style="margin:0; border:none; padding:0; color:var(--manager);">Leave Balances</h3>
+                        <h3 style="margin:0; border:none; padding:0; color:var(--accent);">Leave Balances</h3>
                         <div style="display:flex; gap:10px; align-items:center;">
                             <select id="att_balYear" onchange="att_loadBalances()" style="width:auto; padding:7px 10px; font-size:0.85rem;"></select>
                             <button class="btn btn-secondary" style="width:auto; padding:7px 15px; font-size:0.82rem;" onclick="att_loadBalances()">Refresh</button>
@@ -1075,8 +1125,8 @@
 
             <!-- ── 3. WEEKLY / MONTHLY SUMMARY ──────────── -->
             <div id="rpt_monthly" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--manager);">
-                    <h3 style="color:var(--manager); border-bottom-color:var(--manager);">Weekly / Monthly Summary</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Weekly / Monthly Summary</h3>
                     <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <label>View</label>
@@ -1109,8 +1159,8 @@
 
             <!-- ── 5. CLIENT INTELLIGENCE ────────────────── -->
             <div id="rpt_clients" style="display:none;">
-                <div class="module-box" style="border-top:4px solid var(--admin);">
-                    <h3 style="color:var(--admin); border-bottom-color:var(--admin);">Client Intelligence Report</h3>
+                <div class="module-box" style="border-top:4px solid var(--accent);">
+                    <h3 style="color:var(--accent); border-bottom-color:var(--accent);">Client Intelligence Report</h3>
                     <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
                         <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;"><label>Month (for new clients)</label><input type="month" id="rpt_clientMonth"></div>
                         <button class="btn" style="width:auto; padding:9px 22px;" onclick="rpt_loadClients()">Load</button>
@@ -1144,7 +1194,7 @@
         <div class="consult-modal">
             <button class="consult-close" id="btnCloseConsultation" onclick="closeConsultation()">&times;</button>
             <h2 style="color:var(--primary); margin-bottom:5px;">Consultation & Assessment</h2>
-            <p style="color:var(--manager); font-weight:bold; margin-bottom:20px; font-size:1.1rem;">Client: <span id="consultClientName">...</span></p>
+            <p style="color:var(--accent); font-weight:bold; margin-bottom:20px; font-size:1.1rem;">Client: <span id="consultClientName">...</span></p>
             
             <div class="consult-section-title">II. MEDICAL HISTORY & SAFETY</div>
             <div class="checkbox-grid">

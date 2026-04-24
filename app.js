@@ -2792,44 +2792,11 @@ window.aa_reassign = async function(jobId, select) {
 window.aa_markReady = async function(jobId) {
     if (!confirm('Mark this job as Ready for Payment?')) return;
     try {
-        // Get the appointment to find matching Active_Job by phone + date
-        const apptDoc = await db.collection('Appointments').doc(jobId).get();
-        if (!apptDoc.exists) { alert('Appointment not found.'); return; }
-        const appt = apptDoc.data();
-
-        // Find the matching Active_Job
-        const activeSnap = await db.collection('Active_Jobs')
-            .where('clientPhone', '==', appt.clientPhone)
-            .where('dateString',  '==', appt.dateString || todayDateStr)
-            .where('status', 'in', ['Waiting', 'In Progress'])
-            .get();
-
-        if (activeSnap.empty) {
-            // No Active_Job found — client may not have checked in yet
-            // Update Appointments status as fallback
-            await db.collection('Appointments').doc(jobId).update({
-                status:    'Ready for Payment',
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            alert('Job marked ready. Note: client not yet on the active floor — FOH will see this when they check in.');
-            return;
-        }
-
-        // Update the Active_Job — this triggers FOH billing listener
-        const batch = db.batch();
-        activeSnap.forEach(d => {
-            batch.update(d.ref, {
-                status:    'Ready for Payment',
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        });
-        // Also update Appointments
-        batch.update(db.collection('Appointments').doc(jobId), {
+        // jobId is an Active_Jobs document ID — update it directly
+        await db.collection('Active_Jobs').doc(jobId).update({
             status:    'Ready for Payment',
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        await batch.commit();
-
     } catch(e) { alert('Error: ' + e.message); }
 };
 
