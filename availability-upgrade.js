@@ -1,7 +1,7 @@
 
 // ============================================================
 // THURAYA STAFF AVAILABILITY UPGRADE
-// Version: availability-controls-v3-clean-ui-20260425
+// Version: availability-controls-v2-20260424
 // Loaded AFTER app.js and attendance.js.
 // Adds:
 // 1) Calendar block prep minutes
@@ -9,10 +9,10 @@
 // 3) Tech live lunch break toggle
 // 4) Availability engine factoring prep + lunch + blocks
 // ============================================================
-console.log('✅ Availability controls loaded: availability-controls-v3-clean-ui-20260425');
+console.log('✅ Availability controls loaded: availability-controls-v2-20260424');
 
 (function(){
-    const AV_VERSION = 'availability-controls-v3-clean-ui-20260425';
+    const AV_VERSION = 'availability-controls-v2-20260424';
 
     function av_today() {
         if (typeof todayDateStr !== 'undefined' && todayDateStr) return todayDateStr;
@@ -85,87 +85,49 @@ console.log('✅ Availability controls loaded: availability-controls-v3-clean-ui
     }
 
     function av_injectWorkingLunchUI() {
-        // Permanent-style clean UI: attach to the Working Hours form reliably.
-        // Does not depend on fragile .grid-3 placement.
-        let wrap = document.getElementById('att_schedLunchFields');
-        const form = document.getElementById('att_schedForm');
-        if (!form) return;
+        if (document.getElementById('att_schedLunchEnabled')) return;
+        const grid = document.querySelector('#att_schedForm .grid-3');
+        if (!grid) return;
 
-        if (!wrap) {
-            wrap = document.createElement('div');
-            wrap.id = 'att_schedLunchFields';
-            wrap.className = 'module-box av-availability-defaults';
-            wrap.style.cssText = `
-                border-top:4px solid var(--accent);
-                padding:18px;
-                margin:0 0 20px;
-                background:#fffaf0;
-                border-radius:8px;
-            `;
-            wrap.innerHTML = `
-                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
-                    <div>
-                        <h3 style="margin:0;color:var(--accent);border:none;padding:0;">Availability Defaults</h3>
-                        <p style="font-size:0.82rem;color:#666;margin:4px 0 0;line-height:1.45;">
-                            These values control technician availability and can be changed anytime without editing code.
-                        </p>
-                    </div>
-                    <span style="font-size:0.72rem;font-weight:bold;color:var(--accent);background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);padding:5px 9px;border-radius:999px;">
-                        Config-driven
-                    </span>
+        const wrap = document.createElement('div');
+        wrap.id = 'att_schedLunchFields';
+        wrap.className = 'module-box';
+        wrap.style.cssText = 'border-top:3px solid var(--accent);padding:16px;margin:0 0 20px;background:#fffaf0;';
+        wrap.innerHTML = `
+            <h4 style="margin:0 0 10px;color:var(--accent);">Availability Defaults</h4>
+            <div class="grid-3" style="margin-bottom:0;">
+                <div class="form-group">
+                    <label>Default Prep / Reset Minutes</label>
+                    <input type="number" id="att_schedPrepMinutes" min="0" step="5" value="0" placeholder="e.g. 10">
+                    <small style="color:#777;line-height:1.35;">Added after each appointment before the next client can start.</small>
                 </div>
-
-                <div class="grid-3" style="margin-bottom:0;align-items:start;">
-                    <div class="form-group">
-                        <label>Default Prep / Reset Minutes</label>
-                        <input type="number" id="att_schedPrepMinutes" min="0" step="5" value="0" placeholder="e.g. 10">
-                        <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
-                            Added after each appointment before the next client can start.
-                        </small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Default Lunch Duration</label>
-                        <input type="number" id="att_schedLunchDurationMinutes" min="5" step="5" value="60" placeholder="e.g. 45">
-                        <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
-                            Used when no fixed lunch window is selected and the tech starts lunch from My Attendance.
-                        </small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Lunch Rule</label>
-                        <select id="att_schedLunchEnabled" onchange="av_toggleFixedLunchFields && av_toggleFixedLunchFields()">
-                            <option value="false">Flexible lunch — use default duration</option>
-                            <option value="true">Fixed lunch — block exact time</option>
-                        </select>
-                        <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
-                            Fixed lunch blocks the same period every working day.
-                        </small>
-                    </div>
-
-                    <div class="form-group av-fixed-lunch-field">
-                        <label>Fixed Lunch Start</label>
-                        <input type="time" id="att_schedLunchStart" value="13:00">
-                    </div>
-
-                    <div class="form-group av-fixed-lunch-field">
-                        <label>Fixed Lunch End</label>
-                        <input type="time" id="att_schedLunchEnd" value="14:00">
-                    </div>
-
-                    <div class="form-group" style="background:white;border:1px solid var(--border);border-radius:6px;padding:10px;">
-                        <label style="margin-bottom:6px;">How this is applied</label>
-                        <small style="color:#666;line-height:1.45;display:block;">
-                            Availability = working hours minus appointments, prep time, calendar blocks, fixed lunch, and active live lunch.
-                        </small>
-                    </div>
+                <div class="form-group">
+                    <label>Lunch Mode</label>
+                    <select id="att_schedLunchEnabled" onchange="av_toggleFixedLunchFields && av_toggleFixedLunchFields()">
+                        <option value="false">No fixed lunch — use default duration</option>
+                        <option value="true">Fixed lunch — block exact time</option>
+                    </select>
+                    <small style="color:#777;line-height:1.35;">If no fixed lunch is set, the tech's live lunch button uses the default duration.</small>
                 </div>
-            `;
-
-            // Insert at the top of the Working Hours form so it is immediately visible.
-            form.insertBefore(wrap, form.firstChild);
-        }
-
+                <div class="form-group">
+                    <label>Default Lunch Duration</label>
+                    <input type="number" id="att_schedLunchDurationMinutes" min="5" step="5" value="60" placeholder="e.g. 45">
+                    <small style="color:#777;line-height:1.35;">Used for live lunch breaks when no fixed lunch window is selected.</small>
+                </div>
+                <div class="form-group av-fixed-lunch-field">
+                    <label>Fixed Lunch Start</label>
+                    <input type="time" id="att_schedLunchStart" value="13:00">
+                </div>
+                <div class="form-group av-fixed-lunch-field">
+                    <label>Fixed Lunch End</label>
+                    <input type="time" id="att_schedLunchEnd" value="14:00">
+                </div>
+            </div>
+            <p style="font-size:0.78rem;color:#777;margin:8px 0 0;">
+                Prep and lunch are separate availability controls. Fixed lunch blocks a defined period; no fixed lunch uses the default lunch duration when a technician starts lunch.
+            </p>
+        `;
+        av_insertAfter(grid, wrap);
         if (typeof window.av_toggleFixedLunchFields === 'function') window.av_toggleFixedLunchFields();
     }
 
@@ -408,7 +370,6 @@ console.log('✅ Availability controls loaded: availability-controls-v3-clean-ui
         if (time) time.style.display = type === 'time_range' ? 'grid' : 'none';
         if (tech) tech.style.display = ['time_range','tech_specific','date_range'].includes(type) ? 'block' : 'none';
         if (label) label.textContent = type === 'date_range' || type === 'time_range' ? '(leave blank to apply to all)' : '';
-        av_injectCleanUiStyles();
         av_injectCalendarPrepUI();
         av_populateBlockTechDropdown();
     };
@@ -723,30 +684,6 @@ console.log('✅ Availability controls loaded: availability-controls-v3-clean-ui
     }
     window.startFohRosterListener = startFohRosterListener;
 
-
-    function av_injectCleanUiStyles() {
-        if (document.getElementById('avCleanUiStyles')) return;
-        const st = document.createElement('style');
-        st.id = 'avCleanUiStyles';
-        st.textContent = `
-            .av-availability-defaults .grid-3 {
-                display:grid;
-                grid-template-columns:repeat(3,minmax(0,1fr));
-                gap:14px;
-            }
-            .av-availability-defaults input,
-            .av-availability-defaults select {
-                width:100%;
-            }
-            @media (max-width:900px) {
-                .av-availability-defaults .grid-3 {
-                    grid-template-columns:1fr;
-                }
-            }
-        `;
-        document.head.appendChild(st);
-    }
-
     function av_boot() {
         av_injectCalendarPrepUI();
         av_injectWorkingLunchUI();
@@ -769,3 +706,153 @@ console.log('✅ Availability controls loaded: availability-controls-v3-clean-ui
     // Re-inject when user changes tabs/modules because some sections are hidden at first.
     document.addEventListener('click', () => setTimeout(av_boot, 250));
 })();
+
+
+// ============================================================
+// AVAILABILITY DEFAULTS VISIBLE UI FIX
+// Version: availability-visible-ui-20260425
+// Makes Availability Defaults visible directly under Working Hours,
+// not inside the hidden #att_schedForm.
+// ============================================================
+(function(){
+    console.log('✅ Availability visible UI fix loaded: availability-visible-ui-20260425');
+
+    function avv_buildBox() {
+        const box = document.createElement('div');
+        box.id = 'att_schedLunchFields';
+        box.className = 'module-box av-availability-defaults';
+        box.style.cssText = 'border-top:4px solid var(--accent);padding:18px;margin:12px 0 20px;background:#fffaf0;border-radius:8px;display:block;';
+        box.innerHTML = `
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+                <div>
+                    <h3 style="margin:0;color:var(--accent);border:none;padding:0;">Availability Defaults</h3>
+                    <p style="font-size:0.82rem;color:#666;margin:4px 0 0;line-height:1.45;">
+                        Configure prep/reset time and lunch rules. These are saved per selected staff member.
+                    </p>
+                </div>
+                <span style="font-size:0.72rem;font-weight:bold;color:var(--accent);background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);padding:5px 9px;border-radius:999px;">
+                    Config-driven
+                </span>
+            </div>
+
+            <div class="grid-3" style="margin-bottom:0;align-items:start;">
+                <div class="form-group">
+                    <label>Default Prep / Reset Minutes</label>
+                    <input type="number" id="att_schedPrepMinutes" min="0" step="5" value="0" placeholder="e.g. 10">
+                    <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
+                        Added after each appointment before the next client can start.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label>Default Lunch Duration</label>
+                    <input type="number" id="att_schedLunchDurationMinutes" min="5" step="5" value="60" placeholder="e.g. 45">
+                    <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
+                        Used when lunch is flexible and the tech clicks Start Lunch.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label>Lunch Rule</label>
+                    <select id="att_schedLunchEnabled" onchange="av_toggleFixedLunchFields && av_toggleFixedLunchFields()">
+                        <option value="false">Flexible lunch — use default duration</option>
+                        <option value="true">Fixed lunch — block exact time</option>
+                    </select>
+                    <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
+                        Fixed lunch blocks the same period every working day.
+                    </small>
+                </div>
+
+                <div class="form-group av-fixed-lunch-field">
+                    <label>Fixed Lunch Start</label>
+                    <input type="time" id="att_schedLunchStart" value="13:00">
+                </div>
+
+                <div class="form-group av-fixed-lunch-field">
+                    <label>Fixed Lunch End</label>
+                    <input type="time" id="att_schedLunchEnd" value="14:00">
+                </div>
+
+                <div class="form-group" style="background:white;border:1px solid var(--border);border-radius:6px;padding:10px;">
+                    <label style="margin-bottom:6px;">How this is applied</label>
+                    <small style="color:#666;line-height:1.45;display:block;">
+                        Availability = working hours minus appointments, prep time, calendar blocks, fixed lunch, and active live lunch.
+                    </small>
+                </div>
+            </div>
+
+            <p id="att_availabilityDefaultsHint" style="font-size:0.78rem;color:#777;margin:10px 0 0;">
+                Select a staff member above, then save Working Hours to store these defaults.
+            </p>
+        `;
+        return box;
+    }
+
+    function avv_injectVisibleDefaults() {
+        const workingHours = document.getElementById('att_schedule');
+        if (!workingHours) return false;
+
+        let old = document.getElementById('att_schedLunchFields');
+        if (old) old.remove();
+
+        const box = avv_buildBox();
+
+        const currentBadge = document.getElementById('att_schedCurrentBadge');
+        const form = document.getElementById('att_schedForm');
+
+        if (currentBadge && currentBadge.parentNode) {
+            currentBadge.parentNode.insertBefore(box, currentBadge.nextSibling);
+        } else if (form && form.parentNode) {
+            form.parentNode.insertBefore(box, form);
+        } else {
+            workingHours.prepend(box);
+        }
+
+        if (typeof window.av_toggleFixedLunchFields === 'function') window.av_toggleFixedLunchFields();
+
+        if (typeof window.att_loadSchedule === 'function') {
+            const email = document.getElementById('att_schedTech')?.value || '';
+            if (email) setTimeout(() => window.att_loadSchedule(), 50);
+        }
+
+        return true;
+    }
+
+    function avv_styles() {
+        if (document.getElementById('avVisibleUiStyles')) return;
+        const st = document.createElement('style');
+        st.id = 'avVisibleUiStyles';
+        st.textContent = `
+            .av-availability-defaults .grid-3 {
+                display:grid;
+                grid-template-columns:repeat(3,minmax(0,1fr));
+                gap:14px;
+            }
+            .av-availability-defaults input,
+            .av-availability-defaults select { width:100%; }
+            @media (max-width:900px) {
+                .av-availability-defaults .grid-3 { grid-template-columns:1fr; }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function avv_boot() {
+        avv_styles();
+        avv_injectVisibleDefaults();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', avv_boot);
+    else avv_boot();
+
+    // Re-inject when Attendance/Working Hours tab is opened.
+    document.addEventListener('click', () => setTimeout(avv_boot, 250));
+    document.addEventListener('change', (e) => {
+        if (e.target && (e.target.id === 'att_schedTech' || e.target.name === 'att_sub')) {
+            setTimeout(avv_boot, 250);
+        }
+    });
+
+    window.av_forceShowAvailabilityDefaults = avv_boot;
+})();
+
