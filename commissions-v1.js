@@ -1,11 +1,11 @@
 // ============================================================
-// THURAYA COMMISSIONS — PHASE 3 MY COMMISSIONS
-// Version: commissions-phase3-my-commissions-20260425
+// THURAYA COMMISSIONS — PHASE 4 COMMISSION LOCKING
+// Version: commissions-phase4-locking-20260425
 // Adds technician My Commissions dashboard.
 // Keeps Admin/Manager rules + live dashboard.
 // Does NOT change booking, billing, checkout, or reports logic.
 // ============================================================
-console.log("✅ Commissions Phase 3 loaded: My Commissions");
+console.log("✅ Commissions Phase 4 loaded: locking + payout records");
 
 (function () {
     let editingRuleId = null;
@@ -331,7 +331,7 @@ console.log("✅ Commissions Phase 3 loaded: My Commissions");
                         <h2>💰 Commissions</h2>
                         <p>Rule-based commission setup, live calculation, and technician self-reporting.</p>
                     </div>
-                    <div class="com-pill">Phase 3 · My Commissions</div>
+                    <div class="com-pill">Phase 4 · Locking</div>
                 </div>
 
                 <div class="com-tabs">
@@ -339,6 +339,7 @@ console.log("✅ Commissions Phase 3 loaded: My Commissions");
                     <button class="com-tab-btn ${activeSubTab === "rules" ? "active" : ""}" onclick="com_showTab('rules')">Rules Setup</button>
                     <button class="com-tab-btn ${activeSubTab === "breakdown" ? "active" : ""}" onclick="com_showTab('breakdown')">Staff Breakdown</button>
                     <button class="com-tab-btn ${activeSubTab === "my" ? "active" : ""}" onclick="com_showTab('my')">My Commissions</button>
+                    <button class="com-tab-btn ${activeSubTab === "locked" ? "active" : ""}" onclick="com_showTab('locked')">Locked Records</button>
                 </div>
 
                 <div id="com_content"></div>
@@ -348,6 +349,7 @@ console.log("✅ Commissions Phase 3 loaded: My Commissions");
         if (activeSubTab === "rules") renderRulesSetup();
         else if (activeSubTab === "breakdown") renderBreakdown();
         else if (activeSubTab === "my") renderMyCommissions();
+        else if (activeSubTab === "locked") renderLockedRecords();
         else renderDashboard();
 
         attachRulesListener();
@@ -564,6 +566,11 @@ console.log("✅ Commissions Phase 3 loaded: My Commissions");
                 <div class="com-kpi"><span>Active Rules Used</span><strong>${rules.length}</strong></div>
                 <div class="com-kpi"><span>Staff / Pools</span><strong>${staffCount}</strong></div>
                 <div class="com-kpi"><span>Est. Commission</span><strong>${money(totalCommission)} GHC</strong></div>
+            </div>
+
+            <div class="com-actions" style="border-top:none;padding-top:0;margin-top:0;margin-bottom:16px;">
+                <button class="com-btn primary" onclick="com_lockCurrentCommissions()">🔒 Lock Commissions for This Period</button>
+                <button class="com-btn" onclick="com_showTab('locked')">View Locked Records</button>
             </div>
 
             <div class="com-card" style="margin-bottom:16px;">
@@ -1131,6 +1138,359 @@ console.log("✅ Commissions Phase 3 loaded: My Commissions");
             </table></div>`;
     }
 
+
+    // ---------- Phase 4: Locking / Official Records ----------
+    function currentDashboardDates() {
+        return {
+            start: document.getElementById("com_start")?.value || todayStr(),
+            end: document.getElementById("com_end")?.value || (document.getElementById("com_start")?.value || todayStr()),
+            roleFilter: document.getElementById("com_filterRole")?.value || "all"
+        };
+    }
+
+    function lockPeriodId(start, end, roleFilter) {
+        return `${start}_${end}_${roleFilter || "all"}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    function summarizeCommissionRows(rows) {
+        const summary = {};
+        rows.forEach(r => {
+            const key = `${r.roleKey || "unknown"}:${r.staffEmail || "unknown"}`;
+            if (!summary[key]) {
+                summary[key] = {
+                    roleKey: r.roleKey || "",
+                    roleName: r.roleName || "",
+                    staffEmail: r.staffEmail || "",
+                    staffName: r.staffName || "",
+                    jobIds: [],
+                    jobCount: 0,
+                    baseValue: 0,
+                    commissionAmount: 0
+                };
+            }
+
+            if (r.jobId && !summary[key].jobIds.includes(r.jobId)) {
+                summary[key].jobIds.push(r.jobId);
+            }
+
+            summary[key].baseValue += num(r.baseValue);
+            summary[key].commissionAmount += num(r.commissionAmount);
+        });
+
+        Object.values(summary).forEach(s => s.jobCount = s.jobIds.length);
+        return Object.values(summary).sort((a,b) => b.commissionAmount - a.commissionAmount);
+    }
+
+    async function checkExistingLock(start, end, roleFilter) {
+        const id = lockPeriodId(start, end, roleFilter);
+        const doc = await db.collection("Commission_Locks").doc(id).get();
+        return doc.exists ? { id, ...doc.data() } : null;
+    }
+
+    async function lockCurrentCommissions() {
+        if (!isAdminManager()) {
+            alert("Only Admin/Manager can lock commissions.");
+            return;
+        }
+
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            alert("Please sign in again.");
+            return;
+        }
+
+        const { start, end, roleFilter } = currentDashboardDates();
+
+        if (!lastCommissionRows || !lastCommissionRows.length) {
+            alert("Load the commission dashboard first before locking.");
+            return;
+        }
+
+        const existing = await checkExistingLock(start, end, roleFilter);
+        if (existing) {
+            alert("This commission period is already locked. Use Locked Records to review it.");
+            return;
+        }
+
+        const totalCommission = lastCommissionRows.reduce((s,r) => s + num(r.commissionAmount), 0);
+        const totalBaseValue = lastCommissionRows.reduce((s,r) => s + num(r.baseValue), 0);
+        const staffSummary = summarizeCommissionRows(lastCommissionRows);
+
+        const confirmMsg =
+            `Lock commissions for ${start} to ${end}?\n\n` +
+            `Role filter: ${roleFilter}\n` +
+            `Rows: ${lastCommissionRows.length}\n` +
+            `Staff/Pool records: ${staffSummary.length}\n` +
+            `Total commission: ${money(totalCommission)} GHC\n\n` +
+            `After locking, this snapshot will not change even if rules are edited.`;
+
+        if (!confirm(confirmMsg)) return;
+
+        const lockId = lockPeriodId(start, end, roleFilter);
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+
+        try {
+            const batch = db.batch();
+
+            const lockRef = db.collection("Commission_Locks").doc(lockId);
+            batch.set(lockRef, {
+                periodStart: start,
+                periodEnd: end,
+                roleFilter,
+                status: "locked",
+                rowCount: lastCommissionRows.length,
+                staffCount: staffSummary.length,
+                totalBaseValue,
+                totalCommission,
+                lockedAt: now,
+                lockedBy: user.email || "",
+                createdAt: now,
+                notes: "Generated by Thuraya Commission Phase 4"
+            });
+
+            staffSummary.forEach(s => {
+                const recRef = db.collection("Commission_Records").doc(`${lockId}_${String(s.roleKey || "role")}_${String(s.staffEmail || "staff").replace(/[^a-zA-Z0-9_-]/g, "_")}`);
+                const rowsForStaff = lastCommissionRows.filter(r =>
+                    String(r.roleKey || "") === String(s.roleKey || "") &&
+                    String(r.staffEmail || "") === String(s.staffEmail || "")
+                );
+
+                batch.set(recRef, {
+                    lockId,
+                    periodStart: start,
+                    periodEnd: end,
+                    roleFilter,
+                    roleKey: s.roleKey,
+                    roleName: s.roleName,
+                    staffEmail: s.staffEmail,
+                    staffName: s.staffName,
+                    jobCount: s.jobCount,
+                    jobIds: s.jobIds,
+                    baseValue: s.baseValue,
+                    commissionAmount: s.commissionAmount,
+                    payoutStatus: "pending",
+                    approvalStatus: "locked",
+                    rows: rowsForStaff,
+                    lockedAt: now,
+                    lockedBy: user.email || "",
+                    createdAt: now,
+                    updatedAt: now
+                });
+            });
+
+            await batch.commit();
+            alert("Commissions locked successfully.");
+            com_showTab("locked");
+        } catch (e) {
+            console.error("Commission lock failed", e);
+            alert("Could not lock commissions: " + e.message);
+        }
+    }
+
+    async function loadLockedRecords() {
+        const out = document.getElementById("com_lockedOutput");
+        if (!out) return;
+
+        out.innerHTML = `<div class="com-empty">Loading locked commission records...</div>`;
+
+        try {
+            const snap = await db.collection("Commission_Locks").get();
+            const locks = [];
+            snap.forEach(doc => locks.push({ id: doc.id, ...doc.data() }));
+
+            locks.sort((a,b) => String(b.periodStart || "").localeCompare(String(a.periodStart || "")));
+
+            if (!locks.length) {
+                out.innerHTML = `<div class="com-empty">No locked commission periods yet.</div>`;
+                return;
+            }
+
+            out.innerHTML = `
+                <div class="com-table-wrap">
+                    <table class="com-table">
+                        <thead>
+                            <tr>
+                                <th>Period</th>
+                                <th>Role Filter</th>
+                                <th>Status</th>
+                                <th>Rows</th>
+                                <th>Staff/Pool</th>
+                                <th>Total Commission</th>
+                                <th>Locked By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${locks.map(l => `
+                                <tr>
+                                    <td><strong>${safe(l.periodStart)} → ${safe(l.periodEnd)}</strong></td>
+                                    <td>${safe(l.roleFilter || "all")}</td>
+                                    <td><span class="com-badge active">${safe(l.status || "locked")}</span></td>
+                                    <td>${safe(l.rowCount || 0)}</td>
+                                    <td>${safe(l.staffCount || 0)}</td>
+                                    <td><strong>${money(l.totalCommission)} GHC</strong></td>
+                                    <td>${safe(l.lockedBy || "")}</td>
+                                    <td>
+                                        <div class="com-inline-actions">
+                                            <button class="com-small-btn" onclick="com_viewLockedRecords('${l.id}')">View</button>
+                                            <button class="com-small-btn" onclick="com_exportLockedCsv('${l.id}')">Export CSV</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } catch(e) {
+            console.error("Load locked records failed", e);
+            out.innerHTML = `<div class="com-note" style="border-left-color:var(--error);">Could not load locked records.<br><strong>${safe(e.message)}</strong></div>`;
+        }
+    }
+
+    async function viewLockedRecords(lockId) {
+        const out = document.getElementById("com_lockedDetail");
+        if (!out) return;
+
+        out.innerHTML = `<div class="com-empty">Loading details...</div>`;
+
+        try {
+            const snap = await db.collection("Commission_Records").where("lockId", "==", lockId).get();
+            const records = [];
+            snap.forEach(doc => records.push({ id: doc.id, ...doc.data() }));
+
+            records.sort((a,b) => num(b.commissionAmount) - num(a.commissionAmount));
+
+            if (!records.length) {
+                out.innerHTML = `<div class="com-empty">No detail records found for this lock.</div>`;
+                return;
+            }
+
+            out.innerHTML = `
+                <div class="com-card" style="margin-top:16px;">
+                    <h3>Locked Record Detail</h3>
+                    <div class="com-table-wrap">
+                        <table class="com-table">
+                            <thead>
+                                <tr>
+                                    <th>Role</th>
+                                    <th>Staff / Pool</th>
+                                    <th>Jobs</th>
+                                    <th>Base Value</th>
+                                    <th>Commission</th>
+                                    <th>Payout Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${records.map(r => `
+                                    <tr>
+                                        <td>${safe(r.roleName || r.roleKey)}</td>
+                                        <td><strong>${safe(r.staffName)}</strong><br><span style="color:#777;font-size:.76rem;">${safe(r.staffEmail)}</span></td>
+                                        <td>${safe(r.jobCount || 0)}</td>
+                                        <td>${money(r.baseValue)} GHC</td>
+                                        <td><strong>${money(r.commissionAmount)} GHC</strong></td>
+                                        <td><span class="com-badge ${r.payoutStatus === "paid" ? "active" : ""}">${safe(r.payoutStatus || "pending")}</span></td>
+                                        <td>
+                                            <div class="com-inline-actions">
+                                                <button class="com-small-btn" onclick="com_markCommissionPaid('${r.id}')">Mark Paid</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } catch(e) {
+            console.error("View locked records failed", e);
+            out.innerHTML = `<div class="com-note" style="border-left-color:var(--error);">Could not load locked detail.<br><strong>${safe(e.message)}</strong></div>`;
+        }
+    }
+
+    async function markCommissionPaid(recordId) {
+        if (!isAdminManager()) {
+            alert("Only Admin/Manager can mark commissions as paid.");
+            return;
+        }
+
+        if (!confirm("Mark this commission record as paid?")) return;
+
+        try {
+            await db.collection("Commission_Records").doc(recordId).set({
+                payoutStatus: "paid",
+                paidAt: firebase.firestore.FieldValue.serverTimestamp(),
+                paidBy: firebase.auth().currentUser?.email || "",
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            alert("Commission marked as paid.");
+        } catch(e) {
+            console.error("Mark paid failed", e);
+            alert("Could not mark as paid: " + e.message);
+        }
+    }
+
+    async function exportLockedCsv(lockId) {
+        try {
+            const snap = await db.collection("Commission_Records").where("lockId", "==", lockId).get();
+            const rows = [];
+            snap.forEach(doc => rows.push({ id: doc.id, ...doc.data() }));
+
+            if (!rows.length) {
+                alert("No records found for this lock.");
+                return;
+            }
+
+            const headers = ["Lock ID","Period Start","Period End","Role","Staff Name","Staff Email","Jobs","Base Value","Commission Amount","Payout Status"];
+            const lines = [headers.map(csvEscape).join(",")];
+
+            rows.forEach(r => {
+                lines.push([
+                    r.lockId, r.periodStart, r.periodEnd, r.roleName || r.roleKey,
+                    r.staffName, r.staffEmail, r.jobCount,
+                    money(r.baseValue), money(r.commissionAmount), r.payoutStatus || "pending"
+                ].map(csvEscape).join(","));
+            });
+
+            const blob = new Blob([lines.join("\n")], { type:"text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `thuraya-locked-commissions-${lockId}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch(e) {
+            console.error("Locked CSV export failed", e);
+            alert("Could not export locked records: " + e.message);
+        }
+    }
+
+    function renderLockedRecords() {
+        const root = document.getElementById("com_content");
+        if (!root) return;
+
+        root.innerHTML = `
+            <div class="com-note">
+                Locked records are official payable commission snapshots. They remain stable even if commission rules are edited later.
+            </div>
+
+            <div class="com-actions" style="border-top:none;padding-top:0;margin-top:0;margin-bottom:14px;">
+                <button class="com-btn primary" onclick="com_loadLockedRecords()">Refresh Locked Records</button>
+            </div>
+
+            <div class="com-card">
+                <h3>Locked Commission Periods</h3>
+                <div id="com_lockedOutput" class="com-empty">Click Refresh Locked Records.</div>
+            </div>
+
+            <div id="com_lockedDetail"></div>
+        `;
+
+        setTimeout(loadLockedRecords, 100);
+    }
+
     function init() {
         ensureCommissionShell();
         renderShell("dashboard");
@@ -1160,6 +1520,13 @@ console.log("✅ Commissions Phase 3 loaded: My Commissions");
             });
         }
     }
+
+
+    window.com_lockCurrentCommissions = lockCurrentCommissions;
+    window.com_loadLockedRecords = loadLockedRecords;
+    window.com_viewLockedRecords = viewLockedRecords;
+    window.com_markCommissionPaid = markCommissionPaid;
+    window.com_exportLockedCsv = exportLockedCsv;
 
     window.com_init = init;
     window.com_showTab = showTab;
