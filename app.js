@@ -2923,105 +2923,6 @@ function rpt_tableHead(...cols) {
         `<th style="padding:9px 8px;text-align:${c.align||'left'};color:var(--primary);white-space:nowrap;">${c.label}</th>`
     ).join('')}</tr></thead>`;
 }
-
-
-// ==========================================
-// REPORTS V2 — REVENUE + GROUP BILLING ENGINE
-// Version: reports-v2-revenue-group-20260425
-// Normalizes revenue and prevents group-payment double counting.
-// ==========================================
-function rpt_num(v) {
-    const n = Number(parseFloat(v || 0));
-    return isNaN(n) ? 0 : n;
-}
-
-function rpt_isGroup(item) {
-    return !!(item && (item.isGroupBooking === true || item.groupId));
-}
-
-function rpt_groupMode(item) {
-    return item?.billingMode || item?.billingScenario || item?.groupCheckoutType || '';
-}
-
-function rpt_groupRole(item) {
-    if (item?.isLeadBooker === true) return 'lead';
-    return item?.groupRole || item?.payableBy || '';
-}
-
-function rpt_rawRevenue(item) {
-    return rpt_num(
-        item?.groupCheckoutAmount ||
-        item?.amountDue ||
-        item?.totalGHC ||
-        item?.grandTotal ||
-        item?.bookedPrice ||
-        item?.memberServiceTotal ||
-        0
-    );
-}
-
-function rpt_attributableRevenue(item) {
-    return rpt_num(
-        item?.memberServiceTotal ||
-        item?.amountDue ||
-        item?.grandTotal ||
-        item?.bookedPrice ||
-        item?.totalGHC ||
-        0
-    );
-}
-
-function rpt_prepareRevenueItems(items) {
-    const seen = new Set();
-    (items || []).forEach(item => {
-        const mode = rpt_groupMode(item);
-        let key = '';
-        let rev = rpt_rawRevenue(item);
-
-        if (rpt_isGroup(item)) {
-            if (mode === 'group_lead_all' || mode === 'group_lead_final' || mode === 'lead_pays_all' || mode === 'lead_pays_all_after_last') {
-                key = `group-final:${item.groupId || ''}:${mode}`;
-                if (seen.has(key)) rev = 0;
-                else seen.add(key);
-            } else if (mode === 'subgroup' || mode === 'subgroup_pays_separately') {
-                key = `subgroup:${item.groupId || ''}:${item.subGroupIndex || 1}`;
-                if (seen.has(key)) rev = 0;
-                else seen.add(key);
-            }
-        }
-
-        item._rptRevenue = rev;
-        item._rptAttributableRevenue = rpt_attributableRevenue(item);
-        item._rptGroupLabel = rpt_isGroup(item)
-            ? `${item.groupId || 'Group'}${item.subGroupIndex ? ' / SG ' + item.subGroupIndex : ''}`
-            : '-';
-        item._rptBillingMode = mode || '-';
-    });
-    return items || [];
-}
-
-function rpt_getReportRevenue(item) {
-    if (item && typeof item._rptRevenue === 'number') return item._rptRevenue;
-    return rpt_rawRevenue(item);
-}
-
-function rpt_sumReportRevenue(items) {
-    rpt_prepareRevenueItems(items || []);
-    return (items || []).reduce((s, item) => s + rpt_getReportRevenue(item), 0);
-}
-
-function rpt_groupCsvFields(item) {
-    return [
-        item?.groupId || '',
-        item?.groupSize || '',
-        item?.subGroupIndex || '',
-        rpt_groupRole(item) || '',
-        rpt_groupMode(item) || '',
-        item?.groupCheckoutType || '',
-        item?.payableBy || ''
-    ];
-}
-
 function rpt_noData(msg) {
     return `<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">${msg}</p>`;
 }
@@ -3059,12 +2960,11 @@ window.rpt_loadUpcoming = async function() {
         if (statusFilter !== 'all') appts = appts.filter(a => a.status === statusFilter);
         appts.sort((a,b) => (a.dateString+a.timeString).localeCompare(b.dateString+b.timeString));
 
-        rpt_prepareRevenueItems(appts);
         _rpt_cache.upcoming = appts;
 
         if (!appts.length) { tableEl.innerHTML = rpt_noData('No bookings found for this period.'); return; }
 
-        const totalRev = rpt_sumReportRevenue(appts);
+        const totalRev = appts.reduce((s,a) => s + parseFloat(a.grandTotal||a.bookedPrice||0), 0);
         const groups   = appts.filter(a => a.isGroupBooking).length;
 
         summaryEl.style.display = 'flex';
@@ -3085,7 +2985,7 @@ window.rpt_loadUpcoming = async function() {
                 {label:'Technician'},{label:'Mins',align:'center'},{label:'Amount',align:'right'},{label:'Status',align:'center'}
             )}
             <tbody>${appts.map((a,i) => {
-                const amt   = rpt_getReportRevenue(a).toFixed(2);
+                const amt   = parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2);
                 const color = statusColors[a.status] || '#999';
                 const isToday = a.dateString === todayDateStr;
                 return `<tr style="background:${i%2===0?'white':'#fafafa'};border-bottom:1px solid #f1f1f1;">
@@ -3099,7 +2999,7 @@ window.rpt_loadUpcoming = async function() {
                         ${a.isGroupBooking?'<span style="font-size:0.68rem;background:var(--manager);color:white;padding:1px 5px;border-radius:3px;margin-left:4px;">GROUP</span>':''}
                         <br><span style="font-size:0.75rem;color:#999;">${a.clientPhone||''}</span>
                     </td>
-                    <td style="padding:9px 8px;">${a.bookedService||'N/A'}${rpt_isGroup(a)?`<br><small style="color:var(--manager);font-weight:700;">${a.groupId||''} · ${rpt_groupMode(a)||'group'}</small>`:''}</td>
+                    <td style="padding:9px 8px;">${a.bookedService||'N/A'}</td>
                     <td style="padding:9px 8px;">${a.assignedTechName||'—'}</td>
                     <td style="padding:9px 8px;text-align:center;">${a.bookedDuration||0}</td>
                     <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${amt} GHC</td>
@@ -3144,7 +3044,6 @@ window.rpt_loadDaily = async function() {
 
         const jobs = [];
         closedSnap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
-        rpt_prepareRevenueItems(jobs);
         _rpt_cache.daily = jobs;
 
         // FIX: cancelledCount is a number from snap.size
@@ -3162,7 +3061,7 @@ window.rpt_loadDaily = async function() {
             return;
         }
 
-        const totalRev = rpt_sumReportRevenue(jobs);
+        const totalRev = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
         // FIX: guard against division by zero
         const totalDur = jobs.reduce((s,j) => s + parseInt(j.bookedDuration||0), 0);
         const avgDur   = jobs.length > 0 ? Math.round(totalDur / jobs.length) : 0;
@@ -3173,19 +3072,19 @@ window.rpt_loadDaily = async function() {
             const tn = j.assignedTechName || 'Unknown';
             if (!techMap[tn]) techMap[tn] = { count:0, revenue:0, duration:0 };
             techMap[tn].count++;
-            techMap[tn].revenue  += rpt_getReportRevenue(j);
+            techMap[tn].revenue  += parseFloat(j.grandTotal||j.bookedPrice||0);
             techMap[tn].duration += parseInt(j.bookedDuration||0);
 
             const svc = (j.bookedService||'Unknown').split(',')[0].trim();
             if (!svcMap[svc]) svcMap[svc] = { count:0, revenue:0 };
             svcMap[svc].count++;
-            svcMap[svc].revenue += rpt_getReportRevenue(j);
+            svcMap[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
 
             // FIX: paymentMethod lives on Active_Jobs — use fallback gracefully
             const pay = j.paymentMethod || j.payment || 'Cash / Not Recorded';
             if (!payMap[pay]) payMap[pay] = { count:0, revenue:0 };
             payMap[pay].count++;
-            payMap[pay].revenue += rpt_getReportRevenue(j);
+            payMap[pay].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
         });
 
         metricsEl.style.display = 'flex';
@@ -3276,7 +3175,6 @@ window.rpt_loadMonthly = async function() {
 
         const jobs = [];
         jobsSnap.forEach(d => { const j = d.data(); if (j.dateString <= end) jobs.push({ id:d.id, ...j }); });
-        rpt_prepareRevenueItems(jobs);
         _rpt_cache.monthly = jobs;
 
         const cancelledCount = (() => {
@@ -3290,13 +3188,13 @@ window.rpt_loadMonthly = async function() {
             return;
         }
 
-        const totalRev = rpt_sumReportRevenue(jobs);
+        const totalRev = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
         const dayMap = {}, hourMap = {}, clientSpend = {}, svcRev = {};
 
         jobs.forEach(j => {
             const day = j.dateString||'';
             if (!dayMap[day]) dayMap[day] = { count:0, revenue:0 };
-            dayMap[day].count++; dayMap[day].revenue += rpt_getReportRevenue(j);
+            dayMap[day].count++; dayMap[day].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
 
             const hr = parseInt((j.timeString||'00:00').split(':')[0]);
             hourMap[hr] = (hourMap[hr]||0) + 1;
@@ -3304,13 +3202,13 @@ window.rpt_loadMonthly = async function() {
             const phone = j.clientPhone||'';
             if (phone) {
                 if (!clientSpend[phone]) clientSpend[phone] = { name:j.clientName||'Unknown', spend:0, count:0 };
-                clientSpend[phone].spend  += rpt_getReportRevenue(j);
+                clientSpend[phone].spend  += parseFloat(j.grandTotal||j.bookedPrice||0);
                 clientSpend[phone].count++;
             }
 
             const svc = (j.bookedService||'Unknown').split(',')[0].trim();
             if (!svcRev[svc]) svcRev[svc] = { count:0, revenue:0 };
-            svcRev[svc].count++; svcRev[svc].revenue += rpt_getReportRevenue(j);
+            svcRev[svc].count++; svcRev[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
         });
 
         // FIX: new vs returning — use unique client phones from jobs vs all prior jobs
@@ -3430,7 +3328,7 @@ window.rpt_loadTechPerf = async function() {
             const k = j.assignedTechEmail || 'unknown';
             if (!techMap[k]) techMap[k] = { name: j.assignedTechName||'Unknown', count:0, revenue:0, duration:0 };
             techMap[k].count++;
-            techMap[k].revenue  += (rpt_isGroup(j) ? (j._rptAttributableRevenue || rpt_attributableRevenue(j)) : rpt_getReportRevenue(j));
+            techMap[k].revenue  += parseFloat(j.grandTotal||j.bookedPrice||0);
             techMap[k].duration += parseInt(j.bookedDuration||0);
         });
 
@@ -3526,7 +3424,7 @@ window.rpt_loadClients = async function() {
             if (!phone) return;
             if (!spendMap[phone]) spendMap[phone] = { visits:0, spend:0, lastVisit:'', name:j.clientName||'' };
             spendMap[phone].visits++;
-            spendMap[phone].spend += rpt_getReportRevenue(j);
+            spendMap[phone].spend += parseFloat(j.grandTotal||j.bookedPrice||0);
             if (!spendMap[phone].lastVisit || j.dateString > spendMap[phone].lastVisit) {
                 spendMap[phone].lastVisit = j.dateString;
             }
@@ -3731,33 +3629,33 @@ window.rpt_exportCSV = function(type) {
 
     if (type === 'upcoming') {
         if (!_rpt_cache.upcoming.length) { alert('Load the report first.'); return; }
-        rows = [['Date','Time','Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Status','Group Booking','Group ID','Group Size','Sub-group','Group Role','Billing Mode','Group Checkout Type','Payable By'],
+        rows = [['Date','Time','Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Status','Group Booking'],
             ..._rpt_cache.upcoming.map(a => [
                 a.dateString, a.timeString, a.clientName||'', a.clientPhone||'',
                 a.bookedService||'', a.assignedTechName||'', a.bookedDuration||0,
-                rpt_getReportRevenue(a).toFixed(2),
-                a.status, a.isGroupBooking?'Yes':'No', ...rpt_groupCsvFields(a)
+                parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2),
+                a.status, a.isGroupBooking?'Yes':'No'
             ])];
         filename = `upcoming-bookings-${todayDateStr}.csv`;
 
     } else if (type === 'daily') {
         if (!_rpt_cache.daily.length) { alert('Load the report first.'); return; }
-        rows = [['Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Payment Method','Group ID','Group Size','Sub-group','Group Role','Billing Mode','Group Checkout Type','Payable By'],
+        rows = [['Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Payment Method'],
             ..._rpt_cache.daily.map(j => [
                 j.clientName||'', j.clientPhone||'', j.bookedService||'',
                 j.assignedTechName||'', j.bookedDuration||0,
-                rpt_getReportRevenue(j).toFixed(2),
-                j.paymentMethod||j.payment||'', ...rpt_groupCsvFields(j)
+                parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2),
+                j.paymentMethod||j.payment||''
             ])];
         filename = `daily-ops-${document.getElementById('rpt_dailyDate')?.value||todayDateStr}.csv`;
 
     } else if (type === 'monthly') {
         if (!_rpt_cache.monthly.length) { alert('Load the report first.'); return; }
-        rows = [['Date','Client','Phone','Service','Technician','Amount (GHC)','Group ID','Group Size','Sub-group','Group Role','Billing Mode','Group Checkout Type','Payable By'],
+        rows = [['Date','Client','Phone','Service','Technician','Amount (GHC)'],
             ..._rpt_cache.monthly.map(j => [
                 j.dateString, j.clientName||'', j.clientPhone||'',
                 j.bookedService||'', j.assignedTechName||'',
-                rpt_getReportRevenue(j).toFixed(2), ...rpt_groupCsvFields(j)
+                parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2)
             ])];
         filename = `monthly-summary-${document.getElementById('rpt_monthlyMonth')?.value||''}.csv`;
 
@@ -4353,4 +4251,296 @@ async function _doCheckIn(id, appt) {
         }).catch(err => console.error(err));
     }
 }
+
+
+// ============================================================
+// REPORTS V2 — NO-COMPOSITE-INDEX QUERY PATCH
+// Version: reports-v2-no-index-20260425
+// Purpose:
+// Avoid Firestore composite index errors in Reports by using
+// date-range-only queries and applying optional filters client-side.
+// ============================================================
+console.log('✅ Reports v2 no-index query patch loaded: reports-v2-no-index-20260425');
+
+function rpt_v2_num(v) {
+    const n = Number(parseFloat(v || 0));
+    return isNaN(n) ? 0 : n;
+}
+
+function rpt_v2_money(v) {
+    return rpt_v2_num(v).toFixed(2);
+}
+
+function rpt_v2_revenue(item) {
+    return rpt_v2_num(
+        item.groupCheckoutAmount ||
+        item.amountDue ||
+        item.totalGHC ||
+        item.grandTotal ||
+        item.bookedPrice ||
+        0
+    );
+}
+
+function rpt_v2_isGroup(item) {
+    return item?.isGroupBooking === true || !!item?.groupId;
+}
+
+function rpt_v2_shouldCountRevenue(item, seen = new Set()) {
+    if (!rpt_v2_isGroup(item)) return true;
+
+    const mode = item.billingMode || item.groupCheckoutType || '';
+    const gid = item.groupId || '';
+    const sg = item.subGroupIndex || 1;
+
+    if (mode === 'lead_pays_all' || mode === 'lead_pays_all_after_last' || mode === 'group_lead_all' || mode === 'group_lead_final') {
+        const key = `group:${gid}:lead`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return item.isLeadBooker === true || item.groupRole === 'lead' || item.payableBy === 'lead_booker' || item.payableBy === 'lead_booker_final_bill' || !!item.groupCheckoutAmount;
+    }
+
+    if (mode === 'subgroup_pays_separately' || mode === 'subgroup') {
+        const key = `group:${gid}:sg:${sg}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }
+
+    return true;
+}
+
+async function rpt_v2_fetchAppointmentsNoIndex(startDate, endDate) {
+    const snap = await db.collection('Appointments')
+        .where('dateString', '>=', startDate)
+        .where('dateString', '<=', endDate)
+        .get();
+
+    const rows = [];
+    snap.forEach(doc => rows.push({ id: doc.id, _source: 'Appointments', ...doc.data() }));
+    return rows;
+}
+
+async function rpt_v2_fetchActiveJobsNoIndex(startDate, endDate) {
+    const snap = await db.collection('Active_Jobs')
+        .where('dateString', '>=', startDate)
+        .where('dateString', '<=', endDate)
+        .get();
+
+    const rows = [];
+    snap.forEach(doc => rows.push({ id: doc.id, _source: 'Active_Jobs', ...doc.data() }));
+    return rows;
+}
+
+function rpt_v2_filterRows(rows, opts = {}) {
+    const tech = opts.tech || opts.techEmail || 'all';
+    const status = opts.status || 'all';
+
+    return rows.filter(r => {
+        if (tech && tech !== 'all' && r.assignedTechEmail !== tech) return false;
+        if (status && status !== 'all' && r.status !== status) return false;
+        return true;
+    });
+}
+
+function rpt_v2_groupColumns(row) {
+    return {
+        groupId: row.groupId || '',
+        groupSize: row.groupSize || '',
+        subGroupIndex: row.subGroupIndex || '',
+        billingMode: row.billingMode || row.groupCheckoutType || '',
+        payableBy: row.payableBy || '',
+        isLeadBooker: row.isLeadBooker === true ? 'Yes' : ''
+    };
+}
+
+function rpt_v2_csvEscape(v) {
+    const s = String(v ?? '');
+    return `"${s.replace(/"/g, '""')}"`;
+}
+
+function rpt_v2_downloadCsv(filename, rows) {
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function rpt_v2_renderTable(targetId, rows) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+
+    if (!rows.length) {
+        target.innerHTML = '<p style="color:#999;font-style:italic;">No records found for this filter.</p>';
+        return;
+    }
+
+    const seen = new Set();
+    let revenue = 0;
+    rows.forEach(r => { if (rpt_v2_shouldCountRevenue(r, seen)) revenue += rpt_v2_revenue(r); });
+
+    target.innerHTML = `
+        <div class="report-kpi-row" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0;">
+            <div class="module-box" style="padding:14px;"><strong>Total Records</strong><br><span style="font-size:1.4rem;color:var(--manager);">${rows.length}</span></div>
+            <div class="module-box" style="padding:14px;"><strong>Revenue</strong><br><span style="font-size:1.4rem;color:var(--success);">${rpt_v2_money(revenue)} GHC</span></div>
+            <div class="module-box" style="padding:14px;"><strong>Group Records</strong><br><span style="font-size:1.4rem;color:var(--accent);">${rows.filter(rpt_v2_isGroup).length}</span></div>
+            <div class="module-box" style="padding:14px;"><strong>Source</strong><br><span style="font-size:1rem;color:#666;">No-index query</span></div>
+        </div>
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+                <thead>
+                    <tr style="background:#f3f4f6;">
+                        <th style="padding:8px;border:1px solid #ddd;text-align:left;">Date</th>
+                        <th style="padding:8px;border:1px solid #ddd;text-align:left;">Time</th>
+                        <th style="padding:8px;border:1px solid #ddd;text-align:left;">Client</th>
+                        <th style="padding:8px;border:1px solid #ddd;text-align:left;">Tech</th>
+                        <th style="padding:8px;border:1px solid #ddd;text-align:left;">Status</th>
+                        <th style="padding:8px;border:1px solid #ddd;text-align:left;">Service</th>
+                        <th style="padding:8px;border:1px solid #ddd;text-align:right;">Revenue</th>
+                        <th style="padding:8px;border:1px solid #ddd;text-align:left;">Group ID</th>
+                        <th style="padding:8px;border:1px solid #ddd;text-align:left;">Billing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(r => {
+                        const g = rpt_v2_groupColumns(r);
+                        return `
+                            <tr>
+                                <td style="padding:8px;border:1px solid #ddd;">${r.dateString || ''}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${r.timeString || ''}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${r.clientName || ''}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${r.assignedTechName || r.assignedTechEmail || ''}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${r.status || ''}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${r.bookedService || ''}</td>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:right;">${rpt_v2_money(rpt_v2_revenue(r))}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${g.groupId || '-'}</td>
+                                <td style="padding:8px;border:1px solid #ddd;">${g.billingMode || '-'}</td>
+                            </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function rpt_v2_getFilterValue(ids, fallback = '') {
+    for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el && el.value) return el.value;
+    }
+    return fallback;
+}
+
+async function rpt_v2_loadUpcomingNoIndex() {
+    const out = document.getElementById('rpt_upcomingResults') || document.getElementById('rptResults') || document.querySelector('#reportsView .report-results');
+    if (!out) return false;
+
+    const start = rpt_v2_getFilterValue(['rpt_upcomingStart','rpt_startDate','rptStartDate'], todayDateStr);
+    const end = rpt_v2_getFilterValue(['rpt_upcomingEnd','rpt_endDate','rptEndDate'], start);
+    const tech = rpt_v2_getFilterValue(['rpt_upcomingTech','rpt_techFilter','rptTechFilter'], 'all');
+    const status = rpt_v2_getFilterValue(['rpt_upcomingStatus','rpt_statusFilter','rptStatusFilter'], 'all');
+
+    out.innerHTML = '<p style="color:#666;">Loading report without composite indexes...</p>';
+    try {
+        const rows = rpt_v2_filterRows(await rpt_v2_fetchAppointmentsNoIndex(start, end), { tech, status });
+        window._rpt_v2_lastRows = rows;
+        rpt_v2_renderTable(out.id, rows);
+    } catch(e) {
+        out.innerHTML = `<p style="color:var(--error);">Report error: ${e.message}</p>`;
+    }
+    return true;
+}
+
+async function rpt_v2_loadDailyNoIndex() {
+    const out = document.getElementById('rpt_dailyResults') || document.getElementById('rptResults') || document.querySelector('#reportsView .report-results');
+    if (!out) return false;
+
+    const date = rpt_v2_getFilterValue(['rpt_dailyDate','rptDate'], todayDateStr);
+    const tech = rpt_v2_getFilterValue(['rpt_dailyTech','rpt_techFilter','rptTechFilter'], 'all');
+    const status = rpt_v2_getFilterValue(['rpt_dailyStatus','rpt_statusFilter','rptStatusFilter'], 'all');
+
+    out.innerHTML = '<p style="color:#666;">Loading daily operations without composite indexes...</p>';
+    try {
+        const jobs = await rpt_v2_fetchActiveJobsNoIndex(date, date);
+        const rows = rpt_v2_filterRows(jobs, { tech, status });
+        window._rpt_v2_lastRows = rows;
+        rpt_v2_renderTable(out.id, rows);
+    } catch(e) {
+        out.innerHTML = `<p style="color:var(--error);">Daily report error: ${e.message}</p>`;
+    }
+    return true;
+}
+
+// Safe wrappers for common report buttons.
+// If your existing functions throw index errors, these replacements avoid them.
+window.rpt_loadUpcoming = rpt_v2_loadUpcomingNoIndex;
+window.rpt_loadDaily = rpt_v2_loadDailyNoIndex;
+
+window.rpt_exportCsv = function() {
+    const rows = window._rpt_v2_lastRows || [];
+    if (!rows.length) {
+        alert('No report rows to export. Load a report first.');
+        return;
+    }
+
+    const header = [
+        'Source','Date','Time','Client','Phone','Technician','Status','Service','Revenue',
+        'Group ID','Group Size','Subgroup','Billing Mode','Payable By','Lead Booker'
+    ];
+
+    const lines = [header.map(rpt_v2_csvEscape).join(',')];
+
+    rows.forEach(r => {
+        const g = rpt_v2_groupColumns(r);
+        lines.push([
+            r._source || '',
+            r.dateString || '',
+            r.timeString || '',
+            r.clientName || '',
+            r.clientPhone || '',
+            r.assignedTechName || r.assignedTechEmail || '',
+            r.status || '',
+            r.bookedService || '',
+            rpt_v2_money(rpt_v2_revenue(r)),
+            g.groupId,
+            g.groupSize,
+            g.subGroupIndex,
+            g.billingMode,
+            g.payableBy,
+            g.isLeadBooker
+        ].map(rpt_v2_csvEscape).join(','));
+    });
+
+    rpt_v2_downloadCsv(`thuraya-report-${new Date().toISOString().slice(0,10)}.csv`, lines);
+};
+
+// Intercept the Load Report button for the active report tab where possible.
+document.addEventListener('click', function(e) {
+    const btn = e.target?.closest('button');
+    if (!btn) return;
+    const label = (btn.textContent || '').trim().toLowerCase();
+
+    if (label === 'load report' || label.includes('load report')) {
+        const reportsView = document.getElementById('reportsView');
+        if (!reportsView || reportsView.style.display === 'none') return;
+
+        const activeText = (reportsView.textContent || '').toLowerCase();
+        // Defer to our no-index loader after the original click begins.
+        setTimeout(() => {
+            if (activeText.includes('daily operations')) rpt_v2_loadDailyNoIndex();
+            else rpt_v2_loadUpcomingNoIndex();
+        }, 50);
+    }
+
+    if (label.includes('export csv')) {
+        setTimeout(() => {
+            if (window._rpt_v2_lastRows && window._rpt_v2_lastRows.length) {
+                window.rpt_exportCsv();
+            }
+        }, 50);
+    }
+});
 
