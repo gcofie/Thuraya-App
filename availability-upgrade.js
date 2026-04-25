@@ -127,7 +127,15 @@ console.log('✅ Availability controls loaded: availability-first-ui-separated-l
                 Prep and lunch are separate availability controls. Fixed lunch blocks a defined period; no fixed lunch uses the default lunch duration when a technician starts lunch.
             </p>
         `;
-        av_insertAfter(grid, wrap);
+        // Place Availability Defaults AFTER the Working Hours controls/save button
+        // so Working Hours remains on top of the page.
+        const saveBtn = document.querySelector('#att_schedForm button[onclick*="att_saveSchedule"], #att_schedForm .btn');
+        if (saveBtn && saveBtn.parentNode) {
+            const parent = saveBtn.closest('.form-group') || saveBtn.parentNode;
+            av_insertAfter(parent, wrap);
+        } else {
+            form.appendChild(wrap);
+        }
         if (typeof window.av_toggleFixedLunchFields === 'function') window.av_toggleFixedLunchFields();
     }
 
@@ -920,5 +928,38 @@ console.log('✅ First UI with separated prep/lunch logic active');
     }
 
     document.addEventListener('click', () => setTimeout(aa_insertButton, 250));
+})();
+
+
+// ============================================================
+// FINAL ORDER GUARD — WORKING HOURS ABOVE AVAILABILITY DEFAULTS
+// Version: availability-working-hours-first-20260425
+// ============================================================
+(function(){
+    function orderAvailabilityDefaults() {
+        const box = document.getElementById('att_schedLunchFields');
+        const form = document.getElementById('att_schedForm');
+        if (!box || !form) return;
+
+        const saveBtn = Array.from(form.querySelectorAll('button')).find(b =>
+            (b.textContent || '').toLowerCase().includes('save working hours') ||
+            (b.getAttribute('onclick') || '').includes('att_saveSchedule')
+        );
+
+        if (!saveBtn) {
+            if (box.parentNode !== form) form.appendChild(box);
+            return;
+        }
+
+        const anchor = saveBtn.closest('.form-group') || saveBtn.parentNode;
+        if (anchor && anchor.parentNode && anchor.nextSibling !== box) {
+            anchor.parentNode.insertBefore(box, anchor.nextSibling);
+        }
+    }
+
+    setTimeout(orderAvailabilityDefaults, 500);
+    setTimeout(orderAvailabilityDefaults, 1500);
+    document.addEventListener('click', () => setTimeout(orderAvailabilityDefaults, 250));
+    document.addEventListener('change', () => setTimeout(orderAvailabilityDefaults, 250));
 })();
 
