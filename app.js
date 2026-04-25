@@ -2923,6 +2923,105 @@ function rpt_tableHead(...cols) {
         `<th style="padding:9px 8px;text-align:${c.align||'left'};color:var(--primary);white-space:nowrap;">${c.label}</th>`
     ).join('')}</tr></thead>`;
 }
+
+
+// ==========================================
+// REPORTS V2 — REVENUE + GROUP BILLING ENGINE
+// Version: reports-v2-revenue-group-20260425
+// Normalizes revenue and prevents group-payment double counting.
+// ==========================================
+function rpt_num(v) {
+    const n = Number(parseFloat(v || 0));
+    return isNaN(n) ? 0 : n;
+}
+
+function rpt_isGroup(item) {
+    return !!(item && (item.isGroupBooking === true || item.groupId));
+}
+
+function rpt_groupMode(item) {
+    return item?.billingMode || item?.billingScenario || item?.groupCheckoutType || '';
+}
+
+function rpt_groupRole(item) {
+    if (item?.isLeadBooker === true) return 'lead';
+    return item?.groupRole || item?.payableBy || '';
+}
+
+function rpt_rawRevenue(item) {
+    return rpt_num(
+        item?.groupCheckoutAmount ||
+        item?.amountDue ||
+        item?.totalGHC ||
+        item?.grandTotal ||
+        item?.bookedPrice ||
+        item?.memberServiceTotal ||
+        0
+    );
+}
+
+function rpt_attributableRevenue(item) {
+    return rpt_num(
+        item?.memberServiceTotal ||
+        item?.amountDue ||
+        item?.grandTotal ||
+        item?.bookedPrice ||
+        item?.totalGHC ||
+        0
+    );
+}
+
+function rpt_prepareRevenueItems(items) {
+    const seen = new Set();
+    (items || []).forEach(item => {
+        const mode = rpt_groupMode(item);
+        let key = '';
+        let rev = rpt_rawRevenue(item);
+
+        if (rpt_isGroup(item)) {
+            if (mode === 'group_lead_all' || mode === 'group_lead_final' || mode === 'lead_pays_all' || mode === 'lead_pays_all_after_last') {
+                key = `group-final:${item.groupId || ''}:${mode}`;
+                if (seen.has(key)) rev = 0;
+                else seen.add(key);
+            } else if (mode === 'subgroup' || mode === 'subgroup_pays_separately') {
+                key = `subgroup:${item.groupId || ''}:${item.subGroupIndex || 1}`;
+                if (seen.has(key)) rev = 0;
+                else seen.add(key);
+            }
+        }
+
+        item._rptRevenue = rev;
+        item._rptAttributableRevenue = rpt_attributableRevenue(item);
+        item._rptGroupLabel = rpt_isGroup(item)
+            ? `${item.groupId || 'Group'}${item.subGroupIndex ? ' / SG ' + item.subGroupIndex : ''}`
+            : '-';
+        item._rptBillingMode = mode || '-';
+    });
+    return items || [];
+}
+
+function rpt_getReportRevenue(item) {
+    if (item && typeof item._rptRevenue === 'number') return item._rptRevenue;
+    return rpt_rawRevenue(item);
+}
+
+function rpt_sumReportRevenue(items) {
+    rpt_prepareRevenueItems(items || []);
+    return (items || []).reduce((s, item) => s + rpt_getReportRevenue(item), 0);
+}
+
+function rpt_groupCsvFields(item) {
+    return [
+        item?.groupId || '',
+        item?.groupSize || '',
+        item?.subGroupIndex || '',
+        rpt_groupRole(item) || '',
+        rpt_groupMode(item) || '',
+        item?.groupCheckoutType || '',
+        item?.payableBy || ''
+    ];
+}
+
 function rpt_noData(msg) {
     return `<p style="color:#999;text-align:center;padding:30px 0;font-style:italic;">${msg}</p>`;
 }
@@ -2960,11 +3059,12 @@ window.rpt_loadUpcoming = async function() {
         if (statusFilter !== 'all') appts = appts.filter(a => a.status === statusFilter);
         appts.sort((a,b) => (a.dateString+a.timeString).localeCompare(b.dateString+b.timeString));
 
+        rpt_prepareRevenueItems(appts);
         _rpt_cache.upcoming = appts;
 
         if (!appts.length) { tableEl.innerHTML = rpt_noData('No bookings found for this period.'); return; }
 
-        const totalRev = appts.reduce((s,a) => s + parseFloat(a.grandTotal||a.bookedPrice||0), 0);
+        const totalRev = rpt_sumReportRevenue(appts);
         const groups   = appts.filter(a => a.isGroupBooking).length;
 
         summaryEl.style.display = 'flex';
@@ -2985,7 +3085,7 @@ window.rpt_loadUpcoming = async function() {
                 {label:'Technician'},{label:'Mins',align:'center'},{label:'Amount',align:'right'},{label:'Status',align:'center'}
             )}
             <tbody>${appts.map((a,i) => {
-                const amt   = parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2);
+                const amt   = rpt_getReportRevenue(a).toFixed(2);
                 const color = statusColors[a.status] || '#999';
                 const isToday = a.dateString === todayDateStr;
                 return `<tr style="background:${i%2===0?'white':'#fafafa'};border-bottom:1px solid #f1f1f1;">
@@ -2999,7 +3099,7 @@ window.rpt_loadUpcoming = async function() {
                         ${a.isGroupBooking?'<span style="font-size:0.68rem;background:var(--manager);color:white;padding:1px 5px;border-radius:3px;margin-left:4px;">GROUP</span>':''}
                         <br><span style="font-size:0.75rem;color:#999;">${a.clientPhone||''}</span>
                     </td>
-                    <td style="padding:9px 8px;">${a.bookedService||'N/A'}</td>
+                    <td style="padding:9px 8px;">${a.bookedService||'N/A'}${rpt_isGroup(a)?`<br><small style="color:var(--manager);font-weight:700;">${a.groupId||''} · ${rpt_groupMode(a)||'group'}</small>`:''}</td>
                     <td style="padding:9px 8px;">${a.assignedTechName||'—'}</td>
                     <td style="padding:9px 8px;text-align:center;">${a.bookedDuration||0}</td>
                     <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--success);">${amt} GHC</td>
@@ -3044,6 +3144,7 @@ window.rpt_loadDaily = async function() {
 
         const jobs = [];
         closedSnap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
+        rpt_prepareRevenueItems(jobs);
         _rpt_cache.daily = jobs;
 
         // FIX: cancelledCount is a number from snap.size
@@ -3061,7 +3162,7 @@ window.rpt_loadDaily = async function() {
             return;
         }
 
-        const totalRev = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
+        const totalRev = rpt_sumReportRevenue(jobs);
         // FIX: guard against division by zero
         const totalDur = jobs.reduce((s,j) => s + parseInt(j.bookedDuration||0), 0);
         const avgDur   = jobs.length > 0 ? Math.round(totalDur / jobs.length) : 0;
@@ -3072,19 +3173,19 @@ window.rpt_loadDaily = async function() {
             const tn = j.assignedTechName || 'Unknown';
             if (!techMap[tn]) techMap[tn] = { count:0, revenue:0, duration:0 };
             techMap[tn].count++;
-            techMap[tn].revenue  += parseFloat(j.grandTotal||j.bookedPrice||0);
+            techMap[tn].revenue  += rpt_getReportRevenue(j);
             techMap[tn].duration += parseInt(j.bookedDuration||0);
 
             const svc = (j.bookedService||'Unknown').split(',')[0].trim();
             if (!svcMap[svc]) svcMap[svc] = { count:0, revenue:0 };
             svcMap[svc].count++;
-            svcMap[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+            svcMap[svc].revenue += rpt_getReportRevenue(j);
 
             // FIX: paymentMethod lives on Active_Jobs — use fallback gracefully
             const pay = j.paymentMethod || j.payment || 'Cash / Not Recorded';
             if (!payMap[pay]) payMap[pay] = { count:0, revenue:0 };
             payMap[pay].count++;
-            payMap[pay].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+            payMap[pay].revenue += rpt_getReportRevenue(j);
         });
 
         metricsEl.style.display = 'flex';
@@ -3175,6 +3276,7 @@ window.rpt_loadMonthly = async function() {
 
         const jobs = [];
         jobsSnap.forEach(d => { const j = d.data(); if (j.dateString <= end) jobs.push({ id:d.id, ...j }); });
+        rpt_prepareRevenueItems(jobs);
         _rpt_cache.monthly = jobs;
 
         const cancelledCount = (() => {
@@ -3188,13 +3290,13 @@ window.rpt_loadMonthly = async function() {
             return;
         }
 
-        const totalRev = jobs.reduce((s,j) => s + parseFloat(j.grandTotal||j.bookedPrice||0), 0);
+        const totalRev = rpt_sumReportRevenue(jobs);
         const dayMap = {}, hourMap = {}, clientSpend = {}, svcRev = {};
 
         jobs.forEach(j => {
             const day = j.dateString||'';
             if (!dayMap[day]) dayMap[day] = { count:0, revenue:0 };
-            dayMap[day].count++; dayMap[day].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+            dayMap[day].count++; dayMap[day].revenue += rpt_getReportRevenue(j);
 
             const hr = parseInt((j.timeString||'00:00').split(':')[0]);
             hourMap[hr] = (hourMap[hr]||0) + 1;
@@ -3202,13 +3304,13 @@ window.rpt_loadMonthly = async function() {
             const phone = j.clientPhone||'';
             if (phone) {
                 if (!clientSpend[phone]) clientSpend[phone] = { name:j.clientName||'Unknown', spend:0, count:0 };
-                clientSpend[phone].spend  += parseFloat(j.grandTotal||j.bookedPrice||0);
+                clientSpend[phone].spend  += rpt_getReportRevenue(j);
                 clientSpend[phone].count++;
             }
 
             const svc = (j.bookedService||'Unknown').split(',')[0].trim();
             if (!svcRev[svc]) svcRev[svc] = { count:0, revenue:0 };
-            svcRev[svc].count++; svcRev[svc].revenue += parseFloat(j.grandTotal||j.bookedPrice||0);
+            svcRev[svc].count++; svcRev[svc].revenue += rpt_getReportRevenue(j);
         });
 
         // FIX: new vs returning — use unique client phones from jobs vs all prior jobs
@@ -3328,7 +3430,7 @@ window.rpt_loadTechPerf = async function() {
             const k = j.assignedTechEmail || 'unknown';
             if (!techMap[k]) techMap[k] = { name: j.assignedTechName||'Unknown', count:0, revenue:0, duration:0 };
             techMap[k].count++;
-            techMap[k].revenue  += parseFloat(j.grandTotal||j.bookedPrice||0);
+            techMap[k].revenue  += (rpt_isGroup(j) ? (j._rptAttributableRevenue || rpt_attributableRevenue(j)) : rpt_getReportRevenue(j));
             techMap[k].duration += parseInt(j.bookedDuration||0);
         });
 
@@ -3424,7 +3526,7 @@ window.rpt_loadClients = async function() {
             if (!phone) return;
             if (!spendMap[phone]) spendMap[phone] = { visits:0, spend:0, lastVisit:'', name:j.clientName||'' };
             spendMap[phone].visits++;
-            spendMap[phone].spend += parseFloat(j.grandTotal||j.bookedPrice||0);
+            spendMap[phone].spend += rpt_getReportRevenue(j);
             if (!spendMap[phone].lastVisit || j.dateString > spendMap[phone].lastVisit) {
                 spendMap[phone].lastVisit = j.dateString;
             }
@@ -3629,33 +3731,33 @@ window.rpt_exportCSV = function(type) {
 
     if (type === 'upcoming') {
         if (!_rpt_cache.upcoming.length) { alert('Load the report first.'); return; }
-        rows = [['Date','Time','Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Status','Group Booking'],
+        rows = [['Date','Time','Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Status','Group Booking','Group ID','Group Size','Sub-group','Group Role','Billing Mode','Group Checkout Type','Payable By'],
             ..._rpt_cache.upcoming.map(a => [
                 a.dateString, a.timeString, a.clientName||'', a.clientPhone||'',
                 a.bookedService||'', a.assignedTechName||'', a.bookedDuration||0,
-                parseFloat(a.grandTotal||a.bookedPrice||0).toFixed(2),
-                a.status, a.isGroupBooking?'Yes':'No'
+                rpt_getReportRevenue(a).toFixed(2),
+                a.status, a.isGroupBooking?'Yes':'No', ...rpt_groupCsvFields(a)
             ])];
         filename = `upcoming-bookings-${todayDateStr}.csv`;
 
     } else if (type === 'daily') {
         if (!_rpt_cache.daily.length) { alert('Load the report first.'); return; }
-        rows = [['Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Payment Method'],
+        rows = [['Client','Phone','Service','Technician','Duration (mins)','Amount (GHC)','Payment Method','Group ID','Group Size','Sub-group','Group Role','Billing Mode','Group Checkout Type','Payable By'],
             ..._rpt_cache.daily.map(j => [
                 j.clientName||'', j.clientPhone||'', j.bookedService||'',
                 j.assignedTechName||'', j.bookedDuration||0,
-                parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2),
-                j.paymentMethod||j.payment||''
+                rpt_getReportRevenue(j).toFixed(2),
+                j.paymentMethod||j.payment||'', ...rpt_groupCsvFields(j)
             ])];
         filename = `daily-ops-${document.getElementById('rpt_dailyDate')?.value||todayDateStr}.csv`;
 
     } else if (type === 'monthly') {
         if (!_rpt_cache.monthly.length) { alert('Load the report first.'); return; }
-        rows = [['Date','Client','Phone','Service','Technician','Amount (GHC)'],
+        rows = [['Date','Client','Phone','Service','Technician','Amount (GHC)','Group ID','Group Size','Sub-group','Group Role','Billing Mode','Group Checkout Type','Payable By'],
             ..._rpt_cache.monthly.map(j => [
                 j.dateString, j.clientName||'', j.clientPhone||'',
                 j.bookedService||'', j.assignedTechName||'',
-                parseFloat(j.grandTotal||j.bookedPrice||0).toFixed(2)
+                rpt_getReportRevenue(j).toFixed(2), ...rpt_groupCsvFields(j)
             ])];
         filename = `monthly-summary-${document.getElementById('rpt_monthlyMonth')?.value||''}.csv`;
 
