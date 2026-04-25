@@ -5,7 +5,7 @@
 // Separate module. Does not modify booking/billing/attendance logic.
 // Uses simple date-range queries to avoid Firestore composite indexes.
 // ============================================================
-console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
+console.log("✅ Reports V2 loaded: reports-v2-clean-filters-20260425");
 
 (function () {
     const RPT = {
@@ -195,6 +195,19 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
         }
     }
 
+    function setDefaultFiltersForTab() {
+        const status = document.getElementById("rptv2_status");
+        const group = document.getElementById("rptv2_group");
+
+        if (status) {
+            // Upcoming is the only tab where Scheduled makes sense by default.
+            // All other report tabs use Active_Jobs or Attendance, so Scheduled often returns no rows.
+            status.value = RPT.activeTab === "upcoming" ? "Scheduled" : "all";
+        }
+
+        if (group) group.value = "all";
+    }
+
     async function ensureTechOptions() {
         const sel = document.getElementById("rptv2_tech");
         if (!sel) return;
@@ -324,11 +337,6 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
 
         reportsView.innerHTML = `
             <div class="module-box" style="max-width:1200px;margin:24px auto;">
-                <h2 style="margin-bottom:6px;">📊 Reports V2</h2>
-                <p style="color:#666;margin-top:0;">
-                    Clean reporting engine with group-aware revenue and no Firestore composite-index dependency.
-                </p>
-
                 <div class="rptv2-menu-grid">
                     ${tabButton("upcoming", "📅", "Upcoming Bookings", "Scheduled appointments and group bookings")}
                     ${tabButton("daily", "📋", "Daily Operations", "Closed jobs, pending jobs, revenue and status")}
@@ -355,7 +363,7 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
                         <div class="form-group">
                             <label>Status</label>
                             <select id="rptv2_status">
-                                <option value="all">All Statuses</option>
+                                <option value="all" selected>All Statuses</option>
                                 <option value="Scheduled">Scheduled</option>
                                 <option value="Arrived">Arrived</option>
                                 <option value="Waiting">Waiting</option>
@@ -396,6 +404,7 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
         `;
 
         setRange(RPT.activeTab === "monthly" ? "month" : RPT.activeTab === "daily" ? "today" : "week");
+        setDefaultFiltersForTab();
         ensureTechOptions();
         markActiveTab();
     }
@@ -451,7 +460,12 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
 
     function renderTable(rows) {
         if (!rows.length) {
-            return `<p style="color:#999;font-style:italic;margin:18px 0;">No records found for this report.</p>`;
+            return `<div class="module-box" style="border-left:4px solid var(--accent);">
+                <h3 style="margin-top:0;color:var(--accent);">No records found</h3>
+                <p style="color:#666;margin-bottom:0;">
+                    Try changing Status to <strong>All Statuses</strong>, checking another date range, or confirming that today's bookings have been checked in/closed.
+                </p>
+            </div>`;
         }
 
         return `
@@ -662,13 +676,29 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
                 html = renderKpis(rows) + renderTable(rows) + renderStatusBreakdown(rows);
             } else if (RPT.activeTab === "daily" || RPT.activeTab === "monthly") {
                 rows = filterRows(await fetchDateRange("Active_Jobs", start, end));
+
+                // If no operational jobs exist yet, fall back to Appointments so the report does not look broken.
+                // This is useful early in the day before check-in/checkout creates Active_Jobs.
+                if (!rows.length) {
+                    rows = filterRows(await fetchDateRange("Appointments", start, end));
+                    rows.forEach(r => r._source = "Appointments (fallback)");
+                }
+
                 rows.sort((a,b) => `${a.dateString || ""}${a.timeString || ""}`.localeCompare(`${b.dateString || ""}${b.timeString || ""}`));
                 html = renderKpis(rows) + renderTable(rows) + renderStatusBreakdown(rows);
             } else if (RPT.activeTab === "tech") {
                 rows = filterRows(await fetchDateRange("Active_Jobs", start, end));
+                if (!rows.length) {
+                    rows = filterRows(await fetchDateRange("Appointments", start, end));
+                    rows.forEach(r => r._source = "Appointments (fallback)");
+                }
                 html = renderTechPerformance(rows);
             } else if (RPT.activeTab === "client") {
                 rows = filterRows(await fetchDateRange("Active_Jobs", start, end));
+                if (!rows.length) {
+                    rows = filterRows(await fetchDateRange("Appointments", start, end));
+                    rows.forEach(r => r._source = "Appointments (fallback)");
+                }
                 html = renderClientIntelligence(rows);
             } else if (RPT.activeTab === "attendance") {
                 rows = await loadAttendanceReport(start, end);
@@ -745,6 +775,8 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
         if (key === "daily") setRange("today");
         if (key === "monthly") setRange("month");
         if (key === "upcoming") setRange("week");
+        if (key === "tech" || key === "client" || key === "attendance") setRange("today");
+        setDefaultFiltersForTab();
         document.getElementById("rptv2_output").innerHTML = "";
     }
 
