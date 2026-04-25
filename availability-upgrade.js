@@ -736,3 +736,189 @@ console.log('✅ First UI with separated prep/lunch logic active');
     };
 })();
 
+
+// ============================================================
+// APPLY AVAILABILITY RULES TO ALL STAFF
+// Version: availability-apply-all-20260425
+// Adds a safe bulk action button to apply prep/lunch rules to
+// all technician schedules at once, preserving first UI style.
+// ============================================================
+(function(){
+    console.log('✅ Apply-to-all availability rules loaded: availability-apply-all-20260425');
+
+    function aa_int(v, fallback) {
+        const n = parseInt(v, 10);
+        return isNaN(n) ? fallback : n;
+    }
+
+    function aa_today() {
+        if (typeof todayDateStr !== 'undefined' && todayDateStr) return todayDateStr;
+        const n = new Date();
+        return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+    }
+
+    function aa_currentRules() {
+        const lunchEnabled = document.getElementById('att_schedLunchEnabled')?.value === 'true';
+        const lunchStart = document.getElementById('att_schedLunchStart')?.value || '13:00';
+        const lunchEnd = document.getElementById('att_schedLunchEnd')?.value || '14:00';
+
+        if (lunchEnabled && (!lunchStart || !lunchEnd || lunchEnd <= lunchStart)) {
+            throw new Error('Please enter a valid fixed lunch start and end time before applying to all.');
+        }
+
+        return {
+            prepMinutes: Math.max(0, aa_int(document.getElementById('att_schedPrepMinutes')?.value, 0)),
+            lunchDurationMinutes: Math.max(5, aa_int(document.getElementById('att_schedLunchDurationMinutes')?.value, 60)),
+            lunchEnabled,
+            lunchStart: lunchEnabled ? lunchStart : '',
+            lunchEnd: lunchEnabled ? lunchEnd : ''
+        };
+    }
+
+    function aa_getSelectedWorkingHours() {
+        const days = Array.from(document.querySelectorAll('.att-day-cb:checked')).map(cb => cb.value);
+        return {
+            workingDays: days.length ? days : ['Mon','Tue','Wed','Thu','Fri','Sat'],
+            startTime: document.getElementById('att_schedStart')?.value || '08:00',
+            endTime: document.getElementById('att_schedEnd')?.value || '20:00',
+            effectiveFrom: document.getElementById('att_schedEffective')?.value || aa_today()
+        };
+    }
+
+    function aa_insertButton() {
+        if (document.getElementById('btnApplyAvailabilityToAll')) return;
+
+        const anchor =
+            document.getElementById('att_schedLunchFields') ||
+            document.getElementById('att_schedForm') ||
+            document.getElementById('att_schedule');
+
+        if (!anchor) return;
+
+        const box = document.createElement('div');
+        box.id = 'applyAvailabilityToAllBox';
+        box.style.cssText = 'margin-top:12px;padding:12px;border:1px dashed var(--accent);border-radius:6px;background:#fffdf7;';
+        box.innerHTML = `
+            <p style="margin:0 0 8px;font-size:0.82rem;color:#666;line-height:1.45;">
+                <strong style="color:var(--accent);">Bulk option:</strong>
+                Apply the current working hours, working days, prep/reset time, and lunch settings to all technicians at once.
+            </p>
+            <button type="button" class="btn btn-secondary" id="btnApplyAvailabilityToAll"
+                style="width:auto;padding:8px 14px;color:var(--accent);border-color:var(--accent);"
+                onclick="av_applyAvailabilityRulesToAllStaff()">
+                Apply Working Hours + Prep/Lunch to All Staff
+            </button>
+        `;
+
+        anchor.appendChild(box);
+    }
+
+    async function aa_getTechEmails() {
+        const fromCache = Array.isArray(allTechs)
+            ? allTechs.map(t => t.email).filter(Boolean)
+            : [];
+
+        if (fromCache.length) return [...new Set(fromCache)];
+
+        const snap = await db.collection('Users').get();
+        const emails = [];
+        snap.forEach(doc => {
+            const d = doc.data() || {};
+            const roles = (Array.isArray(d.roles) ? d.roles : [d.role || '']).map(r => String(r || '').toLowerCase());
+            const isTech = roles.some(r => r.includes('tech'));
+            if (isTech) emails.push(doc.id);
+        });
+        return [...new Set(emails)];
+    }
+
+    window.av_applyAvailabilityRulesToAllStaff = async function() {
+        let rules;
+        try {
+            rules = aa_currentRules();
+        } catch(e) {
+            alert(e.message);
+            return;
+        }
+
+        const working = aa_getSelectedWorkingHours();
+
+        if (working.endTime <= working.startTime) {
+            alert('Working Hours end time must be after start time before applying to all.');
+            return;
+        }
+
+        const confirmMsg =
+            `Apply these availability rules to ALL technicians?\n\n` +
+            `Prep/reset: ${rules.prepMinutes} mins\n` +
+            `Lunch duration: ${rules.lunchDurationMinutes} mins\n` +
+            `Lunch rule: ${rules.lunchEnabled ? 'Fixed lunch ' + rules.lunchStart + '–' + rules.lunchEnd : 'Flexible lunch'}\n` +
+            `Working hours: ${working.startTime}–${working.endTime}\n` +
+            `Working days: ${working.workingDays.join(', ')}\n\n` +
+            `This will update working hours, working days, prep/reset rules, and lunch rules for all technician schedules.`;
+
+        if (!confirm(confirmMsg)) return;
+
+        const btn = document.getElementById('btnApplyAvailabilityToAll');
+        const oldText = btn ? btn.textContent : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Applying...';
+        }
+
+        try {
+            const emails = await aa_getTechEmails();
+            if (!emails.length) {
+                alert('No technicians found.');
+                return;
+            }
+
+            const batch = db.batch();
+            emails.forEach(email => {
+                batch.set(db.collection('Staff_Schedules').doc(email), {
+                    ...rules,
+                    // Keep existing working hours if already configured; only set working hours where form has values.
+                    // This allows bulk action to serve both as rule push and optional standard hours sync.
+                    startTime: working.startTime,
+                    endTime: working.endTime,
+                    workingDays: working.workingDays,
+                    effectiveFrom: working.effectiveFrom,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedBy: (typeof currentUserEmail !== 'undefined' ? currentUserEmail : '') || '',
+                    bulkUpdated: true,
+                    bulkUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            });
+
+            await batch.commit();
+
+            alert(`Working hours and availability rules applied to ${emails.length} technician(s).`);
+
+            const msg = document.getElementById('att_schedCurrentText');
+            if (msg) msg.textContent = `Bulk working hours and availability rules applied to ${emails.length} technician(s).`;
+
+            if (typeof generateTimeSlots === 'function') generateTimeSlots();
+        } catch(e) {
+            alert('Bulk apply failed: ' + e.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = oldText || 'Apply Working Hours + Prep/Lunch to All Staff';
+            }
+        }
+    };
+
+    function boot() {
+        aa_insertButton();
+        setTimeout(aa_insertButton, 500);
+        setTimeout(aa_insertButton, 1500);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+
+    document.addEventListener('click', () => setTimeout(aa_insertButton, 250));
+})();
+
