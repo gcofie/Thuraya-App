@@ -825,7 +825,7 @@ console.log('✅ Availability controls loaded: availability-controls-v2-20260424
         st.textContent = `
             .av-availability-defaults .grid-3 {
                 display:grid;
-                grid-template-columns:1fr !important;
+                grid-template-columns:repeat(3,minmax(0,1fr));
                 gap:14px;
             }
             .av-availability-defaults input,
@@ -858,184 +858,240 @@ console.log('✅ Availability controls loaded: availability-controls-v2-20260424
 
 
 // ============================================================
-// AVAILABILITY DEFAULTS SINGLE COLUMN UI
-// Version: availability-single-column-20260425
+// AVAILABILITY COMBINED FINAL FIX
+// Version: availability-combined-final-20260425
+// One combined layer:
+// - Always visible under Attendance > Working Hours
+// - Single-column layout
+// - Fields editable
+// - Save/load uses visible fields
 // ============================================================
 (function(){
-    console.log('✅ Availability single-column UI loaded: availability-single-column-20260425');
+    console.log('✅ Availability combined final loaded: availability-combined-final-20260425');
 
-    function av_singleColumnStyles() {
-        if (document.getElementById('avSingleColumnStyles')) return;
-        const st = document.createElement('style');
-        st.id = 'avSingleColumnStyles';
-        st.textContent = `
-            #att_schedLunchFields.av-availability-defaults {
-                max-width: 720px;
-                margin-left: auto !important;
-                margin-right: auto !important;
-            }
-
-            #att_schedLunchFields.av-availability-defaults .grid-3 {
-                display: grid !important;
-                grid-template-columns: 1fr !important;
-                gap: 14px !important;
-            }
-
-            #att_schedLunchFields.av-availability-defaults .form-group {
-                width: 100% !important;
-            }
-
-            #att_schedLunchFields.av-availability-defaults input,
-            #att_schedLunchFields.av-availability-defaults select {
-                width: 100% !important;
-                max-width: 100% !important;
-            }
-        `;
-        document.head.appendChild(st);
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', av_singleColumnStyles);
-    } else {
-        av_singleColumnStyles();
-    }
-    document.addEventListener('click', () => setTimeout(av_singleColumnStyles, 200));
-})();
-
-
-// ============================================================
-// AVAILABILITY EDITABLE FIELDS FINAL FIX
-// Version: availability-editable-fields-final-20260425
-// Fixes visible fields not updating/saving due to hidden duplicate IDs
-// or old form logic reading the wrong controls.
-// ============================================================
-(function(){
-    console.log('✅ Availability editable fields final fix loaded: availability-editable-fields-final-20260425');
-
-    function avf_today() {
+    function af_today() {
         if (typeof todayDateStr !== 'undefined' && todayDateStr) return todayDateStr;
         const n = new Date();
         return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
     }
 
-    function avf_int(v, fallback) {
+    function af_int(v, fallback) {
         const n = parseInt(v, 10);
         return isNaN(n) ? fallback : n;
     }
 
-    function avf_visibleById(id) {
-        const nodes = Array.from(document.querySelectorAll(`#${id}`));
-        if (!nodes.length) return null;
-
-        // Prefer the visible field inside the Availability Defaults card.
-        const inCard = nodes.find(el => el.closest('#att_schedLunchFields') && el.offsetParent !== null);
-        if (inCard) return inCard;
-
-        // Then any visible field.
-        const visible = nodes.find(el => el.offsetParent !== null);
-        if (visible) return visible;
-
-        // Fallback to the last duplicate, because injected visible UI is usually appended later.
-        return nodes[nodes.length - 1];
+    function af_style() {
+        if (document.getElementById('afCombinedStyle')) return;
+        const st = document.createElement('style');
+        st.id = 'afCombinedStyle';
+        st.textContent = `
+            #att_schedLunchFields.av-availability-defaults {
+                display:block !important;
+                max-width:720px;
+                margin:12px auto 20px !important;
+                border-top:4px solid var(--accent);
+                padding:18px;
+                background:#fffaf0;
+                border-radius:8px;
+                box-shadow:0 2px 8px rgba(0,0,0,0.06);
+            }
+            #att_schedLunchFields.av-availability-defaults .grid-3 {
+                display:grid !important;
+                grid-template-columns:1fr !important;
+                gap:14px !important;
+            }
+            #att_schedLunchFields.av-availability-defaults .form-group {
+                width:100% !important;
+            }
+            #att_schedLunchFields.av-availability-defaults input,
+            #att_schedLunchFields.av-availability-defaults select {
+                width:100% !important;
+                max-width:100% !important;
+                pointer-events:auto !important;
+                opacity:1 !important;
+                cursor:auto !important;
+            }
+        `;
+        document.head.appendChild(st);
     }
 
-    function avf_val(id, fallback='') {
-        const el = avf_visibleById(id);
-        return el ? el.value : fallback;
+    function af_buildBox() {
+        const box = document.createElement('div');
+        box.id = 'att_schedLunchFields';
+        box.className = 'module-box av-availability-defaults';
+        box.innerHTML = `
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+                <div>
+                    <h3 style="margin:0;color:var(--accent);border:none;padding:0;">Availability Defaults</h3>
+                    <p style="font-size:0.82rem;color:#666;margin:4px 0 0;line-height:1.45;">
+                        Configure prep/reset time and lunch rules for the selected staff member.
+                    </p>
+                </div>
+                <span style="font-size:0.72rem;font-weight:bold;color:var(--accent);background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);padding:5px 9px;border-radius:999px;">
+                    Config-driven
+                </span>
+            </div>
+
+            <div class="grid-3" style="margin-bottom:0;align-items:start;">
+                <div class="form-group">
+                    <label>Default Prep / Reset Minutes</label>
+                    <input type="number" id="att_schedPrepMinutes" min="0" step="5" value="0" placeholder="e.g. 10">
+                    <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
+                        Added after each appointment before the next client can start.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label>Default Lunch Duration</label>
+                    <input type="number" id="att_schedLunchDurationMinutes" min="5" step="5" value="60" placeholder="e.g. 45">
+                    <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
+                        Used when lunch is flexible and the tech clicks Start Lunch.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label>Lunch Rule</label>
+                    <select id="att_schedLunchEnabled">
+                        <option value="false">Flexible lunch — use default duration</option>
+                        <option value="true">Fixed lunch — block exact time</option>
+                    </select>
+                    <small style="color:#777;line-height:1.35;display:block;margin-top:4px;">
+                        Fixed lunch blocks the same period every working day.
+                    </small>
+                </div>
+
+                <div class="form-group av-fixed-lunch-field">
+                    <label>Fixed Lunch Start</label>
+                    <input type="time" id="att_schedLunchStart" value="13:00">
+                </div>
+
+                <div class="form-group av-fixed-lunch-field">
+                    <label>Fixed Lunch End</label>
+                    <input type="time" id="att_schedLunchEnd" value="14:00">
+                </div>
+
+                <div class="form-group" style="background:white;border:1px solid var(--border);border-radius:6px;padding:10px;">
+                    <label style="margin-bottom:6px;">How this is applied</label>
+                    <small style="color:#666;line-height:1.45;display:block;">
+                        Availability = working hours minus appointments, prep time, calendar blocks, fixed lunch, and active live lunch.
+                    </small>
+                </div>
+            </div>
+
+            <p id="att_availabilityDefaultsHint" style="font-size:0.78rem;color:#777;margin:10px 0 0;">
+                Select a staff member above, then click Save Working Hours to store these defaults.
+            </p>
+        `;
+        return box;
     }
 
-    function avf_set(id, val) {
-        const nodes = Array.from(document.querySelectorAll(`#${id}`));
-        nodes.forEach(el => {
-            if ('value' in el) el.value = val;
-            el.removeAttribute('disabled');
+    function af_inject() {
+        af_style();
+
+        const attendanceRoot =
+            document.getElementById('att_schedule') ||
+            document.getElementById('subView_Attendance') ||
+            document.getElementById('attendanceView') ||
+            document.querySelector('[id*="schedule"]') ||
+            document.querySelector('[id*="attendance"]');
+
+        if (!attendanceRoot) return false;
+
+        document.querySelectorAll('#att_schedLunchFields').forEach(el => el.remove());
+
+        const box = af_buildBox();
+        const form = document.getElementById('att_schedForm');
+        const badge = document.getElementById('att_schedCurrentBadge');
+        const techSelect = document.getElementById('att_schedTech');
+
+        if (badge && badge.parentNode) {
+            badge.parentNode.insertBefore(box, badge.nextSibling);
+        } else if (form && form.parentNode) {
+            form.parentNode.insertBefore(box, form);
+        } else if (techSelect && techSelect.closest('.module-box')) {
+            techSelect.closest('.module-box').appendChild(box);
+        } else {
+            attendanceRoot.prepend(box);
+        }
+
+        af_makeEditable();
+        af_toggleFixedLunchFields();
+        af_loadValues();
+        return true;
+    }
+
+    function af_el(id) {
+        return document.querySelector(`#att_schedLunchFields #${id}`) || document.getElementById(id);
+    }
+
+    function af_makeEditable() {
+        ['att_schedPrepMinutes','att_schedLunchDurationMinutes','att_schedLunchEnabled','att_schedLunchStart','att_schedLunchEnd'].forEach(id => {
+            const el = af_el(id);
+            if (!el) return;
+            el.disabled = false;
+            el.readOnly = false;
             el.style.pointerEvents = 'auto';
             el.style.opacity = '1';
+            el.style.cursor = 'auto';
         });
     }
 
-    function avf_makeEditable() {
-        ['att_schedPrepMinutes','att_schedLunchDurationMinutes','att_schedLunchEnabled','att_schedLunchStart','att_schedLunchEnd'].forEach(id => {
-            document.querySelectorAll(`#${id}`).forEach(el => {
-                el.removeAttribute('disabled');
-                el.readOnly = false;
-                el.style.pointerEvents = 'auto';
-                el.style.opacity = '1';
-                el.style.cursor = 'auto';
-            });
-        });
-
-        if (typeof window.av_toggleFixedLunchFields === 'function') window.av_toggleFixedLunchFields();
-    }
-
-    function avf_toggleFixedLunchFields() {
-        const enabled = avf_val('att_schedLunchEnabled', 'false') === 'true';
-        document.querySelectorAll('.av-fixed-lunch-field').forEach(el => {
+    function af_toggleFixedLunchFields() {
+        const enabled = (af_el('att_schedLunchEnabled')?.value || 'false') === 'true';
+        document.querySelectorAll('#att_schedLunchFields .av-fixed-lunch-field').forEach(el => {
             el.style.display = enabled ? 'block' : 'none';
         });
     }
 
-    window.av_toggleFixedLunchFields = avf_toggleFixedLunchFields;
+    window.av_toggleFixedLunchFields = af_toggleFixedLunchFields;
 
-    async function avf_loadSelectedScheduleIntoVisibleFields() {
+    async function af_loadValues() {
+        af_makeEditable();
         const email = document.getElementById('att_schedTech')?.value || '';
-        avf_makeEditable();
-
         if (!email || typeof db === 'undefined') return;
 
         try {
-            const doc = await db.collection('Staff_Schedules').doc(email).get();
-            const sched = doc.exists ? (doc.data() || {}) : {};
+            const d = await db.collection('Staff_Schedules').doc(email).get();
+            const sched = d.exists ? (d.data() || {}) : {};
 
-            avf_set('att_schedPrepMinutes', avf_int(sched.prepMinutes, 0));
-            avf_set('att_schedLunchDurationMinutes', Math.max(5, avf_int(sched.lunchDurationMinutes, 60)));
-            avf_set('att_schedLunchEnabled', (sched.lunchEnabled === true || sched.lunchEnabled === 'true') ? 'true' : 'false');
-            avf_set('att_schedLunchStart', sched.lunchStart || '13:00');
-            avf_set('att_schedLunchEnd', sched.lunchEnd || '14:00');
+            const prep = af_el('att_schedPrepMinutes');
+            const lunchDur = af_el('att_schedLunchDurationMinutes');
+            const lunchMode = af_el('att_schedLunchEnabled');
+            const lunchStart = af_el('att_schedLunchStart');
+            const lunchEnd = af_el('att_schedLunchEnd');
 
-            avf_toggleFixedLunchFields();
+            if (prep) prep.value = af_int(sched.prepMinutes, 0);
+            if (lunchDur) lunchDur.value = Math.max(5, af_int(sched.lunchDurationMinutes, 60));
+            if (lunchMode) lunchMode.value = (sched.lunchEnabled === true || sched.lunchEnabled === 'true') ? 'true' : 'false';
+            if (lunchStart) lunchStart.value = sched.lunchStart || '13:00';
+            if (lunchEnd) lunchEnd.value = sched.lunchEnd || '14:00';
+
+            af_toggleFixedLunchFields();
 
             const hint = document.getElementById('att_availabilityDefaultsHint');
             if (hint) {
-                hint.textContent = `Defaults loaded for ${email}. Change values, then click Save Working Hours.`;
+                hint.textContent = `Loaded for ${email}. Change values, then click Save Working Hours.`;
                 hint.style.color = '#666';
             }
         } catch(e) {
-            console.warn('Could not load availability defaults:', e);
+            console.warn('Availability defaults load failed:', e);
         }
     }
 
-    const _oldAttLoadScheduleFinal = window.att_loadSchedule;
-    window.att_loadSchedule = async function() {
-        if (typeof _oldAttLoadScheduleFinal === 'function') {
-            try { await _oldAttLoadScheduleFinal(); } catch(e) { console.warn(e); }
-        }
-        setTimeout(avf_loadSelectedScheduleIntoVisibleFields, 100);
-    };
-
     window.att_saveSchedule = async function() {
         const email = document.getElementById('att_schedTech')?.value || '';
-        if (!email) {
-            alert('Select a staff member before saving availability defaults.');
-            return;
-        }
+        if (!email) { alert('Select a staff member before saving.'); return; }
 
         const workingDays = Array.from(document.querySelectorAll('.att-day-cb:checked')).map(cb => cb.value);
-        if (!workingDays.length) {
-            alert('Select at least one working day.');
-            return;
-        }
+        if (!workingDays.length) { alert('Select at least one working day.'); return; }
 
         const startTime = document.getElementById('att_schedStart')?.value || '08:00';
         const endTime = document.getElementById('att_schedEnd')?.value || '20:00';
-        if (endTime <= startTime) {
-            alert('End time must be after start time.');
-            return;
-        }
+        if (endTime <= startTime) { alert('End time must be after start time.'); return; }
 
-        const lunchEnabled = avf_val('att_schedLunchEnabled', 'false') === 'true';
-        const lunchStart = avf_val('att_schedLunchStart', '13:00') || '13:00';
-        const lunchEnd = avf_val('att_schedLunchEnd', '14:00') || '14:00';
+        const lunchEnabled = (af_el('att_schedLunchEnabled')?.value || 'false') === 'true';
+        const lunchStart = af_el('att_schedLunchStart')?.value || '13:00';
+        const lunchEnd = af_el('att_schedLunchEnd')?.value || '14:00';
 
         if (lunchEnabled && (!lunchStart || !lunchEnd || lunchEnd <= lunchStart)) {
             alert('Please enter a valid fixed lunch start and end time.');
@@ -1046,49 +1102,53 @@ console.log('✅ Availability controls loaded: availability-controls-v2-20260424
             workingDays,
             startTime,
             endTime,
-            effectiveFrom: document.getElementById('att_schedEffective')?.value || avf_today(),
-
-            // Visible availability defaults
-            prepMinutes: Math.max(0, avf_int(avf_val('att_schedPrepMinutes', '0'), 0)),
-            lunchDurationMinutes: Math.max(5, avf_int(avf_val('att_schedLunchDurationMinutes', '60'), 60)),
+            effectiveFrom: document.getElementById('att_schedEffective')?.value || af_today(),
+            prepMinutes: Math.max(0, af_int(af_el('att_schedPrepMinutes')?.value, 0)),
+            lunchDurationMinutes: Math.max(5, af_int(af_el('att_schedLunchDurationMinutes')?.value, 60)),
             lunchEnabled,
             lunchStart: lunchEnabled ? lunchStart : '',
             lunchEnd: lunchEnabled ? lunchEnd : '',
-
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedBy: (typeof currentUserEmail !== 'undefined' ? currentUserEmail : '') || ''
         };
 
         try {
-            await db.collection('Staff_Schedules').doc(email).set(payload, { merge: true });
+            await db.collection('Staff_Schedules').doc(email).set(payload, { merge:true });
 
             const hint = document.getElementById('att_availabilityDefaultsHint');
             if (hint) {
-                hint.textContent = 'Saved successfully. Availability will use these settings.';
+                hint.textContent = 'Saved successfully. Availability will now use these settings.';
                 hint.style.color = 'var(--success)';
             }
 
             alert('Working hours and availability defaults saved.');
             if (typeof generateTimeSlots === 'function') generateTimeSlots();
-            setTimeout(avf_loadSelectedScheduleIntoVisibleFields, 150);
         } catch(e) {
             alert('Error saving schedule: ' + e.message);
         }
     };
 
-    // Keep UI editable and reactive.
-    document.addEventListener('change', (e) => {
+    const previousLoad = window.att_loadSchedule;
+    window.att_loadSchedule = async function() {
+        if (typeof previousLoad === 'function') {
+            try { await previousLoad(); } catch(e) { console.warn(e); }
+        }
+        setTimeout(() => {
+            af_inject();
+            af_loadValues();
+        }, 100);
+    };
+
+    document.addEventListener('change', e => {
         if (!e.target) return;
-
-        if (e.target.id === 'att_schedLunchEnabled') {
-            avf_toggleFixedLunchFields();
-        }
-
         if (e.target.id === 'att_schedTech') {
-            setTimeout(avf_loadSelectedScheduleIntoVisibleFields, 150);
+            setTimeout(() => {
+                af_inject();
+                af_loadValues();
+            }, 100);
         }
-
-        if (['att_schedPrepMinutes','att_schedLunchDurationMinutes','att_schedLunchEnabled','att_schedLunchStart','att_schedLunchEnd'].includes(e.target.id)) {
+        if (e.target.closest('#att_schedLunchFields')) {
+            if (e.target.id === 'att_schedLunchEnabled') af_toggleFixedLunchFields();
             const hint = document.getElementById('att_availabilityDefaultsHint');
             if (hint) {
                 hint.textContent = 'Unsaved changes — click Save Working Hours to apply.';
@@ -1097,9 +1157,8 @@ console.log('✅ Availability controls loaded: availability-controls-v2-20260424
         }
     });
 
-    document.addEventListener('input', (e) => {
-        if (!e.target) return;
-        if (['att_schedPrepMinutes','att_schedLunchDurationMinutes'].includes(e.target.id)) {
+    document.addEventListener('input', e => {
+        if (e.target && e.target.closest('#att_schedLunchFields')) {
             const hint = document.getElementById('att_availabilityDefaultsHint');
             if (hint) {
                 hint.textContent = 'Unsaved changes — click Save Working Hours to apply.';
@@ -1109,13 +1168,15 @@ console.log('✅ Availability controls loaded: availability-controls-v2-20260424
     });
 
     function boot() {
-        avf_makeEditable();
-        avf_loadSelectedScheduleIntoVisibleFields();
+        af_inject();
+        setTimeout(af_inject, 500);
+        setTimeout(af_inject, 1500);
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
 
-    document.addEventListener('click', () => setTimeout(avf_makeEditable, 150));
+    document.addEventListener('click', () => setTimeout(af_inject, 250));
+    window.av_forceShowAvailabilityDefaults = af_inject;
 })();
 
