@@ -224,6 +224,100 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
         sel.value = current;
     }
 
+
+    function injectReportStyles() {
+        if (document.getElementById("rptv2MenuStyles")) return;
+        const st = document.createElement("style");
+        st.id = "rptv2MenuStyles";
+        st.textContent = `
+            .rptv2-menu-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 14px;
+                margin: 20px 0;
+            }
+
+            .rptv2-menu-card {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                width: 100%;
+                text-align: left;
+                background: #fff;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 16px;
+                cursor: pointer;
+                transition: all 0.18s ease;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+                color: var(--primary);
+            }
+
+            .rptv2-menu-card:hover {
+                transform: translateY(-1px);
+                border-color: var(--accent);
+                box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+            }
+
+            .rptv2-menu-card.active {
+                background: var(--primary);
+                border-color: var(--primary);
+                color: #fff;
+                box-shadow: 0 8px 22px rgba(47, 59, 79, 0.22);
+            }
+
+            .rptv2-menu-icon {
+                width: 42px;
+                height: 42px;
+                border-radius: 12px;
+                background: rgba(201,168,76,0.12);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.35rem;
+                flex-shrink: 0;
+            }
+
+            .rptv2-menu-card.active .rptv2-menu-icon {
+                background: rgba(255,255,255,0.16);
+            }
+
+            .rptv2-menu-copy {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .rptv2-menu-copy strong {
+                font-size: 0.95rem;
+                letter-spacing: 0.02em;
+            }
+
+            .rptv2-menu-copy span {
+                font-size: 0.78rem;
+                color: #666;
+                line-height: 1.35;
+            }
+
+            .rptv2-menu-card.active .rptv2-menu-copy span {
+                color: rgba(255,255,255,0.82);
+            }
+
+            @media (max-width: 980px) {
+                .rptv2-menu-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+            }
+
+            @media (max-width: 620px) {
+                .rptv2-menu-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
     function renderShell() {
         const reportsView = document.getElementById("reportsView");
         if (!reportsView) return;
@@ -235,13 +329,13 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
                     Clean reporting engine with group-aware revenue and no Firestore composite-index dependency.
                 </p>
 
-                <div class="rptv2-tabs" style="display:flex;gap:10px;flex-wrap:wrap;margin:18px 0;">
-                    ${tabButton("upcoming", "📅 Upcoming")}
-                    ${tabButton("daily", "📋 Daily Operations")}
-                    ${tabButton("monthly", "📈 Weekly / Monthly")}
-                    ${tabButton("tech", "👷 Tech Performance")}
-                    ${tabButton("client", "👥 Client Intelligence")}
-                    ${tabButton("attendance", "🌿 Leave & Attendance")}
+                <div class="rptv2-menu-grid">
+                    ${tabButton("upcoming", "📅", "Upcoming Bookings", "Scheduled appointments and group bookings")}
+                    ${tabButton("daily", "📋", "Daily Operations", "Closed jobs, pending jobs, revenue and status")}
+                    ${tabButton("monthly", "📈", "Weekly / Monthly Revenue", "Revenue, group billing and trend review")}
+                    ${tabButton("tech", "👷", "Tech Performance", "Jobs, minutes and revenue by technician")}
+                    ${tabButton("client", "👥", "Client Intelligence", "Client visits, spend and repeat activity")}
+                    ${tabButton("attendance", "🌿", "Leave & Attendance", "Attendance and lunch break records")}
                 </div>
 
                 <div class="module-box" style="background:#fafafa;border:1px solid var(--border);">
@@ -291,7 +385,7 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
                     </div>
 
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
-                        <button class="btn btn-auto" onclick="rptv2_load()">Load Report</button>
+                        <button class="btn btn-auto" onclick="rptv2_load()">Load Selected Report</button>
                         <button class="btn btn-secondary btn-auto" onclick="rptv2_exportCsv()">⬇ Export CSV</button>
                         <button class="btn btn-secondary btn-auto" onclick="window.print()">🖨 Print</button>
                     </div>
@@ -306,15 +400,21 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
         markActiveTab();
     }
 
-    function tabButton(key, label) {
-        return `<button class="btn btn-secondary btn-auto rptv2-tab" data-tab="${key}" onclick="rptv2_switch('${key}')">${label}</button>`;
+    function tabButton(key, icon, title, desc) {
+        return `
+            <button type="button" class="rptv2-menu-card" data-tab="${key}" onclick="rptv2_switch('${key}')">
+                <div class="rptv2-menu-icon">${icon}</div>
+                <div class="rptv2-menu-copy">
+                    <strong>${safe(title)}</strong>
+                    <span>${safe(desc)}</span>
+                </div>
+            </button>
+        `;
     }
 
     function markActiveTab() {
-        document.querySelectorAll(".rptv2-tab").forEach(btn => {
-            const active = btn.dataset.tab === RPT.activeTab;
-            btn.style.background = active ? "var(--primary)" : "";
-            btn.style.color = active ? "#fff" : "";
+        document.querySelectorAll(".rptv2-menu-card").forEach(btn => {
+            btn.classList.toggle("active", btn.dataset.tab === RPT.activeTab);
         });
     }
 
@@ -649,6 +749,7 @@ console.log("✅ Reports V2 loaded: reports-v2-rewrite-20260425");
     }
 
     function init() {
+        injectReportStyles();
         renderShell();
     }
 
