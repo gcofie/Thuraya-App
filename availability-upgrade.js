@@ -902,3 +902,220 @@ console.log('✅ Availability controls loaded: availability-controls-v2-20260424
     document.addEventListener('click', () => setTimeout(av_singleColumnStyles, 200));
 })();
 
+
+// ============================================================
+// AVAILABILITY EDITABLE FIELDS FINAL FIX
+// Version: availability-editable-fields-final-20260425
+// Fixes visible fields not updating/saving due to hidden duplicate IDs
+// or old form logic reading the wrong controls.
+// ============================================================
+(function(){
+    console.log('✅ Availability editable fields final fix loaded: availability-editable-fields-final-20260425');
+
+    function avf_today() {
+        if (typeof todayDateStr !== 'undefined' && todayDateStr) return todayDateStr;
+        const n = new Date();
+        return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+    }
+
+    function avf_int(v, fallback) {
+        const n = parseInt(v, 10);
+        return isNaN(n) ? fallback : n;
+    }
+
+    function avf_visibleById(id) {
+        const nodes = Array.from(document.querySelectorAll(`#${id}`));
+        if (!nodes.length) return null;
+
+        // Prefer the visible field inside the Availability Defaults card.
+        const inCard = nodes.find(el => el.closest('#att_schedLunchFields') && el.offsetParent !== null);
+        if (inCard) return inCard;
+
+        // Then any visible field.
+        const visible = nodes.find(el => el.offsetParent !== null);
+        if (visible) return visible;
+
+        // Fallback to the last duplicate, because injected visible UI is usually appended later.
+        return nodes[nodes.length - 1];
+    }
+
+    function avf_val(id, fallback='') {
+        const el = avf_visibleById(id);
+        return el ? el.value : fallback;
+    }
+
+    function avf_set(id, val) {
+        const nodes = Array.from(document.querySelectorAll(`#${id}`));
+        nodes.forEach(el => {
+            if ('value' in el) el.value = val;
+            el.removeAttribute('disabled');
+            el.style.pointerEvents = 'auto';
+            el.style.opacity = '1';
+        });
+    }
+
+    function avf_makeEditable() {
+        ['att_schedPrepMinutes','att_schedLunchDurationMinutes','att_schedLunchEnabled','att_schedLunchStart','att_schedLunchEnd'].forEach(id => {
+            document.querySelectorAll(`#${id}`).forEach(el => {
+                el.removeAttribute('disabled');
+                el.readOnly = false;
+                el.style.pointerEvents = 'auto';
+                el.style.opacity = '1';
+                el.style.cursor = 'auto';
+            });
+        });
+
+        if (typeof window.av_toggleFixedLunchFields === 'function') window.av_toggleFixedLunchFields();
+    }
+
+    function avf_toggleFixedLunchFields() {
+        const enabled = avf_val('att_schedLunchEnabled', 'false') === 'true';
+        document.querySelectorAll('.av-fixed-lunch-field').forEach(el => {
+            el.style.display = enabled ? 'block' : 'none';
+        });
+    }
+
+    window.av_toggleFixedLunchFields = avf_toggleFixedLunchFields;
+
+    async function avf_loadSelectedScheduleIntoVisibleFields() {
+        const email = document.getElementById('att_schedTech')?.value || '';
+        avf_makeEditable();
+
+        if (!email || typeof db === 'undefined') return;
+
+        try {
+            const doc = await db.collection('Staff_Schedules').doc(email).get();
+            const sched = doc.exists ? (doc.data() || {}) : {};
+
+            avf_set('att_schedPrepMinutes', avf_int(sched.prepMinutes, 0));
+            avf_set('att_schedLunchDurationMinutes', Math.max(5, avf_int(sched.lunchDurationMinutes, 60)));
+            avf_set('att_schedLunchEnabled', (sched.lunchEnabled === true || sched.lunchEnabled === 'true') ? 'true' : 'false');
+            avf_set('att_schedLunchStart', sched.lunchStart || '13:00');
+            avf_set('att_schedLunchEnd', sched.lunchEnd || '14:00');
+
+            avf_toggleFixedLunchFields();
+
+            const hint = document.getElementById('att_availabilityDefaultsHint');
+            if (hint) {
+                hint.textContent = `Defaults loaded for ${email}. Change values, then click Save Working Hours.`;
+                hint.style.color = '#666';
+            }
+        } catch(e) {
+            console.warn('Could not load availability defaults:', e);
+        }
+    }
+
+    const _oldAttLoadScheduleFinal = window.att_loadSchedule;
+    window.att_loadSchedule = async function() {
+        if (typeof _oldAttLoadScheduleFinal === 'function') {
+            try { await _oldAttLoadScheduleFinal(); } catch(e) { console.warn(e); }
+        }
+        setTimeout(avf_loadSelectedScheduleIntoVisibleFields, 100);
+    };
+
+    window.att_saveSchedule = async function() {
+        const email = document.getElementById('att_schedTech')?.value || '';
+        if (!email) {
+            alert('Select a staff member before saving availability defaults.');
+            return;
+        }
+
+        const workingDays = Array.from(document.querySelectorAll('.att-day-cb:checked')).map(cb => cb.value);
+        if (!workingDays.length) {
+            alert('Select at least one working day.');
+            return;
+        }
+
+        const startTime = document.getElementById('att_schedStart')?.value || '08:00';
+        const endTime = document.getElementById('att_schedEnd')?.value || '20:00';
+        if (endTime <= startTime) {
+            alert('End time must be after start time.');
+            return;
+        }
+
+        const lunchEnabled = avf_val('att_schedLunchEnabled', 'false') === 'true';
+        const lunchStart = avf_val('att_schedLunchStart', '13:00') || '13:00';
+        const lunchEnd = avf_val('att_schedLunchEnd', '14:00') || '14:00';
+
+        if (lunchEnabled && (!lunchStart || !lunchEnd || lunchEnd <= lunchStart)) {
+            alert('Please enter a valid fixed lunch start and end time.');
+            return;
+        }
+
+        const payload = {
+            workingDays,
+            startTime,
+            endTime,
+            effectiveFrom: document.getElementById('att_schedEffective')?.value || avf_today(),
+
+            // Visible availability defaults
+            prepMinutes: Math.max(0, avf_int(avf_val('att_schedPrepMinutes', '0'), 0)),
+            lunchDurationMinutes: Math.max(5, avf_int(avf_val('att_schedLunchDurationMinutes', '60'), 60)),
+            lunchEnabled,
+            lunchStart: lunchEnabled ? lunchStart : '',
+            lunchEnd: lunchEnabled ? lunchEnd : '',
+
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: (typeof currentUserEmail !== 'undefined' ? currentUserEmail : '') || ''
+        };
+
+        try {
+            await db.collection('Staff_Schedules').doc(email).set(payload, { merge: true });
+
+            const hint = document.getElementById('att_availabilityDefaultsHint');
+            if (hint) {
+                hint.textContent = 'Saved successfully. Availability will use these settings.';
+                hint.style.color = 'var(--success)';
+            }
+
+            alert('Working hours and availability defaults saved.');
+            if (typeof generateTimeSlots === 'function') generateTimeSlots();
+            setTimeout(avf_loadSelectedScheduleIntoVisibleFields, 150);
+        } catch(e) {
+            alert('Error saving schedule: ' + e.message);
+        }
+    };
+
+    // Keep UI editable and reactive.
+    document.addEventListener('change', (e) => {
+        if (!e.target) return;
+
+        if (e.target.id === 'att_schedLunchEnabled') {
+            avf_toggleFixedLunchFields();
+        }
+
+        if (e.target.id === 'att_schedTech') {
+            setTimeout(avf_loadSelectedScheduleIntoVisibleFields, 150);
+        }
+
+        if (['att_schedPrepMinutes','att_schedLunchDurationMinutes','att_schedLunchEnabled','att_schedLunchStart','att_schedLunchEnd'].includes(e.target.id)) {
+            const hint = document.getElementById('att_availabilityDefaultsHint');
+            if (hint) {
+                hint.textContent = 'Unsaved changes — click Save Working Hours to apply.';
+                hint.style.color = 'var(--accent)';
+            }
+        }
+    });
+
+    document.addEventListener('input', (e) => {
+        if (!e.target) return;
+        if (['att_schedPrepMinutes','att_schedLunchDurationMinutes'].includes(e.target.id)) {
+            const hint = document.getElementById('att_availabilityDefaultsHint');
+            if (hint) {
+                hint.textContent = 'Unsaved changes — click Save Working Hours to apply.';
+                hint.style.color = 'var(--accent)';
+            }
+        }
+    });
+
+    function boot() {
+        avf_makeEditable();
+        avf_loadSelectedScheduleIntoVisibleFields();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+
+    document.addEventListener('click', () => setTimeout(avf_makeEditable, 150));
+})();
+
