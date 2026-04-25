@@ -1,7 +1,7 @@
 
 // ============================================================
 // THURAYA STAFF AVAILABILITY UPGRADE
-// Version: availability-controls-v3-clean-ui-20260424
+// Version: availability-controls-v3-clean-ui-20260425
 // Loaded AFTER app.js and attendance.js.
 // Adds:
 // 1) Calendar block prep minutes
@@ -9,10 +9,10 @@
 // 3) Tech live lunch break toggle
 // 4) Availability engine factoring prep + lunch + blocks
 // ============================================================
-console.log('✅ Availability controls loaded: availability-controls-v3-clean-ui-20260424');
+console.log('✅ Availability controls loaded: availability-controls-v3-clean-ui-20260425');
 
 (function(){
-    const AV_VERSION = 'availability-controls-v3-clean-ui-20260424';
+    const AV_VERSION = 'availability-controls-v3-clean-ui-20260425';
 
     function av_today() {
         if (typeof todayDateStr !== 'undefined' && todayDateStr) return todayDateStr;
