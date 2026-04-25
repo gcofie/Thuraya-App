@@ -825,7 +825,7 @@ console.log('✅ Availability controls loaded: availability-controls-v2-20260424
         st.textContent = `
             .av-availability-defaults .grid-3 {
                 display:grid;
-                grid-template-columns:repeat(3,minmax(0,1fr));
+                grid-template-columns:1fr !important;
                 gap:14px;
             }
             .av-availability-defaults input,
@@ -854,5 +854,51 @@ console.log('✅ Availability controls loaded: availability-controls-v2-20260424
     });
 
     window.av_forceShowAvailabilityDefaults = avv_boot;
+})();
+
+
+// ============================================================
+// AVAILABILITY DEFAULTS SINGLE COLUMN UI
+// Version: availability-single-column-20260425
+// ============================================================
+(function(){
+    console.log('✅ Availability single-column UI loaded: availability-single-column-20260425');
+
+    function av_singleColumnStyles() {
+        if (document.getElementById('avSingleColumnStyles')) return;
+        const st = document.createElement('style');
+        st.id = 'avSingleColumnStyles';
+        st.textContent = `
+            #att_schedLunchFields.av-availability-defaults {
+                max-width: 720px;
+                margin-left: auto !important;
+                margin-right: auto !important;
+            }
+
+            #att_schedLunchFields.av-availability-defaults .grid-3 {
+                display: grid !important;
+                grid-template-columns: 1fr !important;
+                gap: 14px !important;
+            }
+
+            #att_schedLunchFields.av-availability-defaults .form-group {
+                width: 100% !important;
+            }
+
+            #att_schedLunchFields.av-availability-defaults input,
+            #att_schedLunchFields.av-availability-defaults select {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', av_singleColumnStyles);
+    } else {
+        av_singleColumnStyles();
+    }
+    document.addEventListener('click', () => setTimeout(av_singleColumnStyles, 200));
 })();
 
