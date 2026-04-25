@@ -316,6 +316,67 @@ console.log("✅ Reports V2 loaded: reports-v2-clean-filters-20260425");
                 color: rgba(255,255,255,0.82);
             }
 
+
+            .rptv2-action-bar {
+                display: flex;
+                gap: 12px;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: flex-start;
+                margin-top: 18px;
+                padding-top: 14px;
+                border-top: 1px solid var(--border);
+            }
+
+            .rptv2-action-btn {
+                width: auto;
+                min-width: 150px;
+                border-radius: 8px;
+                padding: 11px 18px;
+                font-size: 0.82rem;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                cursor: pointer;
+                transition: all 0.18s ease;
+            }
+
+            .rptv2-action-btn.primary {
+                background: var(--primary);
+                color: #fff;
+                border: 1px solid var(--primary);
+                box-shadow: 0 5px 14px rgba(47,59,79,0.16);
+            }
+
+            .rptv2-action-btn.primary:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 8px 20px rgba(47,59,79,0.22);
+            }
+
+            .rptv2-action-btn.secondary {
+                background: #fff;
+                color: var(--primary);
+                border: 1px solid var(--border);
+            }
+
+            .rptv2-action-btn.secondary:hover {
+                border-color: var(--accent);
+                color: var(--accent);
+                background: #fffaf0;
+            }
+
+            @media (max-width: 620px) {
+                .rptv2-action-bar {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+
+                .rptv2-action-btn {
+                    width: 100%;
+                }
+            }
+
+
             @media (max-width: 980px) {
                 .rptv2-menu-grid {
                     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -392,10 +453,10 @@ console.log("✅ Reports V2 loaded: reports-v2-clean-filters-20260425");
                         </div>
                     </div>
 
-                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
-                        <button class="btn btn-auto" onclick="rptv2_load()">Load Selected Report</button>
-                        <button class="btn btn-secondary btn-auto" onclick="rptv2_exportCsv()">⬇ Export CSV</button>
-                        <button class="btn btn-secondary btn-auto" onclick="window.print()">🖨 Print</button>
+                    <div class="rptv2-action-bar">
+                        <button class="rptv2-action-btn primary" onclick="rptv2_load()">Load Report</button>
+                        <button class="rptv2-action-btn secondary" onclick="rptv2_exportCsv()">⬇ Export CSV</button>
+                        <button class="rptv2-action-btn secondary" onclick="window.print()">🖨 Print</button>
                     </div>
                 </div>
 
